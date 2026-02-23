@@ -234,19 +234,19 @@
 
 ### 锁API
 
-- [ ] T090 [US6] 创建锁Handler backend/internal/api/handlers/lock.go
-- [ ] T091 [US6] 实现POST /api/v1/lock backend/internal/api/handlers/lock.go
-- [ ] T092 [US6] 实现POST /api/v1/unlock backend/internal/api/handlers/lock.go
-- [ ] T093 [US6] 实现GET /api/v1/lock/status backend/internal/api/handlers/lock.go
+- [x] T090 [US6] 创建锁Handler backend/internal/api/handlers/lock.go
+- [x] T091 [US6] 实现POST /api/v1/lock backend/internal/api/handlers/lock.go
+- [x] T092 [US6] 实现POST /api/v1/unlock backend/internal/api/handlers/lock.go
+- [x] T093 [US6] 实现GET /api/v1/lock/status backend/internal/api/handlers/lock.go
 
 ### 业务服务
 
-- [ ] T094 [US6] 创建锁服务 backend/internal/services/lock_service.go
+- [x] T094 [US6] 创建锁服务 backend/internal/services/lock_service.go
 
 ### 前端锁功能
 
-- [ ] T095 [US6] 创建锁状态组件 frontend/src/features/tasks/components/LockStatus/index.tsx
-- [ ] T096 [US6] 创建锁操作按钮 frontend/src/features/tasks/components/LockButton/index.tsx
+- [x] T095 [US6] 创建锁状态组件 frontend/src/features/tasks/components/LockStatus/index.tsx
+- [x] T096 [US6] 创建锁操作按钮 frontend/src/features/tasks/components/LockButton/index.tsx
 
 **Checkpoint**: 用户故事6完成 - 锁机制可用
 
@@ -260,21 +260,21 @@
 
 ### 通知API
 
-- [ ] T097 [US7] 创建通知Handler backend/internal/api/handlers/notification.go
-- [ ] T098 [US7] 实现GET /api/v1/notifications backend/internal/api/handlers/notification.go
-- [ ] T099 [US7] 实现POST /api/v1/notifications backend/internal/api/handlers/notification.go
-- [ ] T100 [US7] 实现POST /api/v1/notifications/:id/read backend/internal/api/handlers/notification.go
+- [x] T097 [US7] 创建通知Handler backend/internal/api/handlers/notification.go
+- [x] T098 [US7] 实现GET /api/v1/notifications backend/internal/api/handlers/notification.go
+- [x] T099 [US7] 实现POST /api/v1/notifications backend/internal/api/handlers/notification.go
+- [x] T100 [US7] 实现POST /api/v1/notifications/:id/read backend/internal/api/handlers/notification.go
 
 ### WebSocket
 
-- [ ] T101 [US7] 创建WebSocket服务 backend/internal/websocket/hub.go
-- [ ] T102 [US7] 创建WebSocket连接处理 backend/internal/websocket/connection.go
+- [x] T101 [US7] 创建WebSocket服务 backend/internal/websocket/hub.go
+- [x] T102 [US7] 创建WebSocket连接处理 backend/internal/websocket/connection.go
 
 ### 前端通知
 
-- [ ] T103 [US7] 创建通知下拉组件 frontend/src/components/feedback/NotificationDropdown/index.tsx
-- [ ] T104 [US7] 创建通知列表组件 frontend/src/features/notifications/components/NotificationList/index.tsx
-- [ ] T105 [US7] 创建WebSocket Hook frontend/src/hooks/useWebSocket.ts
+- [x] T103 [US7] 创建通知下拉组件 frontend/src/components/feedback/NotificationDropdown/index.tsx
+- [x] T104 [US7] 创建通知列表组件 frontend/src/features/notifications/components/NotificationList/index.tsx
+- [x] T105 [US7] 创建WebSocket Hook frontend/src/hooks/useWebSocket.ts
 
 **Checkpoint**: 用户故事7完成 - 通知系统可用
 
