@@ -17,14 +17,14 @@
 
 **Purpose**: 项目结构和基础配置
 
-- [ ] T001 创建后端项目结构 backend/
-- [ ] T002 初始化Go模块 backend/go.mod
-- [ ] T003 [P] 创建前端项目结构 frontend/
-- [ ] T004 [P] 初始化前端项目 frontend/package.json
-- [ ] T005 [P] 配置TypeScript frontend/tsconfig.json
-- [ ] T006 [P] 配置Vite frontend/vite.config.ts
-- [ ] T007 [P] 配置TailwindCSS frontend/tailwind.config.js
-- [ ] T008 创建CLI入口文件 cmd/aitdd/main.go
+- [x] T001 创建后端项目结构 backend/
+- [x] T002 初始化Go模块 backend/go.mod
+- [x] T003 [P] 创建前端项目结构 frontend/
+- [x] T004 [P] 初始化前端项目 frontend/package.json
+- [x] T005 [P] 配置TypeScript frontend/tsconfig.json
+- [x] T006 [P] 配置Vite frontend/vite.config.ts
+- [x] T007 [P] 配置TailwindCSS frontend/tailwind.config.js
+- [x] T008 创建CLI入口文件 cmd/aitdd/main.go
 
 ---
 
@@ -36,33 +36,33 @@
 
 ### 数据库层
 
-- [ ] T009 创建Project模型 backend/internal/models/project.go
-- [ ] T010 [P] 创建Module模型 backend/internal/models/module.go
-- [ ] T011 [P] 创建Task模型 backend/internal/models/task.go
-- [ ] T012 [P] 创建Dependency模型 backend/internal/models/dependency.go
-- [ ] T013 [P] 创建Notification模型 backend/internal/models/notification.go
-- [ ] T014 [P] 创建ChangeHistory模型 backend/internal/models/change_history.go
-- [ ] T015 [P] 创建Config模型 backend/internal/models/config.go
-- [ ] T016 创建数据库初始化脚本 backend/internal/database/init.go
-- [ ] T017 创建数据库迁移SQL backend/migrations/001_init.sql
+- [x] T009 创建Project模型 backend/internal/models/project.go
+- [x] T010 [P] 创建Module模型 backend/internal/models/module.go
+- [x] T011 [P] 创建Task模型 backend/internal/models/task.go
+- [x] T012 [P] 创建Dependency模型 backend/internal/models/dependency.go
+- [x] T013 [P] 创建Notification模型 backend/internal/models/notification.go
+- [x] T014 [P] 创建ChangeHistory模型 backend/internal/models/change_history.go
+- [x] T015 [P] 创建Config模型 backend/internal/models/config.go
+- [x] T016 创建数据库初始化脚本 backend/internal/database/init.go
+- [x] T017 创建数据库迁移SQL backend/migrations/001_init.sql
 
 ### API基础设施
 
-- [ ] T018 创建Gin路由器 backend/internal/api/routes.go
-- [ ] T019 [P] 创建CORS中间件 backend/internal/api/middleware/cors.go
-- [ ] T020 [P] 创建日志中间件 backend/internal/api/middleware/logger.go
-- [ ] T021 [P] 创建错误处理中间件 backend/internal/api/middleware/error.go
-- [ ] T022 创建统一响应结构 backend/internal/api/response.go
+- [x] T018 创建Gin路由器 backend/internal/api/routes.go
+- [x] T019 [P] 创建CORS中间件 backend/internal/api/middleware/cors.go
+- [x] T020 [P] 创建日志中间件 backend/internal/api/middleware/logger.go
+- [x] T021 [P] 创建错误处理中间件 backend/internal/api/middleware/error.go
+- [x] T022 创建统一响应结构 backend/internal/api/response.go
 
 ### 前端基础设施
 
-- [ ] T023 创建API客户端 frontend/src/services/api.ts
-- [ ] T024 [P] 创建UI状态Store frontend/src/stores/useUIStore.ts
-- [ ] T025 [P] 创建通用类型定义 frontend/src/types/common.ts
-- [ ] T026 [P] 创建API类型定义 frontend/src/types/api.ts
-- [ ] T027 创建主布局组件 frontend/src/components/layout/MainLayout/index.tsx
-- [ ] T028 [P] 创建Header组件 frontend/src/components/layout/Header/index.tsx
-- [ ] T029 [P] 创建Sidebar组件 frontend/src/components/layout/Sidebar/index.tsx
+- [x] T023 创建API客户端 frontend/src/services/api.ts
+- [x] T024 [P] 创建UI状态Store frontend/src/stores/useUIStore.ts
+- [x] T025 [P] 创建通用类型定义 frontend/src/types/common.ts
+- [x] T026 [P] 创建API类型定义 frontend/src/types/api.ts
+- [x] T027 创建主布局组件 frontend/src/components/layout/MainLayout/index.tsx
+- [x] T028 [P] 创建Header组件 frontend/src/components/layout/Header/index.tsx
+- [x] T029 [P] 创建Sidebar组件 frontend/src/components/layout/Sidebar/index.tsx
 
 **Checkpoint**: 基础设施就绪 - 可以开始用户故事实现
 
@@ -76,22 +76,22 @@
 
 ### CLI实现
 
-- [ ] T030 [US1] 实现init命令逻辑 cmd/init.go
-- [ ] T031 [US1] 创建目录结构生成器 backend/internal/services/init_service.go
-- [ ] T032 [US1] 创建数据库初始化服务 backend/internal/services/database_service.go
-- [ ] T033 [US1] 创建配置文件生成器 backend/internal/services/config_service.go
+- [x] T030 [US1] 实现init命令逻辑 cmd/init.go
+- [x] T031 [US1] 创建目录结构生成器 backend/internal/services/init_service.go
+- [x] T032 [US1] 创建数据库初始化服务 backend/internal/services/database_service.go
+- [x] T033 [US1] 创建配置文件生成器 backend/internal/services/config_service.go
 
 ### Workflow模板
 
-- [ ] T034 [P] [US1] 创建KiloCode workflow模板 backend/templates/kilocode/
-- [ ] T035 [P] [US1] 创建OpenCode workflow模板 backend/templates/opencode/
-- [ ] T036 [P] [US1] 创建ClaudeCode workflow模板 backend/templates/claudecode/
-- [ ] T037 [US1] 创建AITDD_GUIDE.md模板 backend/templates/AITDD_GUIDE.md
+- [x] T034 [P] [US1] 创建KiloCode workflow模板 backend/templates/kilocode/
+- [x] T035 [P] [US1] 创建OpenCode workflow模板 backend/templates/opencode/
+- [x] T036 [P] [US1] 创建ClaudeCode workflow模板 backend/templates/claudecode/
+- [x] T037 [US1] 创建AITDD_GUIDE.md模板 backend/templates/AITDD_GUIDE.md
 
 ### 前端初始化页面
 
-- [ ] T038 [US1] 创建欢迎/初始化页面 frontend/src/features/setup/index.tsx
-- [ ] T039 [US1] 创建插件选择组件 frontend/src/features/setup/components/PluginSelector.tsx
+- [x] T038 [US1] 创建欢迎/初始化页面 frontend/src/features/setup/index.tsx
+- [x] T039 [US1] 创建插件选择组件 frontend/src/features/setup/components/PluginSelector.tsx
 
 **Checkpoint**: 用户故事1完成 - `aitdd init`命令可用
 
@@ -105,22 +105,22 @@
 
 ### CLI实现
 
-- [ ] T040 [US2] 实现serve命令逻辑 cmd/serve.go
-- [ ] T041 [US2] 创建HTTP服务器 backend/internal/server/http.go
-- [ ] T042 [US2] 创建静态文件服务 backend/internal/server/static.go
+- [x] T040 [US2] 实现serve命令逻辑 cmd/serve.go
+- [x] T041 [US2] 创建HTTP服务器 backend/internal/server/http.go
+- [x] T042 [US2] 创建静态文件服务 backend/internal/server/static.go
 
 ### 项目API
 
-- [ ] T043 [US2] 创建项目Handler backend/internal/api/handlers/project.go
-- [ ] T044 [US2] 实现GET /api/v1/project backend/internal/api/handlers/project.go
-- [ ] T045 [US2] 实现GET /api/v1/project/constitution backend/internal/api/handlers/project.go
-- [ ] T046 [US2] 实现PUT /api/v1/project/constitution backend/internal/api/handlers/project.go
+- [x] T043 [US2] 创建项目Handler backend/internal/api/handlers/project.go
+- [x] T044 [US2] 实现GET /api/v1/project backend/internal/api/handlers/project.go
+- [x] T045 [US2] 实现GET /api/v1/project/constitution backend/internal/api/handlers/project.go
+- [x] T046 [US2] 实现PUT /api/v1/project/constitution backend/internal/api/handlers/project.go
 
 ### 前端仪表盘
 
-- [ ] T047 [US2] 创建仪表盘页面 frontend/src/features/dashboard/index.tsx
-- [ ] T048 [US2] 创建项目信息组件 frontend/src/features/dashboard/components/ProjectInfo.tsx
-- [ ] T049 [US2] 创建宪法展示组件 frontend/src/features/dashboard/components/ConstitutionView.tsx
+- [x] T047 [US2] 创建仪表盘页面 frontend/src/features/dashboard/index.tsx
+- [x] T048 [US2] 创建项目信息组件 frontend/src/features/dashboard/components/ProjectInfo.tsx
+- [x] T049 [US2] 创建宪法展示组件 frontend/src/features/dashboard/components/ConstitutionView.tsx
 
 **Checkpoint**: 用户故事2完成 - 服务启动和MCP注册可用
 
@@ -134,39 +134,39 @@
 
 ### 模块API
 
-- [ ] T050 [US3] 创建模块Handler backend/internal/api/handlers/module.go
-- [ ] T051 [US3] 实现GET /api/v1/modules backend/internal/api/handlers/module.go
-- [ ] T052 [US3] 实现GET /api/v1/modules/:id backend/internal/api/handlers/module.go
-- [ ] T053 [US3] 实现POST /api/v1/modules backend/internal/api/handlers/module.go
-- [ ] T054 [US3] 实现PUT /api/v1/modules/:id backend/internal/api/handlers/module.go
-- [ ] T055 [US3] 实现DELETE /api/v1/modules/:id backend/internal/api/handlers/module.go
-- [ ] T056 [US3] 实现GET /api/v1/modules/:id/tasks backend/internal/api/handlers/module.go
+- [x] T050 [US3] 创建模块Handler backend/internal/api/handlers/module.go
+- [x] T051 [US3] 实现GET /api/v1/modules backend/internal/api/handlers/module.go
+- [x] T052 [US3] 实现GET /api/v1/modules/:id backend/internal/api/handlers/module.go
+- [x] T053 [US3] 实现POST /api/v1/modules backend/internal/api/handlers/module.go
+- [x] T054 [US3] 实现PUT /api/v1/modules/:id backend/internal/api/handlers/module.go
+- [x] T055 [US3] 实现DELETE /api/v1/modules/:id backend/internal/api/handlers/module.go
+- [x] T056 [US3] 实现GET /api/v1/modules/:id/tasks backend/internal/api/handlers/module.go
 
 ### 任务API
 
-- [ ] T057 [US3] 创建任务Handler backend/internal/api/handlers/task.go
-- [ ] T058 [US3] 实现GET /api/v1/tasks backend/internal/api/handlers/task.go
-- [ ] T059 [US3] 实现GET /api/v1/tasks/:id backend/internal/api/handlers/task.go
-- [ ] T060 [US3] 实现POST /api/v1/tasks backend/internal/api/handlers/task.go
-- [ ] T061 [US3] 实现PUT /api/v1/tasks/:id backend/internal/api/handlers/task.go
-- [ ] T062 [US3] 实现DELETE /api/v1/tasks/:id backend/internal/api/handlers/task.go
+- [x] T057 [US3] 创建任务Handler backend/internal/api/handlers/task.go
+- [x] T058 [US3] 实现GET /api/v1/tasks backend/internal/api/handlers/task.go
+- [x] T059 [US3] 实现GET /api/v1/tasks/:id backend/internal/api/handlers/task.go
+- [x] T060 [US3] 实现POST /api/v1/tasks backend/internal/api/handlers/task.go
+- [x] T061 [US3] 实现PUT /api/v1/tasks/:id backend/internal/api/handlers/task.go
+- [x] T062 [US3] 实现DELETE /api/v1/tasks/:id backend/internal/api/handlers/task.go
 
 ### 业务服务
 
-- [ ] T063 [US3] 创建模块服务 backend/internal/services/module_service.go
-- [ ] T064 [US3] 创建任务服务 backend/internal/services/task_service.go
+- [x] T063 [US3] 创建模块服务 backend/internal/services/module_service.go
+- [x] T064 [US3] 创建任务服务 backend/internal/services/task_service.go
 
 ### 前端模块管理
 
-- [ ] T065 [US3] 创建模块树组件 frontend/src/features/modules/components/ModuleTree/index.tsx
-- [ ] T066 [US3] 创建模块树节点组件 frontend/src/features/modules/components/ModuleTree/ModuleTreeNode.tsx
-- [ ] T067 [US3] 创建模块详情组件 frontend/src/features/modules/components/ModuleDetail/index.tsx
-- [ ] T068 [US3] 创建模块表单组件 frontend/src/features/modules/components/ModuleForm/index.tsx
+- [x] T065 [US3] 创建模块树组件 frontend/src/features/modules/components/ModuleTree/index.tsx
+- [x] T066 [US3] 创建模块树节点组件 frontend/src/features/modules/components/ModuleTree/ModuleTreeNode.tsx
+- [x] T067 [US3] 创建模块详情组件 frontend/src/features/modules/components/ModuleDetail/index.tsx
+- [x] T068 [US3] 创建模块表单组件 frontend/src/features/modules/components/ModuleForm/index.tsx
 
 ### 前端任务管理
 
-- [ ] T069 [US3] 创建任务列表组件 frontend/src/features/tasks/components/TaskList/index.tsx
-- [ ] T070 [US3] 创建任务表单组件 frontend/src/features/tasks/components/TaskForm/index.tsx
+- [x] T069 [US3] 创建任务列表组件 frontend/src/features/tasks/components/TaskList/index.tsx
+- [x] T070 [US3] 创建任务表单组件 frontend/src/features/tasks/components/TaskForm/index.tsx
 
 **Checkpoint**: 用户故事3完成 - 模块和任务CRUD可用
 

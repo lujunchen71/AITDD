@@ -1,0 +1,21 @@
+.main-layout {
+  min-height: 100vh;
+  background: #1a1a2e;
+}
+
+.main-layout-content-wrapper {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #1a1a2e;
+}
+
+.main-layout-content {
+  margin: 16px;
+  padding: 24px;
+  background: #16213e;
+  border-radius: 8px;
+  flex: 1;
+  overflow: auto;
+  border: 1px solid #0f3460;
+}

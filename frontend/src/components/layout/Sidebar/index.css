@@ -1,0 +1,35 @@
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 100;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
+  background: #16213e !important;
+}
+
+.sidebar-logo {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 20px;
+  font-weight: bold;
+  background: rgba(233, 69, 96, 0.2);
+  transition: all 0.2s ease;
+  border-bottom: 1px solid #0f3460;
+}
+
+.sidebar .ant-menu {
+  border-right: none;
+  background: #16213e !important;
+}
+
+.sidebar .ant-menu-dark .ant-menu-item-selected {
+  background: #e94560 !important;
+}
+
+.sidebar .ant-menu-dark .ant-menu-item:hover {
+  background: rgba(233, 69, 96, 0.3) !important;
+}
