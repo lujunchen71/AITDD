@@ -288,14 +288,14 @@
 
 ### 同步服务
 
-- [ ] T106 [US8] 创建同步服务 backend/internal/services/sync_service.go
-- [ ] T107 [US8] 实现变更追踪 backend/internal/services/change_tracker.go
-- [ ] T108 [US8] 实现冲突检测 backend/internal/services/conflict_resolver.go
+- [x] T106 [US8] 创建同步服务 backend/internal/services/sync_service.go
+- [x] T107 [US8] 实现变更追踪 backend/internal/services/change_tracker.go
+- [x] T108 [US8] 实现冲突检测 backend/internal/services/conflict_resolver.go
 
 ### 前端同步
 
-- [ ] T109 [US8] 创建同步设置页面 frontend/src/features/settings/components/SyncSettings.tsx
-- [ ] T110 [US8] 创建冲突解决组件 frontend/src/features/settings/components/ConflictResolver.tsx
+- [x] T109 [US8] 创建同步设置页面 frontend/src/features/settings/components/SyncSettings.tsx
+- [x] T110 [US8] 创建冲突解决组件 frontend/src/features/settings/components/ConflictResolver.tsx
 
 **Checkpoint**: 用户故事8完成 - 数据同步可用
 
