@@ -180,20 +180,20 @@
 
 ### 依赖API
 
-- [ ] T071 [US4] 创建依赖Handler backend/internal/api/handlers/dependency.go
-- [ ] T072 [US4] 实现GET /api/v1/dependencies backend/internal/api/handlers/dependency.go
-- [ ] T073 [US4] 实现POST /api/v1/dependencies backend/internal/api/handlers/dependency.go
-- [ ] T074 [US4] 实现DELETE /api/v1/dependencies/:id backend/internal/api/handlers/dependency.go
-- [ ] T075 [US4] 实现循环依赖检测 backend/internal/services/dependency_service.go
+- [x] T071 [US4] 创建依赖Handler backend/internal/api/handlers/dependency.go
+- [x] T072 [US4] 实现GET /api/v1/dependencies backend/internal/api/handlers/dependency.go
+- [x] T073 [US4] 实现POST /api/v1/dependencies backend/internal/api/handlers/dependency.go
+- [x] T074 [US4] 实现DELETE /api/v1/dependencies/:id backend/internal/api/handlers/dependency.go
+- [x] T075 [US4] 实现循环依赖检测 backend/internal/services/dependency_service.go
 
 ### 业务服务
 
-- [ ] T076 [US4] 创建依赖服务 backend/internal/services/dependency_service.go
+- [x] T076 [US4] 创建依赖服务 backend/internal/services/dependency_service.go
 
 ### 前端依赖管理
 
-- [ ] T077 [US4] 创建契约编辑器组件 frontend/src/features/tasks/components/ContractEditor/index.tsx
-- [ ] T078 [US4] 创建依赖关系组件 frontend/src/features/tasks/components/DependencyList/index.tsx
+- [x] T077 [US4] 创建契约编辑器组件 frontend/src/features/tasks/components/ContractEditor/index.tsx
+- [x] T078 [US4] 创建依赖关系组件 frontend/src/features/tasks/components/DependencyList/index.tsx
 
 **Checkpoint**: 用户故事4完成 - 依赖和契约管理可用
 
