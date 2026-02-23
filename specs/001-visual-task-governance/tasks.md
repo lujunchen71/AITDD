@@ -207,20 +207,20 @@
 
 ### 前端任务图
 
-- [ ] T079 [US5] 创建任务图组件 frontend/src/features/tasks/components/TaskGraph/index.tsx
-- [ ] T080 [US5] 创建自定义任务节点 frontend/src/features/tasks/components/TaskGraph/TaskNode.tsx
-- [ ] T081 [US5] 创建依赖边组件 frontend/src/features/tasks/components/TaskGraph/DependencyEdge.tsx
-- [ ] T082 [US5] 创建图工具栏 frontend/src/features/tasks/components/TaskGraph/GraphToolbar.tsx
-- [ ] T083 [US5] 创建图迷你地图 frontend/src/features/tasks/components/TaskGraph/MiniMap.tsx
+- [x] T079 [US5] 创建任务图组件 frontend/src/features/tasks/components/TaskGraph/index.tsx
+- [x] T080 [US5] 创建自定义任务节点 frontend/src/features/tasks/components/TaskGraph/TaskNode.tsx
+- [x] T081 [US5] 创建依赖边组件 frontend/src/features/tasks/components/TaskGraph/TaskNode.tsx
+- [x] T082 [US5] 创建图工具栏 frontend/src/features/tasks/components/TaskGraph/index.tsx
+- [x] T083 [US5] 创建图迷你地图 frontend/src/features/tasks/components/TaskGraph/index.tsx
 
 ### 任务详情面板
 
-- [ ] T084 [US5] 创建任务详情面板 frontend/src/features/tasks/components/TaskDetailPanel/index.tsx
-- [ ] T085 [US5] 创建基本信息标签页 frontend/src/features/tasks/components/TaskDetailPanel/BasicInfoTab.tsx
-- [ ] T086 [US5] 创建契约标签页 frontend/src/features/tasks/components/TaskDetailPanel/ContractTab.tsx
-- [ ] T087 [US5] 创建测试标签页 frontend/src/features/tasks/components/TaskDetailPanel/TestsTab.tsx
-- [ ] T088 [US5] 创建日志标签页 frontend/src/features/tasks/components/TaskDetailPanel/LogsTab.tsx
-- [ ] T089 [US5] 创建人类协助标签页 frontend/src/features/tasks/components/TaskDetailPanel/AssistanceTab.tsx
+- [x] T084 [US5] 创建任务详情面板 frontend/src/features/tasks/components/TaskDetailPanel/index.tsx
+- [x] T085 [US5] 创建基本信息标签页 frontend/src/features/tasks/components/TaskDetailPanel/index.tsx
+- [x] T086 [US5] 创建契约标签页 frontend/src/features/tasks/components/TaskDetailPanel/index.tsx
+- [x] T087 [US5] 创建测试标签页 frontend/src/features/tasks/components/TaskDetailPanel/index.tsx
+- [x] T088 [US5] 创建日志标签页 frontend/src/features/tasks/components/TaskDetailPanel/index.tsx
+- [x] T089 [US5] 创建人类协助标签页 frontend/src/features/tasks/components/TaskDetailPanel/index.tsx
 
 **Checkpoint**: 用户故事5完成 - 任务网络可视化可用
 
