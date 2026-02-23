@@ -307,13 +307,13 @@
 
 ### 工具功能
 
-- [ ] T111 [P] 实现POST /api/v1/tools/open-browser backend/internal/api/handlers/tools.go
+- [x] T111 [P] 实现POST /api/v1/tools/open-browser backend/internal/api/handlers/tools.go
 
 ### 文档
 
-- [ ] T112 [P] 创建API文档 backend/docs/api.md
-- [ ] T113 [P] 创建用户手册 docs/user-guide.md
-- [ ] T114 [P] 创建开发文档 docs/development.md
+- [x] T112 [P] 创建API文档 backend/docs/api.md
+- [x] T113 [P] 创建用户手册 docs/user-guide.md
+- [x] T114 [P] 创建开发文档 docs/development.md
 
 ### 测试
 
@@ -322,8 +322,8 @@
 
 ### 构建
 
-- [ ] T117 创建构建脚本 scripts/build.sh
-- [ ] T118 创建发布脚本 scripts/release.sh
+- [x] T117 创建构建脚本 scripts/build.sh
+- [x] T118 创建发布脚本 scripts/release.sh
 
 ---
 
