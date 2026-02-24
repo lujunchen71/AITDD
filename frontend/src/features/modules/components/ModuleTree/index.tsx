@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Tree, Button, Empty, Spin } from 'antd';
 import { PlusOutlined, FolderOutlined, FolderOpenOutlined } from '@ant-design/icons';
@@ -19,33 +18,30 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
   selectedModuleId,
   onAddModule,
 }) => {
-  // 获取模块列表
   const { data, isLoading, error } = useQuery({
     queryKey: ['modules', projectId],
     queryFn: async () => {
       const response = await apiClient.get('/modules', {
         params: { projectId },
       });
-      return response.data;
+      // API 响应格式：{success: true, data: {modules: [], total: 0}}
+      return response.data?.data?.modules || [];
     },
   });
 
-  // 转换为树形数据
   const convertToTreeData = (modules: any[]): TreeDataNode[] => {
     const moduleMap = new Map<string, TreeDataNode>();
     const rootNodes: TreeDataNode[] = [];
 
-    // 先创建所有节点
     modules.forEach((module) => {
       moduleMap.set(module.id, {
         key: module.id,
         title: module.name,
-        icon: ({ expanded }) => expanded ? <FolderOpenOutlined /> : <FolderOutlined />,
+        icon: ({ expanded }) => expanded ? <FolderOpenOutlined style={{ color: '#00d9ff' }} /> : <FolderOutlined style={{ color: '#a0a0a0' }} />,
         children: [],
       });
     });
 
-    // 构建树结构
     modules.forEach((module) => {
       const node = moduleMap.get(module.id)!;
       if (module.parentId && moduleMap.has(module.parentId)) {
@@ -59,7 +55,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
     return rootNodes;
   };
 
-  const treeData = data?.modules ? convertToTreeData(data.modules) : [];
+  const treeData = data && Array.isArray(data) ? convertToTreeData(data) : [];
 
   const handleSelect: TreeProps['onSelect'] = (selectedKeys) => {
     if (selectedKeys.length > 0) {
@@ -69,7 +65,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
         <Spin />
       </div>
     );
@@ -77,22 +73,35 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
 
   if (error) {
     return (
-      <div className="p-4 text-red-500">
+      <div style={{ padding: '16px', color: '#ff4d4f', textAlign: 'center' }}>
         加载模块失败
       </div>
     );
   }
 
   return (
-    <div className="module-tree">
-      <div className="module-tree-header flex justify-between items-center mb-4">
-        <span className="text-lg font-medium">模块列表</span>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '12px',
+        paddingBottom: '8px',
+        borderBottom: '1px solid #2d2d44',
+      }}>
+        <span style={{ fontSize: '13px', fontWeight: 500, color: '#a0a0a0' }}>模块列表</span>
         {onAddModule && (
           <Button
             type="primary"
             icon={<PlusOutlined />}
             size="small"
             onClick={() => onAddModule()}
+            style={{
+              background: 'linear-gradient(135deg, #e94560 0%, #ff6b6b 100%)',
+              border: 'none',
+              height: 24,
+              fontSize: 12,
+            }}
           >
             新建
           </Button>
@@ -100,7 +109,11 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
       </div>
 
       {treeData.length === 0 ? (
-        <Empty description="暂无模块" />
+        <Empty 
+          description="暂无模块" 
+          imageStyle={{ opacity: 0.5 }}
+          style={{ padding: '20px 0' }}
+        />
       ) : (
         <Tree
           showIcon
@@ -108,6 +121,11 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
           selectedKeys={selectedModuleId ? [selectedModuleId] : []}
           treeData={treeData}
           onSelect={handleSelect}
+          style={{ 
+            background: 'transparent',
+            fontSize: '13px',
+          }}
+          blockNode
         />
       )}
     </div>

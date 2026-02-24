@@ -82,6 +82,23 @@ func SetupRouter() *gin.Engine {
 		{
 			tools.POST("/open-browser", handlers.OpenBrowser)
 		}
+
+		// 提示词版本相关
+		promptVersions := v1.Group("/prompt-versions")
+		{
+			promptVersions.GET("/:type/:id", handlers.GetPromptVersions)
+			promptVersions.GET("/:type/:id/:version", handlers.GetPromptVersion)
+			promptVersions.GET("/:type/:id/latest", handlers.GetLatestPromptVersion)
+			promptVersions.POST("", handlers.CreatePromptVersion)
+			promptVersions.POST("/:type/:id/compare", handlers.ComparePromptVersions)
+		}
+
+		// 图表相关
+		graph := v1.Group("/graph")
+		{
+			graph.GET("/project", handlers.GetProjectGraph)
+			graph.GET("/modules/:id/ports", handlers.GetModulePorts)
+		}
 	}
 
 	// 健康检查

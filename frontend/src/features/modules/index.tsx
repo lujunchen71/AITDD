@@ -1,22 +1,22 @@
-import React, { useState } from 'react';
-import { Row, Col, Card, Typography, Button, Empty, message, Tooltip, Spin } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Typography, Button, Empty, message, Tooltip, Spin } from 'antd';
+import { PlusOutlined, DeploymentUnitOutlined, AppstoreOutlined } from '@ant-design/icons';
 import ModuleTree from './components/ModuleTree';
 import ModuleDetail from './components/ModuleDetail';
 import ModuleForm from './components/ModuleForm';
 import TaskForm from '../tasks/components/TaskForm';
-import TaskList from '../tasks/components/TaskList';
+import ViewSwitcher from './components/ViewSwitcher';
+import ModuleGraphView from './components/ModuleGraphView';
 import { apiClient } from '../../services/api';
 import { useProjectId, useProjectStore } from '../../stores/useProjectStore';
+import { Module, ModuleDependency, Task, TaskDependency, ViewMode } from '../../types';
 
 const { Title } = Typography;
 
 const ModulesPage: React.FC = () => {
-  // 获取项目ID和初始化状态
   const projectId = useProjectId();
   const { isInitialized, isLoading } = useProjectStore();
   
-  // 模块相关状态
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [moduleFormVisible, setModuleFormVisible] = useState(false);
   const [editingModuleId, setEditingModuleId] = useState<string | undefined>();
@@ -24,18 +24,80 @@ const ModulesPage: React.FC = () => {
   const [parentIdForNew, setParentIdForNew] = useState<string | undefined>();
   const [formLoading, setFormLoading] = useState(false);
   const [editingModule, setEditingModule] = useState<any>(null);
+  
+  // 数据状态
+  const [modules, setModules] = useState<Module[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskDependencies, setTaskDependencies] = useState<TaskDependency[]>([]);
+  const [moduleDependencies, setModuleDependencies] = useState<ModuleDependency[]>([]);
 
-  // 任务相关状态
   const [taskFormVisible, setTaskFormVisible] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | undefined>();
   const [editingTask, setEditingTask] = useState<any>(null);
   const [taskFormLoading, setTaskFormLoading] = useState(false);
-  const [taskRefreshKey, setTaskRefreshKey] = useState(0);
 
-  // 检查项目是否已初始化
+  // 视图模式
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+
   const isProjectReady = isInitialized && projectId;
 
-  // ========== 模块相关处理函数 ==========
+  // 加载模块
+  useEffect(() => {
+    if (projectId) {
+      loadModules();
+    }
+  }, [projectId, refreshKey]);
+
+  // 加载选中模块的依赖
+  useEffect(() => {
+    if (selectedModuleId && viewMode === 'list') {
+      loadModuleDependencies(selectedModuleId);
+    }
+  }, [selectedModuleId, viewMode]);
+
+  // 加载项目图表数据（图形视图模式）
+  useEffect(() => {
+    if (projectId && viewMode === 'graph') {
+      loadProjectGraph();
+    }
+  }, [projectId, viewMode]);
+
+  const loadModules = async () => {
+    try {
+      const response = await apiClient.get(`/modules?projectId=${projectId}`);
+      // API 响应格式：{success: true, data: {modules: [], total: 0}}
+      setModules(response.data?.data?.modules || []);
+    } catch (error) {
+      console.error('加载模块失败:', error);
+    }
+  };
+
+  const loadModuleDependencies = async (moduleId: string) => {
+    try {
+      const response = await apiClient.get(`/modules/${moduleId}/dependencies`);
+      setModuleDependencies(response.data?.dependencies || []);
+    } catch (error) {
+      console.error('加载模块依赖失败:', error);
+    }
+  };
+
+  const loadProjectGraph = async () => {
+    try {
+      const response = await apiClient.get(`/graph/project?projectId=${projectId}`);
+      // API 响应格式：{success: true, data: {modules: [], tasks: [], ...}}
+      const graphData = response.data?.data;
+      if (graphData) {
+        setModules(graphData.modules || []);
+        setTasks(graphData.tasks || []);
+        setTaskDependencies(graphData.taskDependencies || []);
+        setModuleDependencies(graphData.moduleDependencies || []);
+      }
+    } catch (error) {
+      // 静默失败，图形视图会显示空状态
+      console.log('图形视图数据加载失败，将显示空状态');
+    }
+  };
+
   const handleSelectModule = (moduleId: string) => {
     setSelectedModuleId(moduleId);
   };
@@ -89,7 +151,7 @@ const ModulesPage: React.FC = () => {
 
   const handleModuleFormSubmit = async (values: any) => {
     if (!projectId) {
-      message.error('项目ID不存在，无法创建模块');
+      message.error('项目 ID 不存在，无法创建模块');
       return;
     }
     
@@ -118,7 +180,6 @@ const ModulesPage: React.FC = () => {
     }
   };
 
-  // ========== 任务相关处理函数 ==========
   const handleAddTask = (_moduleId: string) => {
     if (!projectId) {
       message.warning('项目尚未初始化，请稍候再试');
@@ -173,7 +234,10 @@ const ModulesPage: React.FC = () => {
       setTaskFormVisible(false);
       setEditingTaskId(undefined);
       setEditingTask(null);
-      setTaskRefreshKey((prev) => prev + 1);
+      // 刷新数据
+      if (viewMode === 'graph') {
+        loadProjectGraph();
+      }
     } catch (error: any) {
       const errorMsg = error?.response?.data?.error?.message || '操作失败';
       message.error(errorMsg);
@@ -182,23 +246,21 @@ const ModulesPage: React.FC = () => {
     }
   };
 
-  const handleTaskDeleted = () => {
-    setTaskRefreshKey((prev) => prev + 1);
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
   };
 
-  // 显示加载状态
   if (isLoading && !isInitialized) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', padding: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: '#0f0f23' }}>
         <Spin size="large" tip="正在加载项目..." />
       </div>
     );
   }
 
-  // 显示项目未初始化提示
   if (!isProjectReady) {
     return (
-      <div style={{ padding: 24 }}>
+      <div style={{ padding: 24, background: '#0f0f23', minHeight: '100vh' }}>
         <Empty
           description="项目尚未初始化，请刷新页面重试"
           style={{ padding: '40px 0' }}
@@ -211,77 +273,173 @@ const ModulesPage: React.FC = () => {
     );
   }
 
+  const selectedModule = modules.find(m => m.id === selectedModuleId);
+
   return (
-    <div style={{ padding: 24 }}>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
-        <Col>
-          <Title level={4} style={{ margin: 0 }}>
+    <div style={{ 
+      height: 'calc(100vh - 64px)', 
+      display: 'flex', 
+      flexDirection: 'column',
+      background: '#0f0f23',
+    }}>
+      {/* 顶部工具栏 */}
+      <div style={{ 
+        padding: '12px 24px', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+        borderBottom: '1px solid #2d2d44',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <DeploymentUnitOutlined style={{ fontSize: 20, color: '#e94560' }} />
+          <Title level={4} style={{ margin: 0, color: '#ffffff' }}>
             模块与任务管理
           </Title>
-        </Col>
-        <Col>
+        </div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <ViewSwitcher currentMode={viewMode} onModeChange={handleViewModeChange} />
           <Tooltip title={!projectId ? '项目初始化中...' : ''}>
             <Button
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => handleAddModule()}
               disabled={!projectId}
+              style={{ 
+                background: 'linear-gradient(135deg, #e94560 0%, #ff6b6b 100%)', 
+                border: 'none',
+                boxShadow: '0 2px 8px rgba(233, 69, 96, 0.4)',
+              }}
             >
               新建模块
             </Button>
           </Tooltip>
-        </Col>
-      </Row>
+        </div>
+      </div>
 
-      <Row gutter={16}>
-        <Col xs={24} lg={8}>
-          <Card
-            title="模块结构"
-            bordered={false}
-            style={{ height: '100%' }}
-          >
-            <ModuleTree
-              key={refreshKey}
-              projectId={projectId ?? ''}
-              onSelectModule={handleSelectModule}
-              selectedModuleId={selectedModuleId}
-              onAddModule={handleAddModule}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} lg={16}>
-          <Card
-            title={selectedModuleId ? '模块详情与任务列表' : '模块详情'}
-            bordered={false}
-            style={{ height: '100%' }}
-          >
-            {selectedModuleId ? (
-              <>
-                <ModuleDetail
-                  moduleId={selectedModuleId}
-                  onEdit={handleEditModule}
-                  onDelete={handleDeleteModule}
-                  onAddTask={handleAddTask}
-                  onEditTask={handleEditTask}
+      {/* 主内容区 */}
+      <div style={{ 
+        flex: 1, 
+        display: 'flex', 
+        overflow: 'hidden',
+        gap: '1px',
+        background: '#1a1a2e',
+      }}>
+        {viewMode === 'list' ? (
+          // 列表视图模式
+          <>
+            {/* 左栏：模块树 */}
+            <div style={{ 
+              width: '280px', 
+              background: '#16213e',
+              borderRight: '1px solid #2d2d44',
+              display: 'flex',
+              flexDirection: 'column',
+            }}>
+              <div style={{ 
+                padding: '12px 16px', 
+                borderBottom: '1px solid #2d2d44',
+                background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                color: '#a0a0a0', 
+                fontSize: '13px',
+                fontWeight: 500,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}>
+                <AppstoreOutlined />
+                模块结构
+              </div>
+              <div style={{ flex: 1, overflow: 'auto', padding: '8px' }}>
+                <ModuleTree
+                  key={refreshKey}
+                  projectId={projectId ?? ''}
+                  onSelectModule={handleSelectModule}
+                  selectedModuleId={selectedModuleId}
+                  onAddModule={handleAddModule}
                 />
-                <div style={{ marginTop: 24 }}>
-                  <TaskList
-                    key={taskRefreshKey}
-                    moduleId={selectedModuleId}
-                    onEdit={(taskId) => handleEditTask(taskId, selectedModuleId)}
-                    onDelete={handleTaskDeleted}
+              </div>
+            </div>
+
+            {/* 中栏：详情面板 */}
+            <div style={{ 
+              width: '450px', 
+              background: '#16213e',
+              borderRight: '1px solid #2d2d44',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}>
+              {selectedModule ? (
+                <>
+                  <div style={{ 
+                    padding: '12px 16px', 
+                    borderBottom: '1px solid #2d2d44',
+                    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                    color: '#a0a0a0', 
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <AppstoreOutlined />
+                      模块详情
+                    </span>
+                    <span style={{ color: '#e94560', fontSize: '12px', fontWeight: 500 }}>{selectedModule.name}</span>
+                  </div>
+                  <div style={{ flex: 1, overflow: 'auto' }}>
+                    <ModuleDetail
+                      moduleId={selectedModuleId!}
+                      onEdit={handleEditModule}
+                      onDelete={handleDeleteModule}
+                      onAddTask={handleAddTask}
+                      onEditTask={handleEditTask}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                  <Empty
+                    description="请从左侧选择一个模块查看详情和任务"
+                    style={{ padding: '40px 0' }}
+                    imageStyle={{ filter: 'hue-rotate(200deg)' }}
                   />
                 </div>
-              </>
-            ) : (
+              )}
+            </div>
+
+            {/* 右栏：占位 */}
+            <div style={{ 
+              flex: 1, 
+              background: '#0f0f23',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
               <Empty
-                description="请从左侧选择一个模块查看详情和任务"
+                description="切换到节点图表视图查看完整的依赖关系图"
                 style={{ padding: '40px 0' }}
+                imageStyle={{ filter: 'hue-rotate(200deg)' }}
               />
-            )}
-          </Card>
-        </Col>
-      </Row>
+            </div>
+          </>
+        ) : (
+          // 图形视图模式
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <ModuleGraphView
+              modules={modules}
+              tasks={tasks}
+              taskDependencies={taskDependencies}
+              moduleDependencies={moduleDependencies}
+              onModuleClick={handleSelectModule}
+              onTaskClick={(taskId: string) => handleEditTask(taskId, selectedModuleId || '')}
+            />
+          </div>
+        )}
+      </div>
 
       {/* 模块表单 */}
       <ModuleForm

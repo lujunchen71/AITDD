@@ -13,10 +13,10 @@ interface TaskListProps {
 }
 
 const statusColors: Record<string, string> = {
-  ready: 'default',
-  in_progress: 'processing',
-  done: 'success',
-  blocked: 'error',
+  ready: '#808080',
+  in_progress: '#3b82f6',
+  done: '#10b981',
+  blocked: '#ef4444',
 };
 
 const statusLabels: Record<string, string> = {
@@ -37,7 +37,6 @@ const TaskList: React.FC<TaskListProps> = ({
   const [statusFilter, setStatusFilter] = React.useState<string>('');
   const [searchText, setSearchText] = React.useState('');
 
-  // 获取任务列表
   const { data, isLoading, error } = useQuery({
     queryKey: ['tasks', moduleId, page, pageSize, statusFilter],
     queryFn: async () => {
@@ -55,17 +54,19 @@ const TaskList: React.FC<TaskListProps> = ({
       title: '任务名称',
       dataIndex: 'name',
       key: 'name',
+      width: 200,
       render: (text, record) => (
-        <a onClick={() => onEdit?.(record.id)}>{text}</a>
+        <a onClick={() => onEdit?.(record.id)} style={{ color: '#00d9ff' }}>{text}</a>
       ),
+      fixed: 'left',
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
+      width: 90,
       render: (status) => (
-        <Tag color={statusColors[status] || 'default'}>
+        <Tag style={{ background: statusColors[status] || '#404040', border: 'none', color: '#fff' }}>
           {statusLabels[status] || status}
         </Tag>
       ),
@@ -74,40 +75,40 @@ const TaskList: React.FC<TaskListProps> = ({
       title: '分配给',
       dataIndex: 'assignee',
       key: 'assignee',
-      width: 120,
-      render: (assignee) => assignee || <span className="text-gray-400">未分配</span>,
+      width: 100,
+      render: (assignee) => assignee || <span style={{ color: '#666' }}>未分配</span>,
     },
     {
       title: '版本',
       dataIndex: 'version',
       key: 'version',
-      width: 80,
-      render: (v) => `v${v}`,
+      width: 60,
+      render: (v) => <span style={{ color: '#a0a0a0' }}>v{v}</span>,
     },
     {
       title: '更新时间',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
-      width: 180,
-      render: (time) => new Date(time).toLocaleString(),
+      width: 150,
+      render: (time) => <span style={{ color: '#a0a0a0' }}>{new Date(time).toLocaleString()}</span>,
     },
     {
       title: '操作',
       key: 'action',
-      width: 120,
+      width: 80,
+      fixed: 'right',
       render: (_, record) => (
         <Space size="small">
           <Button
             type="text"
             size="small"
-            icon={<EditOutlined />}
+            icon={<EditOutlined style={{ color: '#00d9ff' }} />}
             onClick={() => onEdit?.(record.id)}
           />
           <Button
             type="text"
             size="small"
-            danger
-            icon={<DeleteOutlined />}
+            icon={<DeleteOutlined style={{ color: '#ff4d4f' }} />}
             onClick={() => onDelete?.(record.id)}
           />
         </Space>
@@ -117,7 +118,7 @@ const TaskList: React.FC<TaskListProps> = ({
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
         <Spin />
       </div>
     );
@@ -125,7 +126,7 @@ const TaskList: React.FC<TaskListProps> = ({
 
   if (error) {
     return (
-      <div className="p-4 text-red-500">
+      <div style={{ padding: '16px', color: '#ff4d4f', textAlign: 'center' }}>
         加载任务失败
       </div>
     );
@@ -134,28 +135,36 @@ const TaskList: React.FC<TaskListProps> = ({
   const tasks = data?.tasks || [];
   const total = data?.total || 0;
 
-  // 过滤搜索文本
   const filteredTasks = searchText
     ? tasks.filter((t: any) => t.name.toLowerCase().includes(searchText.toLowerCase()))
     : tasks;
 
   return (
-    <div className="task-list">
-      <div className="task-list-header flex justify-between items-center mb-4">
+    <div style={{ padding: '16px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <Space>
           <Input
             placeholder="搜索任务"
-            prefix={<SearchOutlined />}
+            prefix={<SearchOutlined style={{ color: '#666' }} />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: 200 }}
+            style={{ 
+              width: 200, 
+              background: '#1a1a2e',
+              border: '1px solid #2d2d44',
+              color: '#e0e0e0',
+            }}
             allowClear
           />
           <Select
             placeholder="状态筛选"
             value={statusFilter}
             onChange={setStatusFilter}
-            style={{ width: 120 }}
+            style={{ 
+              width: 120,
+              background: '#1a1a2e',
+              border: '1px solid #2d2d44',
+            }}
             allowClear
             options={[
               { value: 'ready', label: '就绪' },
@@ -166,14 +175,26 @@ const TaskList: React.FC<TaskListProps> = ({
           />
         </Space>
         {onAdd && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>
+          <Button 
+            type="primary" 
+            icon={<PlusOutlined />} 
+            onClick={onAdd}
+            style={{
+              background: 'linear-gradient(135deg, #e94560 0%, #ff6b6b 100%)',
+              border: 'none',
+            }}
+          >
             新建任务
           </Button>
         )}
       </div>
 
       {filteredTasks.length === 0 ? (
-        <Empty description="暂无任务" />
+        <Empty 
+          description="暂无任务" 
+          imageStyle={{ opacity: 0.5 }}
+          style={{ padding: '40px 0' }}
+        />
       ) : (
         <Table
           columns={columns}
@@ -189,6 +210,12 @@ const TaskList: React.FC<TaskListProps> = ({
               setPage(p);
               setPageSize(ps);
             },
+          }}
+          scroll={{ x: 600 }}
+          style={{ 
+            background: '#16213e',
+            borderRadius: '8px',
+            overflow: 'hidden',
           }}
         />
       )}
