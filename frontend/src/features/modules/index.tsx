@@ -65,8 +65,10 @@ const ModulesPage: React.FC = () => {
   const loadModules = async () => {
     try {
       const response = await apiClient.get(`/modules?projectId=${projectId}`);
-      // API 响应格式：{success: true, data: {modules: [], total: 0}}
-      setModules(response.data?.data?.modules || []);
+      console.log('loadModules response:', response);
+      // API 响应格式：{success: true, data: {modules: [], total: 0}} 或 {success: true, data: {data: {modules: []}}}
+      const modules = response.data?.data?.modules || response.data?.modules || [];
+      setModules(modules);
     } catch (error) {
       console.error('加载模块失败:', error);
     }

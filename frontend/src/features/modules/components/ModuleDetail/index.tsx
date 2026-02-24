@@ -66,8 +66,9 @@ const ModuleDetail: React.FC<ModuleDetailProps> = ({
     queryFn: async () => {
       if (!moduleId) return { tasks: [], total: 0 };
       const response = await apiClient.get(`/modules/${moduleId}/tasks`);
-      // API 响应格式：{success: true, data: {tasks: [], total: 0}}
-      return response.data?.data || { tasks: [], total: 0 };
+      console.log('ModuleDetail tasks response:', response);
+      // API 响应格式：{success: true, data: {tasks: [], total: 0}} 或 {success: true, data: {data: {tasks: []}}}
+      return response.data?.data?.tasks ? response.data.data : response.data?.data || { tasks: [], total: 0 };
     },
     enabled: !!moduleId && activeTab === 'tasks',
   });

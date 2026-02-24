@@ -24,8 +24,9 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
       const response = await apiClient.get('/modules', {
         params: { projectId },
       });
+      console.log('ModuleTree API response:', response);
       // API 响应格式：{success: true, data: {modules: [], total: 0}}
-      return response.data?.data?.modules || [];
+      return response.data?.data?.modules || response.data?.modules || [];
     },
   });
 
@@ -111,7 +112,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
       {treeData.length === 0 ? (
         <Empty 
           description="暂无模块" 
-          imageStyle={{ opacity: 0.5 }}
+          styles={{ image: { opacity: 0.5 } }}
           style={{ padding: '20px 0' }}
         />
       ) : (
