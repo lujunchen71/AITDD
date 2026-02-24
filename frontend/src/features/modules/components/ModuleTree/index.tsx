@@ -40,6 +40,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
         title: module.name,
         icon: ({ expanded }) => expanded ? <FolderOpenOutlined style={{ color: '#00d9ff' }} /> : <FolderOutlined style={{ color: '#a0a0a0' }} />,
         children: [],
+        isLeaf: false, // 允许展开
       });
     });
 
@@ -58,9 +59,13 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
 
   const treeData = data && Array.isArray(data) ? convertToTreeData(data) : [];
 
-  const handleSelect: TreeProps['onSelect'] = (selectedKeys) => {
+  const handleSelect: TreeProps['onSelect'] = (selectedKeys, info) => {
     if (selectedKeys.length > 0) {
       onSelectModule(selectedKeys[0] as string);
+    }
+    // 如果是点击了展开/折叠图标，不触发选择
+    if (info.selected && info.node.children && info.node.children.length > 0) {
+      // 有子节点的模块，点击时展开/折叠
     }
   };
 
