@@ -1,4 +1,10 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import {
+  ModuleDependencyWithModule,
+  ModuleDependentWithModule,
+  CreateModuleDependencyRequest,
+  UpdateModuleDependencyRequest,
+} from '../types';
 
 // API基础配置
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:34567/api/v1';
@@ -101,4 +107,34 @@ export const api = {
   },
 };
 
+// Export both named and default exports for flexibility
+export { apiClient };
 export default api;
+
+// 模块依赖API
+export const moduleDependencyApi = {
+  // 获取模块的依赖列表
+  getDependencies(moduleId: string) {
+    return api.get<{ dependencies: ModuleDependencyWithModule[]; total: number }>(`/modules/${moduleId}/dependencies`);
+  },
+
+  // 获取依赖此模块的模块列表
+  getDependents(moduleId: string) {
+    return api.get<{ dependents: ModuleDependentWithModule[]; total: number }>(`/modules/${moduleId}/dependents`);
+  },
+
+  // 创建模块依赖
+  createDependency(moduleId: string, data: CreateModuleDependencyRequest) {
+    return api.post<{ dependency: ModuleDependencyWithModule }>(`/modules/${moduleId}/dependencies`, data);
+  },
+
+  // 更新模块依赖
+  updateDependency(moduleId: string, dependencyId: string, data: UpdateModuleDependencyRequest) {
+    return api.put<{ dependency: ModuleDependencyWithModule }>(`/modules/${moduleId}/dependencies/${dependencyId}`, data);
+  },
+
+  // 删除模块依赖
+  deleteDependency(moduleId: string, dependencyId: string) {
+    return api.delete<{ deleted: boolean }>(`/modules/${moduleId}/dependencies/${dependencyId}`);
+  },
+};

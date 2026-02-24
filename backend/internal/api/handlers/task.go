@@ -3,7 +3,6 @@ package handlers
 import (
 	"time"
 
-	"github.com/aitdd/backend/internal/api"
 	"github.com/aitdd/backend/internal/database"
 	"github.com/aitdd/backend/internal/models"
 	"github.com/gin-gonic/gin"
@@ -42,11 +41,11 @@ func GetTasks(c *gin.Context) {
 
 	offset := (page - 1) * pageSize
 	if err := query.Offset(offset).Limit(pageSize).Find(&tasks).Error; err != nil {
-		api.InternalError(c, "查询任务失败")
+		InternalError(c, "查询任务失败")
 		return
 	}
 
-	api.Success(c, gin.H{
+	Success(c, gin.H{
 		"tasks":    tasks,
 		"total":    total,
 		"page":     page,
@@ -60,11 +59,11 @@ func GetTask(c *gin.Context) {
 
 	var task models.Task
 	if err := database.DB.First(&task, "id = ?", id).Error; err != nil {
-		api.NotFound(c, "任务不存在")
+		NotFound(c, "任务不存在")
 		return
 	}
 
-	api.Success(c, gin.H{
+	Success(c, gin.H{
 		"task": task,
 	})
 }
@@ -72,16 +71,16 @@ func GetTask(c *gin.Context) {
 // CreateTask 创建任务
 func CreateTask(c *gin.Context) {
 	var req struct {
-		ModuleID                 string  `json:"moduleId" binding:"required"`
-		Name                     string  `json:"name" binding:"required"`
-		Description              string  `json:"description"`
-		Prompt                   string  `json:"prompt"`
-		UpstreamContractDetail   string  `json:"upstreamContractDetail"`
-		DownstreamContractDetail string  `json:"downstreamContractDetail"`
+		ModuleID                 string `json:"moduleId" binding:"required"`
+		Name                     string `json:"name" binding:"required"`
+		Description              string `json:"description"`
+		Prompt                   string `json:"prompt"`
+		UpstreamContractDetail   string `json:"upstreamContractDetail"`
+		DownstreamContractDetail string `json:"downstreamContractDetail"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.ValidationError(c, "无效的请求数据", nil)
+		ValidationError(c, "无效的请求数据", nil)
 		return
 	}
 
@@ -101,11 +100,11 @@ func CreateTask(c *gin.Context) {
 	}
 
 	if err := database.DB.Create(&task).Error; err != nil {
-		api.InternalError(c, "创建任务失败")
+		InternalError(c, "创建任务失败")
 		return
 	}
 
-	api.Success(c, gin.H{
+	Success(c, gin.H{
 		"task": task,
 	})
 }
@@ -116,7 +115,7 @@ func UpdateTask(c *gin.Context) {
 
 	var task models.Task
 	if err := database.DB.First(&task, "id = ?", id).Error; err != nil {
-		api.NotFound(c, "任务不存在")
+		NotFound(c, "任务不存在")
 		return
 	}
 
@@ -136,19 +135,19 @@ func UpdateTask(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.ValidationError(c, "无效的请求数据", nil)
+		ValidationError(c, "无效的请求数据", nil)
 		return
 	}
 
 	// 版本检查
 	if task.Version != req.Version {
-		api.VersionConflict(c, "数据已被其他请求修改，请刷新后重试")
+		VersionConflict(c, "数据已被其他请求修改，请刷新后重试")
 		return
 	}
 
 	// 检查是否锁定
 	if task.Locked {
-		api.Locked(c, "任务已被锁定，无法修改", gin.H{
+		Locked(c, "任务已被锁定，无法修改", gin.H{
 			"lockedBy": task.LockedBy,
 		})
 		return
@@ -193,11 +192,11 @@ func UpdateTask(c *gin.Context) {
 	task.UpdatedAt = time.Now().UnixMilli()
 
 	if err := database.DB.Save(&task).Error; err != nil {
-		api.InternalError(c, "更新任务失败")
+		InternalError(c, "更新任务失败")
 		return
 	}
 
-	api.Success(c, gin.H{
+	Success(c, gin.H{
 		"task": task,
 	})
 }
@@ -208,35 +207,24 @@ func DeleteTask(c *gin.Context) {
 
 	var task models.Task
 	if err := database.DB.First(&task, "id = ?", id).Error; err != nil {
-		api.NotFound(c, "任务不存在")
+		NotFound(c, "任务不存在")
 		return
 	}
 
 	// 检查是否锁定
 	if task.Locked {
-		api.Locked(c, "任务已被锁定，无法删除", gin.H{
+		Locked(c, "任务已被锁定，无法删除", gin.H{
 			"lockedBy": task.LockedBy,
 		})
 		return
 	}
 
 	if err := database.DB.Delete(&task).Error; err != nil {
-		api.InternalError(c, "删除任务失败")
+		InternalError(c, "删除任务失败")
 		return
 	}
 
-	api.Success(c, gin.H{
+	Success(c, gin.H{
 		"deleted": true,
 	})
-}
-
-// parseInt 辅助函数
-func parseInt(s string) int {
-	var result int
-	for _, c := range s {
-		if c >= '0' && c <= '9' {
-			result = result*10 + int(c-'0')
-		}
-	}
-	return result
 }

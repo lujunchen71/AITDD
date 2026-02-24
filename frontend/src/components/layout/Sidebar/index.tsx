@@ -3,7 +3,6 @@ import { Layout, Menu } from 'antd';
 import {
   DashboardOutlined,
   AppstoreOutlined,
-  CheckSquareOutlined,
   NotificationOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
@@ -27,12 +26,7 @@ const Sidebar: React.FC = () => {
     {
       key: '/modules',
       icon: <AppstoreOutlined />,
-      label: '模块管理',
-    },
-    {
-      key: '/tasks',
-      icon: <CheckSquareOutlined />,
-      label: '任务管理',
+      label: '模块与任务',
     },
     {
       key: '/notifications',

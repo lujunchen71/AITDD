@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/aitdd/backend/internal/models"
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -62,6 +62,7 @@ func autoMigrate() error {
 		&models.Module{},
 		&models.Task{},
 		&models.Dependency{},
+		&models.ModuleDependency{},
 		&models.Notification{},
 		&models.ChangeHistory{},
 		&models.Config{},

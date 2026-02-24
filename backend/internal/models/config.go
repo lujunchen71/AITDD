@@ -1,18 +1,22 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // Config 配置
 type Config struct {
-	ID        string `gorm:"primaryKey;type:text"`
-	Key       string `gorm:"not null;unique;type:text"`
-	Value     string `gorm:"type:text"`
-	CreatedAt int64  `gorm:"not null"`
-	UpdatedAt int64  `gorm:"not null"`
+	ID        string `json:"id" gorm:"primaryKey;type:text"`
+	Key       string `json:"key" gorm:"not null;unique;type:text"`
+	Value     string `json:"value" gorm:"type:text"`
+	CreatedAt int64  `json:"createdAt" gorm:"not null"`
+	UpdatedAt int64  `json:"updatedAt" gorm:"not null"`
 }
 
 // BeforeCreate 创建前钩子
-func (c *Config) BeforeCreate() error {
+func (c *Config) BeforeCreate(_ *gorm.DB) error {
 	if c.CreatedAt == 0 {
 		c.CreatedAt = time.Now().UnixMilli()
 	}
@@ -23,7 +27,7 @@ func (c *Config) BeforeCreate() error {
 }
 
 // BeforeUpdate 更新前钩子
-func (c *Config) BeforeUpdate() error {
+func (c *Config) BeforeUpdate(_ *gorm.DB) error {
 	c.UpdatedAt = time.Now().UnixMilli()
 	return nil
 }

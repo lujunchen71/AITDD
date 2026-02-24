@@ -14,6 +14,7 @@ interface TaskFormProps {
     assignee?: string;
     upstreamContractDetail?: string;
     downstreamContractDetail?: string;
+    version?: number;
   };
   onSubmit: (values: any) => void;
   onCancel: () => void;

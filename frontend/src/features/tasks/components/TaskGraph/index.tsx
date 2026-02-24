@@ -29,7 +29,7 @@ const TaskGraph: React.FC<TaskGraphProps> = ({ moduleId, onTaskSelect }) => {
   const { data: tasksData } = useQuery({
     queryKey: ['tasks', moduleId],
     queryFn: async () => {
-      const response = await apiClient.get('/api/v1/tasks', {
+      const response = await apiClient.get('/tasks', {
         params: { moduleId, pageSize: 100 },
       });
       return response.data;
@@ -40,7 +40,7 @@ const TaskGraph: React.FC<TaskGraphProps> = ({ moduleId, onTaskSelect }) => {
   const { data: depsData } = useQuery({
     queryKey: ['dependencies', moduleId],
     queryFn: async () => {
-      const response = await apiClient.get('/api/v1/dependencies', {
+      const response = await apiClient.get('/dependencies', {
         params: { moduleId },
       });
       return response.data;
@@ -61,17 +61,17 @@ const TaskGraph: React.FC<TaskGraphProps> = ({ moduleId, onTaskSelect }) => {
 
   const initialEdges: Edge[] = (depsData?.dependencies || []).map((dep: any) => ({
     id: dep.id,
-    source: dep.moduleId,
-    target: dep.dependsOn,
+    source: dep.upstreamTaskId,
+    target: dep.downstreamTaskId,
     animated: true,
     style: { stroke: '#e94560' },
   }));
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [nodes, , onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   const onConnect = useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
+    (params: Connection) => setEdges((eds: Edge[]) => addEdge(params, eds)),
     [setEdges]
   );
 

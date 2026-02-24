@@ -3,7 +3,6 @@ package handlers
 import (
 	"time"
 
-	"github.com/aitdd/backend/internal/api"
 	"github.com/aitdd/backend/internal/database"
 	"github.com/aitdd/backend/internal/models"
 	"github.com/gin-gonic/gin"
@@ -18,13 +17,13 @@ func GetProject(c *gin.Context) {
 	result := database.DB.First(&project)
 	if result.Error != nil {
 		// 如果没有项目，返回空
-		api.Success(c, gin.H{
+		Success(c, gin.H{
 			"project": nil,
 		})
 		return
 	}
 
-	api.Success(c, gin.H{
+	Success(c, gin.H{
 		"project": project,
 	})
 }
@@ -35,11 +34,11 @@ func GetConstitution(c *gin.Context) {
 
 	result := database.DB.First(&project)
 	if result.Error != nil {
-		api.NotFound(c, "项目不存在")
+		NotFound(c, "项目不存在")
 		return
 	}
 
-	api.Success(c, gin.H{
+	Success(c, gin.H{
 		"constitution": project.Constitution,
 	})
 }
@@ -47,18 +46,21 @@ func GetConstitution(c *gin.Context) {
 // UpdateConstitution 更新项目宪法
 func UpdateConstitution(c *gin.Context) {
 	var project models.Project
+	isNewProject := false
 
 	// 获取或创建项目
 	result := database.DB.First(&project)
 	if result.Error != nil {
-		// 创建默认项目
+		// 项目不存在，标记为新项目
+		isNewProject = true
+		// 创建默认项目，版本从0开始（与前端传入的version一致）
 		project = models.Project{
 			ID:           uuid.New().String(),
 			Name:         "AITDD Project",
 			Constitution: "",
 			CreatedAt:    time.Now().UnixMilli(),
 			UpdatedAt:    time.Now().UnixMilli(),
-			Version:      1,
+			Version:      0,
 			SyncStatus:   models.SyncStatusSynced,
 		}
 	}
@@ -70,13 +72,14 @@ func UpdateConstitution(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.ValidationError(c, "无效的请求数据", nil)
+		ValidationError(c, "无效的请求数据", nil)
 		return
 	}
 
-	// 版本检查（乐观锁）
-	if project.Version != req.Version {
-		api.VersionConflict(c, "数据已被其他请求修改，请刷新后重试")
+	// 版本检查（乐观锁）- 仅对已存在的项目进行检查
+	// 如果前端传入 version: 0，说明是初始化请求，跳过版本检查
+	if !isNewProject && req.Version != 0 && project.Version != req.Version {
+		VersionConflict(c, "数据已被其他请求修改，请刷新后重试")
 		return
 	}
 
@@ -86,18 +89,18 @@ func UpdateConstitution(c *gin.Context) {
 	project.UpdatedAt = time.Now().UnixMilli()
 
 	// 保存
-	if result.Error == nil {
-		result = database.DB.Save(&project)
-	} else {
+	if isNewProject {
 		result = database.DB.Create(&project)
+	} else {
+		result = database.DB.Save(&project)
 	}
 
 	if result.Error != nil {
-		api.InternalError(c, "保存失败")
+		InternalError(c, "保存失败")
 		return
 	}
 
-	api.Success(c, gin.H{
+	Success(c, gin.H{
 		"project": project,
 	})
 }

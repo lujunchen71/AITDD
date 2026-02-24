@@ -1,18 +1,22 @@
-package models
+ package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // Notification 通知
 type Notification struct {
-	ID          string `gorm:"primaryKey;type:text"`
-	FromTaskID  string `gorm:"not null;type:text;index"`
-	ToTaskID    string `gorm:"not null;type:text;index"`
-	Type        string `gorm:"not null;type:text"`
-	Title       string `gorm:"not null;type:text"`
-	Content     string `gorm:"type:text"`
-	Read        bool   `gorm:"not null;default:false"`
-	CreatedAt   int64  `gorm:"not null"`
-	SyncStatus  string `gorm:"not null;default:'SYNCED';type:text"`
+	ID          string `json:"id" gorm:"primaryKey;type:text"`
+	FromTaskID  string `json:"fromTaskId" gorm:"not null;type:text;index"`
+	ToTaskID    string `json:"toTaskId" gorm:"not null;type:text;index"`
+	Type        string `json:"type" gorm:"not null;type:text"`
+	Title       string `json:"title" gorm:"not null;type:text"`
+	Content     string `json:"content" gorm:"type:text"`
+	Read        bool   `json:"read" gorm:"not null;default:false"`
+	CreatedAt   int64  `json:"createdAt" gorm:"not null"`
+	SyncStatus  string `json:"syncStatus" gorm:"not null;default:'SYNCED';type:text"`
 }
 
 // NotificationType 通知类型枚举
@@ -25,7 +29,7 @@ const (
 )
 
 // BeforeCreate 创建前钩子
-func (n *Notification) BeforeCreate() error {
+func (n *Notification) BeforeCreate(_ *gorm.DB) error {
 	if n.CreatedAt == 0 {
 		n.CreatedAt = time.Now().UnixMilli()
 	}

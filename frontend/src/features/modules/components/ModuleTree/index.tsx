@@ -23,7 +23,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
   const { data, isLoading, error } = useQuery({
     queryKey: ['modules', projectId],
     queryFn: async () => {
-      const response = await apiClient.get('/api/v1/modules', {
+      const response = await apiClient.get('/modules', {
         params: { projectId },
       });
       return response.data;

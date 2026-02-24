@@ -1,27 +1,31 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // Module 模块
 type Module struct {
-	ID                       string  `gorm:"primaryKey;type:text"`
-	ParentID                 *string `gorm:"type:text;index"`
-	ProjectID                string  `gorm:"not null;type:text;index"`
-	Name                     string  `gorm:"not null;type:text"`
-	Description              string  `gorm:"type:text"`
-	Prompt                   string  `gorm:"type:text"`
-	Status                   string  `gorm:"not null;default:'designing';type:text;index"`
-	TestCoverage             float64 `gorm:"default:0"`
-	UpstreamContractSummary  string  `gorm:"type:text"`
-	DownstreamContractSummary string  `gorm:"type:text"`
-	Locked                   bool    `gorm:"not null;default:false"`
-	LockedBy                 *string `gorm:"type:text"`
-	LockedAt                 *int64  `gorm:"type:integer"`
-	LockExpiresAt            *int64  `gorm:"type:integer"`
-	CreatedAt                int64   `gorm:"not null"`
-	UpdatedAt                int64   `gorm:"not null"`
-	Version                  int     `gorm:"not null;default:1"`
-	SyncStatus               string  `gorm:"not null;default:'SYNCED';type:text"`
+	ID                       string  `json:"id" gorm:"primaryKey;type:text"`
+	ParentID                 *string `json:"parentId" gorm:"type:text;index"`
+	ProjectID                string  `json:"projectId" gorm:"not null;type:text;index"`
+	Name                     string  `json:"name" gorm:"not null;type:text"`
+	Description              string  `json:"description" gorm:"type:text"`
+	Prompt                   string  `json:"prompt" gorm:"type:text"`
+	Status                   string  `json:"status" gorm:"not null;default:'designing';type:text;index"`
+	TestCoverage             float64 `json:"testCoverage" gorm:"default:0"`
+	UpstreamContractSummary  string  `json:"upstreamContractSummary" gorm:"type:text"`
+	DownstreamContractSummary string  `json:"downstreamContractSummary" gorm:"type:text"`
+	Locked                   bool    `json:"locked" gorm:"not null;default:false"`
+	LockedBy                 *string `json:"lockedBy" gorm:"type:text"`
+	LockedAt                 *int64  `json:"lockedAt" gorm:"type:integer"`
+	LockExpiresAt            *int64  `json:"lockExpiresAt" gorm:"type:integer"`
+	CreatedAt                int64   `json:"createdAt" gorm:"not null"`
+	UpdatedAt                int64   `json:"updatedAt" gorm:"not null"`
+	Version                  int     `json:"version" gorm:"not null;default:1"`
+	SyncStatus               string  `json:"syncStatus" gorm:"not null;default:'SYNCED';type:text"`
 }
 
 // ModuleStatus 模块状态枚举
@@ -33,7 +37,7 @@ const (
 )
 
 // BeforeCreate 创建前钩子
-func (m *Module) BeforeCreate() error {
+func (m *Module) BeforeCreate(_ *gorm.DB) error {
 	if m.CreatedAt == 0 {
 		m.CreatedAt = time.Now().UnixMilli()
 	}
@@ -44,7 +48,7 @@ func (m *Module) BeforeCreate() error {
 }
 
 // BeforeUpdate 更新前钩子
-func (m *Module) BeforeUpdate() error {
+func (m *Module) BeforeUpdate(_ *gorm.DB) error {
 	m.UpdatedAt = time.Now().UnixMilli()
 	return nil
 }

@@ -19,16 +19,16 @@ func NewDependencyService() *DependencyService {
 }
 
 // GetDependencies 获取依赖列表
-func (s *DependencyService) GetDependencies(moduleID string, dependsOn string) ([]models.Dependency, error) {
+func (s *DependencyService) GetDependencies(upstreamTaskID string, downstreamTaskID string) ([]models.Dependency, error) {
 	var dependencies []models.Dependency
 
 	query := database.DB.Model(&models.Dependency{})
 
-	if moduleID != "" {
-		query = query.Where("module_id = ?", moduleID)
+	if upstreamTaskID != "" {
+		query = query.Where("upstream_task_id = ?", upstreamTaskID)
 	}
-	if dependsOn != "" {
-		query = query.Where("depends_on = ?", dependsOn)
+	if downstreamTaskID != "" {
+		query = query.Where("downstream_task_id = ?", downstreamTaskID)
 	}
 
 	if err := query.Find(&dependencies).Error; err != nil {
@@ -39,24 +39,24 @@ func (s *DependencyService) GetDependencies(moduleID string, dependsOn string) (
 }
 
 // CreateDependency 创建依赖
-func (s *DependencyService) CreateDependency(moduleID, dependsOn, dependency string) (*models.Dependency, error) {
+func (s *DependencyService) CreateDependency(upstreamTaskID, downstreamTaskID, contractSummary string) (*models.Dependency, error) {
 	// 检查是否已存在
 	var existing models.Dependency
-	if err := database.DB.Where("module_id = ? AND depends_on = ?", moduleID, dependsOn).First(&existing).Error; err == nil {
+	if err := database.DB.Where("upstream_task_id = ? AND downstream_task_id = ?", upstreamTaskID, downstreamTaskID).First(&existing).Error; err == nil {
 		return nil, errors.New("依赖关系已存在")
 	}
 
 	// 检查循环依赖
-	if s.wouldCreateCycle(moduleID, dependsOn) {
+	if s.wouldCreateCycle(upstreamTaskID, downstreamTaskID) {
 		return nil, errors.New("创建此依赖将导致循环依赖")
 	}
 
 	dep := models.Dependency{
-		ID:         uuid.New().String(),
-		ModuleID:   moduleID,
-		DependsOn:  dependsOn,
-		Dependency: dependency,
-		CreatedAt:  time.Now().UnixMilli(),
+		ID:               uuid.New().String(),
+		UpstreamTaskID:   upstreamTaskID,
+		DownstreamTaskID: downstreamTaskID,
+		ContractSummary:  contractSummary,
+		CreatedAt:        time.Now().UnixMilli(),
 	}
 
 	if err := database.DB.Create(&dep).Error; err != nil {
@@ -80,10 +80,10 @@ func (s *DependencyService) DeleteDependency(id string) error {
 }
 
 // wouldCreateCycle 检查是否会创建循环依赖
-func (s *DependencyService) wouldCreateCycle(moduleID, dependsOn string) bool {
-	// 如果 dependsOn 依赖于 moduleID（直接或间接），则创建循环
+func (s *DependencyService) wouldCreateCycle(upstreamTaskID, downstreamTaskID string) bool {
+	// 如果 downstreamTaskID 依赖于 upstreamTaskID（直接或间接），则创建循环
 	visited := make(map[string]bool)
-	return s.hasPath(dependsOn, moduleID, visited)
+	return s.hasPath(downstreamTaskID, upstreamTaskID, visited)
 }
 
 // hasPath 检查从 start 到 target 是否存在路径
@@ -98,10 +98,10 @@ func (s *DependencyService) hasPath(start, target string, visited map[string]boo
 	visited[start] = true
 
 	var dependencies []models.Dependency
-	database.DB.Where("module_id = ?", start).Find(&dependencies)
+	database.DB.Where("downstream_task_id = ?", start).Find(&dependencies)
 
 	for _, dep := range dependencies {
-		if s.hasPath(dep.DependsOn, target, visited) {
+		if s.hasPath(dep.UpstreamTaskID, target, visited) {
 			return true
 		}
 	}
@@ -109,28 +109,30 @@ func (s *DependencyService) hasPath(start, target string, visited map[string]boo
 	return false
 }
 
-// GetModuleDependencies 获取模块的所有依赖（直接和间接）
-func (s *DependencyService) GetModuleDependencies(moduleID string) ([]models.Dependency, error) {
+// GetTaskDependencies 获取任务的所有依赖（直接和间接）
+func (s *DependencyService) GetTaskDependencies(taskID string) ([]models.Dependency, error) {
 	var dependencies []models.Dependency
 
 	// 递归获取所有依赖
-	s.collectDependencies(moduleID, &dependencies, make(map[string]bool))
+	s.collectDependencies(taskID, &dependencies, make(map[string]bool))
 
 	return dependencies, nil
 }
 
 // collectDependencies 递归收集依赖
-func (s *DependencyService) collectDependencies(moduleID string, deps *[]models.Dependency, visited map[string]bool) {
-	if visited[moduleID] {
+func (s *DependencyService) collectDependencies(taskID string, deps *[]models.Dependency, visited map[string]bool) {
+	if visited[taskID] {
 		return
 	}
-	visited[moduleID] = true
+	visited[taskID] = true
 
+	// 获取当前任务作为下游任务的所有依赖关系
 	var directDeps []models.Dependency
-	database.DB.Where("module_id = ?", moduleID).Find(&directDeps)
+	database.DB.Where("downstream_task_id = ?", taskID).Find(&directDeps)
 
 	for _, dep := range directDeps {
 		*deps = append(*deps, dep)
-		s.collectDependencies(dep.DependsOn, deps, visited)
+		// 递归获取上游任务的依赖
+		s.collectDependencies(dep.UpstreamTaskID, deps, visited)
 	}
 }

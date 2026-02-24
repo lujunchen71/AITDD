@@ -1,30 +1,34 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // Task 任务
 type Task struct {
-	ID                     string  `gorm:"primaryKey;type:text"`
-	ModuleID               string  `gorm:"not null;type:text;index"`
-	Name                   string  `gorm:"not null;type:text"`
-	Description            string  `gorm:"type:text"`
-	Status                 string  `gorm:"not null;default:'ready';type:text;index"`
-	Assignee               *string `gorm:"type:text"`
-	UpstreamContractDetail string  `gorm:"type:text"`
-	DownstreamContractDetail string `gorm:"type:text"`
-	Prompt                 string  `gorm:"type:text"`
-	Tests                  string  `gorm:"type:text"` // JSON array
-	Logs                   string  `gorm:"type:text"` // JSON array
-	CodePaths              string  `gorm:"type:text"` // JSON array
-	HumanAssistance        string  `gorm:"type:text"` // JSON object
-	Locked                 bool    `gorm:"not null;default:false"`
-	LockedBy               *string `gorm:"type:text"`
-	LockedAt               *int64  `gorm:"type:integer"`
-	LockExpiresAt          *int64  `gorm:"type:integer"`
-	CreatedAt              int64   `gorm:"not null"`
-	UpdatedAt              int64   `gorm:"not null"`
-	Version                int     `gorm:"not null;default:1"`
-	SyncStatus             string  `gorm:"not null;default:'SYNCED';type:text"`
+	ID                     string  `json:"id" gorm:"primaryKey;type:text"`
+	ModuleID               string  `json:"moduleId" gorm:"not null;type:text;index"`
+	Name                   string  `json:"name" gorm:"not null;type:text"`
+	Description            string  `json:"description" gorm:"type:text"`
+	Status                 string  `json:"status" gorm:"not null;default:'ready';type:text;index"`
+	Assignee               *string `json:"assignee" gorm:"type:text"`
+	UpstreamContractDetail string  `json:"upstreamContractDetail" gorm:"type:text"`
+	DownstreamContractDetail string `json:"downstreamContractDetail" gorm:"type:text"`
+	Prompt                 string  `json:"prompt" gorm:"type:text"`
+	Tests                  string  `json:"tests" gorm:"type:text"` // JSON array
+	Logs                   string  `json:"logs" gorm:"type:text"` // JSON array
+	CodePaths              string  `json:"codePaths" gorm:"type:text"` // JSON array
+	HumanAssistance        string  `json:"humanAssistance" gorm:"type:text"` // JSON object
+	Locked                 bool    `json:"locked" gorm:"not null;default:false"`
+	LockedBy               *string `json:"lockedBy" gorm:"type:text"`
+	LockedAt               *int64  `json:"lockedAt" gorm:"type:integer"`
+	LockExpiresAt          *int64  `json:"lockExpiresAt" gorm:"type:integer"`
+	CreatedAt              int64   `json:"createdAt" gorm:"not null"`
+	UpdatedAt              int64   `json:"updatedAt" gorm:"not null"`
+	Version                int     `json:"version" gorm:"not null;default:1"`
+	SyncStatus             string  `json:"syncStatus" gorm:"not null;default:'SYNCED';type:text"`
 }
 
 // TaskStatus 任务状态枚举
@@ -39,7 +43,7 @@ const (
 )
 
 // BeforeCreate 创建前钩子
-func (t *Task) BeforeCreate() error {
+func (t *Task) BeforeCreate(_ *gorm.DB) error {
 	if t.CreatedAt == 0 {
 		t.CreatedAt = time.Now().UnixMilli()
 	}
@@ -50,7 +54,7 @@ func (t *Task) BeforeCreate() error {
 }
 
 // BeforeUpdate 更新前钩子
-func (t *Task) BeforeUpdate() error {
+func (t *Task) BeforeUpdate(_ *gorm.DB) error {
 	t.UpdatedAt = time.Now().UnixMilli()
 	return nil
 }

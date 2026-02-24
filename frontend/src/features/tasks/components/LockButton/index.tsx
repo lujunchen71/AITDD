@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button, Tooltip, message, Modal, Input, Space } from 'antd';
 import { LockOutlined, UnlockOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '../../../services/api';
+import { apiClient } from '../../../../services/api';
 
 interface LockButtonProps {
   resourceType: 'module' | 'task';
@@ -29,7 +29,7 @@ const LockButton: React.FC<LockButtonProps> = ({
 
   const lockMutation = useMutation({
     mutationFn: async (agent: string) => {
-      const response = await apiClient.post('/api/v1/lock', {
+      const response = await apiClient.post('/lock', {
         resourceType,
         resourceId,
         lockedBy: agent,
@@ -52,7 +52,7 @@ const LockButton: React.FC<LockButtonProps> = ({
 
   const unlockMutation = useMutation({
     mutationFn: async (agent: string) => {
-      const response = await apiClient.delete('/api/v1/lock', {
+      const response = await apiClient.delete('/lock', {
         data: {
           resourceType,
           resourceId,

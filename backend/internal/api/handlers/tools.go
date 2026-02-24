@@ -4,7 +4,6 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/aitdd/backend/internal/api"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,7 +14,7 @@ func OpenBrowser(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.ValidationError(c, "无效的请求数据", nil)
+		ValidationError(c, "无效的请求数据", nil)
 		return
 	}
 
@@ -28,16 +27,16 @@ func OpenBrowser(c *gin.Context) {
 	case "darwin":
 		cmd = exec.Command("open", req.URL)
 	default:
-		api.ValidationError(c, "不支持的操作系统", nil)
+		ValidationError(c, "不支持的操作系统", nil)
 		return
 	}
 
 	if err := cmd.Start(); err != nil {
-		api.InternalError(c, "打开浏览器失败")
+		InternalError(c, "打开浏览器失败")
 		return
 	}
 
-	api.Success(c, gin.H{
+	Success(c, gin.H{
 		"opened": true,
 		"url":    req.URL,
 	})

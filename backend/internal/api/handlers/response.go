@@ -1,10 +1,17 @@
-package api
+package handlers
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+// parseInt 解析整数
+func parseInt(s string) int {
+	n, _ := strconv.Atoi(s)
+	return n
+}
 
 // Response 统一响应结构
 type Response struct {
@@ -23,12 +30,12 @@ type ErrorInfo struct {
 
 // 错误码常量
 const (
-	ErrCodeNotFound            = "NOT_FOUND"
-	ErrCodeVersionConflict     = "VERSION_CONFLICT"
-	ErrCodeLocked              = "LOCKED"
-	ErrCodeValidationError     = "VALIDATION_ERROR"
-	ErrCodeCircularDependency  = "CIRCULAR_DEPENDENCY"
-	ErrCodeInternalError       = "INTERNAL_ERROR"
+	ErrCodeNotFound           = "NOT_FOUND"
+	ErrCodeVersionConflict    = "VERSION_CONFLICT"
+	ErrCodeLocked             = "LOCKED"
+	ErrCodeValidationError    = "VALIDATION_ERROR"
+	ErrCodeCircularDependency = "CIRCULAR_DEPENDENCY"
+	ErrCodeInternalError      = "INTERNAL_ERROR"
 )
 
 // Success 成功响应
@@ -81,4 +88,9 @@ func Locked(c *gin.Context, message string, details map[string]interface{}) {
 // InternalError 内部错误响应
 func InternalError(c *gin.Context, message string) {
 	Error(c, 500, ErrCodeInternalError, message)
+}
+
+// BadRequest 返回400错误响应
+func BadRequest(c *gin.Context, message string) {
+	Error(c, 400, ErrCodeValidationError, message)
 }

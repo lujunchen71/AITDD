@@ -35,6 +35,12 @@ func SetupRouter() *gin.Engine {
 			modules.PUT("/:id", handlers.UpdateModule)
 			modules.DELETE("/:id", handlers.DeleteModule)
 			modules.GET("/:id/tasks", handlers.GetModuleTasks)
+			// 模块依赖相关
+			modules.GET("/:id/dependencies", handlers.GetModuleDependencies)
+			modules.GET("/:id/dependents", handlers.GetModuleDependents)
+			modules.POST("/:id/dependencies", handlers.CreateModuleDependency)
+			modules.PUT("/:id/dependencies/:depId", handlers.UpdateModuleDependency)
+			modules.DELETE("/:id/dependencies/:depId", handlers.DeleteModuleDependency)
 		}
 
 		// 任务相关

@@ -12,6 +12,7 @@ interface ModuleFormProps {
     status?: string;
     testCoverage?: number;
     parentId?: string;
+    version?: number;
   };
   parentId?: string;
   onSubmit: (values: any) => void;

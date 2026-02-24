@@ -6,14 +6,29 @@ import apiClient from '../../../services/api';
 
 const { Title, Text } = Typography;
 
+interface SyncConfig {
+  syncEnabled: boolean;
+  syncInterval: string;
+  remoteUrl: string;
+}
+
+interface SyncStatus {
+  status: 'synced' | 'pending' | 'error';
+  lastSyncTime: number | null;
+}
+
+interface SyncResult {
+  syncedItems: number;
+}
+
 const SyncSettings: React.FC = () => {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
 
-  const { data: syncConfig, isLoading } = useQuery({
+  const { data: syncConfig } = useQuery({
     queryKey: ['sync', 'config'],
     queryFn: async () => {
-      const response = await apiClient.get('/api/v1/sync/config');
+      const response = await apiClient.get<SyncConfig>('/sync/config');
       return response.data;
     },
   });
@@ -21,15 +36,15 @@ const SyncSettings: React.FC = () => {
   const { data: syncStatus } = useQuery({
     queryKey: ['sync', 'status'],
     queryFn: async () => {
-      const response = await apiClient.get('/api/v1/sync/status');
+      const response = await apiClient.get<SyncStatus>('/sync/status');
       return response.data;
     },
     refetchInterval: 30000, // 每30秒刷新
   });
 
   const saveConfigMutation = useMutation({
-    mutationFn: async (values: any) => {
-      await apiClient.post('/api/v1/sync/config', values);
+    mutationFn: async (values: SyncConfig) => {
+      await apiClient.post('/sync/config', values);
     },
     onSuccess: () => {
       message.success('同步配置已保存');
@@ -42,11 +57,13 @@ const SyncSettings: React.FC = () => {
 
   const syncNowMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiClient.post('/api/v1/sync/execute');
+      const response = await apiClient.post<SyncResult>('/sync/execute');
       return response.data;
     },
     onSuccess: (data) => {
-      message.success(`同步完成: ${data.syncedItems} 项已同步`);
+      if (data) {
+        message.success(`同步完成: ${data.syncedItems} 项已同步`);
+      }
       queryClient.invalidateQueries({ queryKey: ['sync'] });
     },
     onError: () => {
@@ -54,7 +71,7 @@ const SyncSettings: React.FC = () => {
     },
   });
 
-  const formatTime = (timestamp: number) => {
+  const formatTime = (timestamp: number | null | undefined) => {
     if (!timestamp) return '从未同步';
     return new Date(timestamp).toLocaleString('zh-CN');
   };

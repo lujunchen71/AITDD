@@ -20,7 +20,7 @@ const DependencyList: React.FC<DependencyListProps> = ({ moduleId, dependsOn }) 
       if (moduleId) params.moduleId = moduleId;
       if (dependsOn) params.dependsOn = dependsOn;
 
-      const response = await apiClient.get('/api/v1/dependencies', { params });
+      const response = await apiClient.get('/dependencies', { params });
       return response.data;
     },
   });
@@ -28,7 +28,7 @@ const DependencyList: React.FC<DependencyListProps> = ({ moduleId, dependsOn }) 
   // 删除依赖
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiClient.delete(`/api/v1/dependencies/${id}`);
+      await apiClient.delete(`/dependencies/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dependencies'] });
@@ -90,12 +90,12 @@ const DependencyList: React.FC<DependencyListProps> = ({ moduleId, dependsOn }) 
               <List.Item.Meta
                 title={
                   <span>
-                    <Tag color="blue">{dep.moduleId?.slice(0, 8)}</Tag>
+                    <Tag color="blue">{dep.upstreamTaskId?.slice(0, 8)}</Tag>
                     <span className="mx-2">→</span>
-                    <Tag color="green">{dep.dependsOn?.slice(0, 8)}</Tag>
+                    <Tag color="green">{dep.downstreamTaskId?.slice(0, 8)}</Tag>
                   </span>
                 }
-                description={dep.dependency || '无描述'}
+                description={dep.contractSummary || '无描述'}
               />
             </List.Item>
           )}

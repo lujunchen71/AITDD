@@ -45,7 +45,7 @@ const TaskList: React.FC<TaskListProps> = ({
       if (moduleId) params.moduleId = moduleId;
       if (statusFilter) params.status = statusFilter;
 
-      const response = await apiClient.get('/api/v1/tasks', { params });
+      const response = await apiClient.get('/tasks', { params });
       return response.data;
     },
   });

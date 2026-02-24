@@ -1,16 +1,20 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // ChangeHistory 变更历史
 type ChangeHistory struct {
-	ID         string `gorm:"primaryKey;type:text"`
-	EntityType string `gorm:"not null;type:text;index"` // project, module, task, dependency
-	EntityID   string `gorm:"not null;type:text;index"`
-	Action     string `gorm:"not null;type:text"` // create, update, delete
-	Changes    string `gorm:"type:text"` // JSON object
-	ChangedBy  string `gorm:"type:text"`
-	CreatedAt  int64  `gorm:"not null"`
+	ID         string `json:"id" gorm:"primaryKey;type:text"`
+	EntityType string `json:"entityType" gorm:"not null;type:text;index"` // project, module, task, dependency
+	EntityID   string `json:"entityId" gorm:"not null;type:text;index"`
+	Action     string `json:"action" gorm:"not null;type:text"` // create, update, delete
+	Changes    string `json:"changes" gorm:"type:text"` // JSON object
+	ChangedBy  string `json:"changedBy" gorm:"type:text"`
+	CreatedAt  int64  `json:"createdAt" gorm:"not null"`
 }
 
 // EntityType 实体类型枚举
@@ -29,7 +33,7 @@ const (
 )
 
 // BeforeCreate 创建前钩子
-func (c *ChangeHistory) BeforeCreate() error {
+func (c *ChangeHistory) BeforeCreate(_ *gorm.DB) error {
 	if c.CreatedAt == 0 {
 		c.CreatedAt = time.Now().UnixMilli()
 	}

@@ -3,14 +3,13 @@ package handlers
 import (
 	"time"
 
-	"github.com/aitdd/backend/internal/api"
 	"github.com/aitdd/backend/internal/database"
 	"github.com/gin-gonic/gin"
 )
 
 // LockRequest 锁定请求
 type LockRequest struct {
-	ResourceType string `json:"resourceType" binding:"required"` // module 或 task
+	ResourceType string `json:"resourceType" binding:"required"` // module or task
 	ResourceID   string `json:"resourceId" binding:"required"`
 	LockedBy     string `json:"lockedBy" binding:"required"` // AI代理标识
 }
@@ -19,7 +18,7 @@ type LockRequest struct {
 func LockResource(c *gin.Context) {
 	var req LockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.ValidationError(c, "无效的请求数据", nil)
+		ValidationError(c, "无效的请求数据", nil)
 		return
 	}
 
@@ -28,18 +27,18 @@ func LockResource(c *gin.Context) {
 	switch req.ResourceType {
 	case "module":
 		var module struct {
-			ID        string
-			Locked    bool
-			LockedBy  *string
-			LockedAt  *int64
-			Version   int
+			ID       string
+			Locked   bool
+			LockedBy *string
+			LockedAt *int64
+			Version  int
 		}
 		if err := database.DB.Table("modules").Where("id = ?", req.ResourceID).First(&module).Error; err != nil {
-			api.NotFound(c, "模块不存在")
+			NotFound(c, "模块不存在")
 			return
 		}
 		if module.Locked {
-			api.Locked(c, "资源已被锁定", gin.H{
+			Locked(c, "资源已被锁定", gin.H{
 				"lockedBy": module.LockedBy,
 				"lockedAt": module.LockedAt,
 			})
@@ -50,7 +49,7 @@ func LockResource(c *gin.Context) {
 			"locked_by": req.LockedBy,
 			"locked_at": now,
 		}).Error; err != nil {
-			api.InternalError(c, "锁定失败")
+			InternalError(c, "锁定失败")
 			return
 		}
 
@@ -62,11 +61,11 @@ func LockResource(c *gin.Context) {
 			LockedAt *int64
 		}
 		if err := database.DB.Table("tasks").Where("id = ?", req.ResourceID).First(&task).Error; err != nil {
-			api.NotFound(c, "任务不存在")
+			NotFound(c, "任务不存在")
 			return
 		}
 		if task.Locked {
-			api.Locked(c, "资源已被锁定", gin.H{
+			Locked(c, "资源已被锁定", gin.H{
 				"lockedBy": task.LockedBy,
 				"lockedAt": task.LockedAt,
 			})
@@ -77,16 +76,16 @@ func LockResource(c *gin.Context) {
 			"locked_by": req.LockedBy,
 			"locked_at": now,
 		}).Error; err != nil {
-			api.InternalError(c, "锁定失败")
+			InternalError(c, "锁定失败")
 			return
 		}
 
 	default:
-		api.ValidationError(c, "不支持的资源类型", nil)
+		ValidationError(c, "不支持的资源类型", nil)
 		return
 	}
 
-	api.Success(c, gin.H{
+	Success(c, gin.H{
 		"locked":    true,
 		"lockedBy":  req.LockedBy,
 		"lockedAt":  now,
@@ -97,7 +96,7 @@ func LockResource(c *gin.Context) {
 func UnlockResource(c *gin.Context) {
 	var req LockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.ValidationError(c, "无效的请求数据", nil)
+		ValidationError(c, "无效的请求数据", nil)
 		return
 	}
 
@@ -109,11 +108,11 @@ func UnlockResource(c *gin.Context) {
 			"locked_at": nil,
 		})
 		if result.Error != nil {
-			api.InternalError(c, "解锁失败")
+			InternalError(c, "解锁失败")
 			return
 		}
 		if result.RowsAffected == 0 {
-			api.NotFound(c, "未找到锁定的资源或无权解锁")
+			NotFound(c, "未找到锁定的资源或无权解锁")
 			return
 		}
 
@@ -124,20 +123,20 @@ func UnlockResource(c *gin.Context) {
 			"locked_at": nil,
 		})
 		if result.Error != nil {
-			api.InternalError(c, "解锁失败")
+			InternalError(c, "解锁失败")
 			return
 		}
 		if result.RowsAffected == 0 {
-			api.NotFound(c, "未找到锁定的资源或无权解锁")
+			NotFound(c, "未找到锁定的资源或无权解锁")
 			return
 		}
 
 	default:
-		api.ValidationError(c, "不支持的资源类型", nil)
+		ValidationError(c, "不支持的资源类型", nil)
 		return
 	}
 
-	api.Success(c, gin.H{
+	Success(c, gin.H{
 		"unlocked": true,
 	})
 }
@@ -148,7 +147,7 @@ func GetLockStatus(c *gin.Context) {
 	resourceID := c.Query("resourceId")
 
 	if resourceType == "" || resourceID == "" {
-		api.ValidationError(c, "缺少必要参数", nil)
+		ValidationError(c, "缺少必要参数", nil)
 		return
 	}
 
@@ -161,10 +160,10 @@ func GetLockStatus(c *gin.Context) {
 			LockedAt *int64
 		}
 		if err := database.DB.Table("modules").Where("id = ?", resourceID).First(&module).Error; err != nil {
-			api.NotFound(c, "模块不存在")
+			NotFound(c, "模块不存在")
 			return
 		}
-		api.Success(c, gin.H{
+		Success(c, gin.H{
 			"locked":   module.Locked,
 			"lockedBy": module.LockedBy,
 			"lockedAt": module.LockedAt,
@@ -178,16 +177,16 @@ func GetLockStatus(c *gin.Context) {
 			LockedAt *int64
 		}
 		if err := database.DB.Table("tasks").Where("id = ?", resourceID).First(&task).Error; err != nil {
-			api.NotFound(c, "任务不存在")
+			NotFound(c, "任务不存在")
 			return
 		}
-		api.Success(c, gin.H{
+		Success(c, gin.H{
 			"locked":   task.Locked,
 			"lockedBy": task.LockedBy,
 			"lockedAt": task.LockedAt,
 		})
 
 	default:
-		api.ValidationError(c, "不支持的资源类型", nil)
+		ValidationError(c, "不支持的资源类型", nil)
 	}
 }

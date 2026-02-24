@@ -2,7 +2,7 @@ import React from 'react';
 import { List, Card, Tag, Button, Empty, Spin, Typography, Space } from 'antd';
 import { CheckOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '../../../services/api';
+import { apiClient } from '../../../../services/api';
 
 interface Notification {
   id: string;
@@ -20,7 +20,7 @@ const NotificationList: React.FC = () => {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['notifications', 'all'],
     queryFn: async () => {
-      const response = await apiClient.get('/api/v1/notifications', {
+      const response = await apiClient.get('/notifications', {
         params: { pageSize: 50 },
       });
       return response.data;
@@ -29,7 +29,7 @@ const NotificationList: React.FC = () => {
 
   const markReadMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiClient.post(`/api/v1/notifications/${id}/read`);
+      await apiClient.post(`/notifications/${id}/read`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });

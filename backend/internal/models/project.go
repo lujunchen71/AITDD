@@ -1,16 +1,20 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 // Project 项目信息
 type Project struct {
-	ID           string `gorm:"primaryKey;type:text"`
-	Name         string `gorm:"not null;type:text"`
-	Constitution string `gorm:"type:text"`
-	CreatedAt    int64  `gorm:"not null"`
-	UpdatedAt    int64  `gorm:"not null"`
-	Version      int    `gorm:"not null;default:1"`
-	SyncStatus   string `gorm:"not null;default:'SYNCED';type:text"`
+	ID           string `json:"id" gorm:"primaryKey;type:text"`
+	Name         string `json:"name" gorm:"not null;type:text"`
+	Constitution string `json:"constitution" gorm:"type:text"`
+	CreatedAt    int64  `json:"createdAt" gorm:"not null"`
+	UpdatedAt    int64  `json:"updatedAt" gorm:"not null"`
+	Version      int    `json:"version" gorm:"not null;default:1"`
+	SyncStatus   string `json:"syncStatus" gorm:"not null;default:'SYNCED';type:text"`
 }
 
 // SyncStatus 同步状态枚举
@@ -22,7 +26,7 @@ const (
 )
 
 // BeforeCreate 创建前钩子
-func (p *Project) BeforeCreate() error {
+func (p *Project) BeforeCreate(_ *gorm.DB) error {
 	if p.CreatedAt == 0 {
 		p.CreatedAt = time.Now().UnixMilli()
 	}
@@ -33,7 +37,7 @@ func (p *Project) BeforeCreate() error {
 }
 
 // BeforeUpdate 更新前钩子
-func (p *Project) BeforeUpdate() error {
+func (p *Project) BeforeUpdate(_ *gorm.DB) error {
 	p.UpdatedAt = time.Now().UnixMilli()
 	return nil
 }

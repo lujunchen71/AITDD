@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Badge, Dropdown, List, Button, Empty, Spin, Typography } from 'antd';
-import { BellOutlined, CheckOutlined, DeleteOutlined } from '@ant-design/icons';
+import { BellOutlined, CheckOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '../../../services/api';
+import { apiClient } from '../../../services/api';
 
 interface Notification {
   id: string;
@@ -14,6 +14,11 @@ interface Notification {
   createdAt: number;
 }
 
+interface NotificationsResponse {
+  notifications: Notification[];
+  total: number;
+}
+
 const NotificationDropdown: React.FC = () => {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -21,7 +26,7 @@ const NotificationDropdown: React.FC = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['notifications', 'unread'],
     queryFn: async () => {
-      const response = await apiClient.get('/api/v1/notifications', {
+      const response = await apiClient.get<NotificationsResponse>('/notifications', {
         params: { unread: true, pageSize: 10 },
       });
       return response.data;
@@ -30,7 +35,7 @@ const NotificationDropdown: React.FC = () => {
 
   const markReadMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiClient.post(`/api/v1/notifications/${id}/read`);
+      await apiClient.post(`/notifications/${id}/read`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });

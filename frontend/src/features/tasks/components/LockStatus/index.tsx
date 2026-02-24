@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tag, Tooltip, Space } from 'antd';
+import { Tag, Space } from 'antd';
 import { LockOutlined, UnlockOutlined, UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
 
 interface LockStatusProps {

@@ -17,6 +17,10 @@ interface Conflict {
   resolution?: string;
 }
 
+interface ConflictsResponse {
+  conflicts: Conflict[];
+}
+
 const ConflictResolver: React.FC = () => {
   const [selectedConflict, setSelectedConflict] = useState<Conflict | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -25,14 +29,14 @@ const ConflictResolver: React.FC = () => {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['conflicts'],
     queryFn: async () => {
-      const response = await apiClient.get('/api/v1/sync/conflicts');
+      const response = await apiClient.get<ConflictsResponse>('/sync/conflicts');
       return response.data;
     },
   });
 
   const resolveMutation = useMutation({
     mutationFn: async ({ conflictId, resolution, mergedData }: { conflictId: string; resolution: string; mergedData?: any }) => {
-      await apiClient.post(`/api/v1/sync/conflicts/${conflictId}/resolve`, {
+      await apiClient.post(`/sync/conflicts/${conflictId}/resolve`, {
         resolution,
         mergedData,
       });

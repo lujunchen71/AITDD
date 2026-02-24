@@ -1,10 +1,8 @@
 import React from 'react';
-import { Card, Typography, Button, Empty } from 'antd';
+import { Card, Button, Empty } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../../services/api';
-
-const { Title, Paragraph } = Typography;
 
 const ConstitutionView: React.FC = () => {
   const { data, isLoading } = useQuery({

@@ -27,7 +27,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ taskId, onClose }) =>
     queryKey: ['task', taskId],
     queryFn: async () => {
       if (!taskId) return null;
-      const response = await apiClient.get(`/api/v1/tasks/${taskId}`);
+      const response = await apiClient.get(`/tasks/${taskId}`);
       return response.data;
     },
     enabled: !!taskId,
