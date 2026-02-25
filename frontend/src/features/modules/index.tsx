@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Button, Empty, message, Tooltip, Spin } from 'antd';
-import { PlusOutlined, DeploymentUnitOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { Typography, Button, Empty, message, Spin } from 'antd';
+import { DeploymentUnitOutlined, AppstoreOutlined } from '@ant-design/icons';
 import ModuleTree from './components/ModuleTree';
 import ModuleDetail from './components/ModuleDetail';
 import ModuleForm from './components/ModuleForm';
@@ -10,10 +10,12 @@ import ModuleGraphView from './components/ModuleGraphView';
 import { apiClient } from '../../services/api';
 import { useProjectId, useProjectStore } from '../../stores/useProjectStore';
 import { Module, ModuleDependency, Task, TaskDependency, ViewMode } from '../../types';
+import { useQueryClient } from '@tanstack/react-query';
 
 const { Title } = Typography;
 
 const ModulesPage: React.FC = () => {
+  const queryClient = useQueryClient();
   const projectId = useProjectId();
   const { isInitialized, isLoading } = useProjectStore();
   
@@ -68,7 +70,22 @@ const ModulesPage: React.FC = () => {
       console.log('loadModules response:', response);
       // API 响应格式：{success: true, data: {modules: [], total: 0}} 或 {success: true, data: {data: {modules: []}}}
       const modules = response.data?.data?.modules || response.data?.modules || [];
-      setModules(modules);
+      
+      // 为每个模块加载任务
+      const modulesWithTasks = await Promise.all(
+        modules.map(async (module: any) => {
+          try {
+            const taskResponse = await apiClient.get(`/modules/${module.id}/tasks`);
+            const tasks = taskResponse.data?.data?.tasks || taskResponse.data?.data || [];
+            return { ...module, tasks };
+          } catch (error) {
+            console.error(`加载模块 ${module.id} 的任务失败:`, error);
+            return { ...module, tasks: [] };
+          }
+        })
+      );
+      
+      setModules(modulesWithTasks);
     } catch (error) {
       console.error('加载模块失败:', error);
     }
@@ -86,8 +103,9 @@ const ModulesPage: React.FC = () => {
   const loadProjectGraph = async () => {
     try {
       const response = await apiClient.get(`/graph/project?projectId=${projectId}`);
-      // API 响应格式：{success: true, data: {modules: [], tasks: [], ...}}
-      const graphData = response.data?.data;
+      // apiClient 响应拦截器已经解包了 axios 响应，所以 response = {success: true, data: {...}}
+      // response.data 就是 {modules: [], tasks: [], ...}
+      const graphData = response.data;
       if (graphData) {
         setModules(graphData.modules || []);
         setTasks(graphData.tasks || []);
@@ -96,7 +114,7 @@ const ModulesPage: React.FC = () => {
       }
     } catch (error) {
       // 静默失败，图形视图会显示空状态
-      console.log('图形视图数据加载失败，将显示空状态');
+      console.log('图形视图数据加载失败，将显示空状态', error);
     }
   };
 
@@ -182,13 +200,14 @@ const ModulesPage: React.FC = () => {
     }
   };
 
-  const handleAddTask = (_moduleId: string) => {
+  const handleAddTask = (moduleId: string) => {
     if (!projectId) {
       message.warning('项目尚未初始化，请稍候再试');
       return;
     }
     setEditingTaskId(undefined);
     setEditingTask(null);
+    setSelectedModuleId(moduleId);
     setTaskFormVisible(true);
   };
 
@@ -236,7 +255,11 @@ const ModulesPage: React.FC = () => {
       setTaskFormVisible(false);
       setEditingTaskId(undefined);
       setEditingTask(null);
-      // 刷新数据
+      // 刷新模块数据（包含任务）
+      await loadModules();
+      // 刷新 ModuleDetail 中的任务查询
+      queryClient.invalidateQueries({ queryKey: ['moduleTasks', selectedModuleId] });
+      queryClient.invalidateQueries({ queryKey: ['modules', projectId] });
       if (viewMode === 'graph') {
         loadProjectGraph();
       }
@@ -278,17 +301,17 @@ const ModulesPage: React.FC = () => {
   const selectedModule = modules.find(m => m.id === selectedModuleId);
 
   return (
-    <div style={{ 
-      height: 'calc(100vh - 64px)', 
-      display: 'flex', 
+    <div style={{
+      height: 'calc(100vh - 64px)',
+      display: 'flex',
       flexDirection: 'column',
       background: '#0f0f23',
     }}>
       {/* 顶部工具栏 */}
-      <div style={{ 
-        padding: '12px 24px', 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+      <div style={{
+        padding: '12px 24px',
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
         background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
         borderBottom: '1px solid #2d2d44',
@@ -302,21 +325,6 @@ const ModulesPage: React.FC = () => {
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <ViewSwitcher currentMode={viewMode} onModeChange={handleViewModeChange} />
-          <Tooltip title={!projectId ? '项目初始化中...' : ''}>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => handleAddModule()}
-              disabled={!projectId}
-              style={{ 
-                background: 'linear-gradient(135deg, #e94560 0%, #ff6b6b 100%)', 
-                border: 'none',
-                boxShadow: '0 2px 8px rgba(233, 69, 96, 0.4)',
-              }}
-            >
-              新建模块
-            </Button>
-          </Tooltip>
         </div>
       </div>
 
@@ -332,18 +340,18 @@ const ModulesPage: React.FC = () => {
           // 列表视图模式
           <>
             {/* 左栏：模块树 */}
-            <div style={{ 
-              width: '280px', 
+            <div style={{
+              width: '280px',
               background: '#16213e',
               borderRight: '1px solid #2d2d44',
               display: 'flex',
               flexDirection: 'column',
             }}>
-              <div style={{ 
-                padding: '12px 16px', 
+              <div style={{
+                padding: '12px 16px',
                 borderBottom: '1px solid #2d2d44',
                 background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-                color: '#a0a0a0', 
+                color: '#a0a0a0',
                 fontSize: '13px',
                 fontWeight: 500,
                 display: 'flex',
@@ -360,26 +368,27 @@ const ModulesPage: React.FC = () => {
                   onSelectModule={handleSelectModule}
                   selectedModuleId={selectedModuleId}
                   onAddModule={handleAddModule}
+                  onAddTask={handleAddTask}
+                  onDeleteModule={handleDeleteModule}
                 />
               </div>
             </div>
 
             {/* 中栏：详情面板 */}
-            <div style={{ 
-              width: '450px', 
+            <div style={{
+              flex: 1,
               background: '#16213e',
-              borderRight: '1px solid #2d2d44',
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
             }}>
               {selectedModule ? (
                 <>
-                  <div style={{ 
-                    padding: '12px 16px', 
+                  <div style={{
+                    padding: '12px 16px',
                     borderBottom: '1px solid #2d2d44',
                     background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-                    color: '#a0a0a0', 
+                    color: '#a0a0a0',
                     fontSize: '13px',
                     fontWeight: 500,
                     display: 'flex',
@@ -411,21 +420,6 @@ const ModulesPage: React.FC = () => {
                   />
                 </div>
               )}
-            </div>
-
-            {/* 右栏：占位 */}
-            <div style={{ 
-              flex: 1, 
-              background: '#0f0f23',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}>
-              <Empty
-                description="切换到节点图表视图查看完整的依赖关系图"
-                style={{ padding: '40px 0' }}
-                imageStyle={{ filter: 'hue-rotate(200deg)' }}
-              />
             </div>
           </>
         ) : (

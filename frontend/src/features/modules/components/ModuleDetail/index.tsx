@@ -49,28 +49,47 @@ const ModuleDetail: React.FC<ModuleDetailProps> = ({
   onEditTask,
 }) => {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('info');
+  const [activeTab, setActiveTab] = useState('tasks');
 
   const { data: moduleData, isLoading: moduleLoading, error: moduleError } = useQuery({
     queryKey: ['module', moduleId],
     queryFn: async () => {
       if (!moduleId) return null;
-      const response = await apiClient.get(`/modules/${moduleId}`);
-      return response.data?.module;
+      try {
+        const response = await apiClient.get(`/modules/${moduleId}`);
+        // API 响应格式：{success: true, data: {module: {...}}, timestamp: ...}
+        // 添加空值检查，防止 undefined
+        return response.data?.data?.module || null;
+      } catch (error) {
+        console.error('获取模块详情失败:', error);
+        throw error;
+      }
     },
     enabled: !!moduleId,
+    retry: 1,
   });
 
   const { data: tasksData, isLoading: tasksLoading } = useQuery({
     queryKey: ['moduleTasks', moduleId],
     queryFn: async () => {
       if (!moduleId) return { tasks: [], total: 0 };
-      const response = await apiClient.get(`/modules/${moduleId}/tasks`);
-      console.log('ModuleDetail tasks response:', response);
-      // API 响应格式：{success: true, data: {tasks: [], total: 0}} 或 {success: true, data: {data: {tasks: []}}}
-      return response.data?.data?.tasks ? response.data.data : response.data?.data || { tasks: [], total: 0 };
+      try {
+        const response = await apiClient.get(`/modules/${moduleId}/tasks`);
+        console.log('ModuleDetail tasks response:', response);
+        // API 响应格式：{success: true, data: {tasks: [], total: 0}} 或 {success: true, data: {data: {tasks: []}}}
+        // 添加空值检查，防止 undefined
+        const responseData = response.data?.data;
+        if (!responseData) {
+          return { tasks: [], total: 0 };
+        }
+        return responseData?.tasks ? responseData : { tasks: responseData?.data?.tasks || [], total: responseData?.total || 0 };
+      } catch (error) {
+        console.error('获取任务列表失败:', error);
+        return { tasks: [], total: 0 };
+      }
     },
     enabled: !!moduleId && activeTab === 'tasks',
+    retry: 1,
   });
 
   const handleDeleteTask = async (taskId: string) => {
@@ -101,7 +120,7 @@ const ModuleDetail: React.FC<ModuleDetailProps> = ({
       key: 'status',
       width: 90,
       render: (status) => (
-        <Tag style={{ background: taskStatusColors[status] || '#404040', border: 'none', color: '#fff' }}>
+        <Tag style={{ background: taskStatusColors[status] || '#404040', border: 'none', color: '#0d3d80' }}>
           {taskStatusLabels[status] || status}
         </Tag>
       ),
@@ -169,15 +188,32 @@ const ModuleDetail: React.FC<ModuleDetailProps> = ({
   if (moduleLoading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
-        <Spin />
+        <Spin tip="加载中..." />
       </div>
     );
   }
 
-  if (moduleError || !moduleData?.module) {
+  if (moduleError) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-        <Empty description="加载模块失败" />
+        <Empty
+          description={
+            <div style={{ color: '#ff4d4f', fontSize: '13px' }}>
+              加载模块失败，请稍后重试
+              <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
+                {moduleError.message}
+              </div>
+            </div>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (!moduleData?.module) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <Empty description="未找到模块信息" />
       </div>
     );
   }

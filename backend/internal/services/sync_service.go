@@ -1,6 +1,7 @@
 package services
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/aitdd/backend/internal/database"
@@ -27,10 +28,15 @@ type SyncStatus struct {
 	ErrorMessage string `json:"errorMessage,omitempty"`
 }
 
+// makeConfigKey 生成配置键
+func makeConfigKey(projectID, key string) string {
+	return projectID + ":" + key
+}
+
 // GetSyncStatus 获取同步状态
 func (s *SyncService) GetSyncStatus(projectID string) (*SyncStatus, error) {
 	var config models.Config
-	err := s.db.Where("project_id = ? AND key = ?", projectID, "sync_status").First(&config).Error
+	err := s.db.Where("key = ?", makeConfigKey(projectID, "sync_status")).First(&config).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return &SyncStatus{Status: "pending"}, nil
@@ -59,9 +65,10 @@ func (s *SyncService) SyncProject(projectID string) (*SyncResult, error) {
 	// 获取上次同步时间
 	var lastSync int64
 	var config models.Config
-	err := s.db.Where("project_id = ? AND key = ?", projectID, "last_sync").First(&config).Error
+	lastSyncKey := makeConfigKey(projectID, "last_sync")
+	err := s.db.Where("key = ?", lastSyncKey).First(&config).Error
 	if err == nil {
-		lastSync = config.IntValue
+		lastSync, _ = strconv.ParseInt(config.Value, 10, 64)
 	}
 
 	// 同步模块
@@ -78,24 +85,24 @@ func (s *SyncService) SyncProject(projectID string) (*SyncResult, error) {
 
 	// 更新同步时间
 	now := time.Now().UnixMilli()
+	nowStr := strconv.FormatInt(now, 10)
 	if err == gorm.ErrRecordNotFound {
 		config = models.Config{
-			ProjectID: projectID,
-			Key:       "last_sync",
-			IntValue:  now,
+			Key:   lastSyncKey,
+			Value: nowStr,
 		}
 		s.db.Create(&config)
 	} else {
-		config.IntValue = now
+		config.Value = nowStr
 		s.db.Save(&config)
 	}
 
 	// 更新同步状态
-	s.db.Where("project_id = ? AND key = ?", projectID, "sync_status").
+	statusKey := makeConfigKey(projectID, "sync_status")
+	s.db.Where("key = ?", statusKey).
 		Assign(models.Config{
-			ProjectID: projectID,
-			Key:       "sync_status",
-			Value:     "synced",
+			Key:   statusKey,
+			Value: "synced",
 		}).
 		FirstOrCreate(&models.Config{})
 
@@ -105,15 +112,19 @@ func (s *SyncService) SyncProject(projectID string) (*SyncResult, error) {
 
 // ConfigureSync 配置同步
 func (s *SyncService) ConfigureSync(projectID, remoteURL, syncInterval string) error {
-	configs := []models.Config{
-		{ProjectID: projectID, Key: "remote_url", Value: remoteURL},
-		{ProjectID: projectID, Key: "sync_interval", Value: syncInterval},
-		{ProjectID: projectID, Key: "sync_enabled", Value: "true"},
+	configs := map[string]string{
+		"remote_url":    remoteURL,
+		"sync_interval": syncInterval,
+		"sync_enabled":  "true",
 	}
 
-	for _, cfg := range configs {
-		s.db.Where("project_id = ? AND key = ?", projectID, cfg.Key).
-			Assign(cfg).
+	for name, value := range configs {
+		key := makeConfigKey(projectID, name)
+		s.db.Where("key = ?", key).
+			Assign(models.Config{
+				Key:   key,
+				Value: value,
+			}).
 			FirstOrCreate(&models.Config{})
 	}
 
@@ -123,16 +134,25 @@ func (s *SyncService) ConfigureSync(projectID, remoteURL, syncInterval string) e
 // GetSyncConfig 获取同步配置
 func (s *SyncService) GetSyncConfig(projectID string) (map[string]string, error) {
 	var configs []models.Config
-	err := s.db.Where("project_id = ?", projectID).
-		Where("key IN ?", []string{"remote_url", "sync_interval", "sync_enabled"}).
-		Find(&configs).Error
+	keys := []string{
+		makeConfigKey(projectID, "remote_url"),
+		makeConfigKey(projectID, "sync_interval"),
+		makeConfigKey(projectID, "sync_enabled"),
+	}
+	err := s.db.Where("key IN ?", keys).Find(&configs).Error
 	if err != nil {
 		return nil, err
 	}
 
 	result := make(map[string]string)
 	for _, cfg := range configs {
-		result[cfg.Key] = cfg.Value
+		// 移除 projectID 前缀
+		for _, name := range []string{"remote_url", "sync_interval", "sync_enabled"} {
+			if cfg.Key == makeConfigKey(projectID, name) {
+				result[name] = cfg.Value
+				break
+			}
+		}
 	}
 
 	return result, nil

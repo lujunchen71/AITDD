@@ -155,7 +155,7 @@ func (s *TaskService) AssignTask(id, assignee string, version int) (*models.Task
 // CompleteTask 完成任务
 func (s *TaskService) CompleteTask(id string, version int) (*models.Task, error) {
 	updates := map[string]interface{}{
-		"status": models.TaskStatusDone,
+		"status": models.TaskStatusCompleted,
 	}
 	return s.UpdateTask(id, updates, version)
 }

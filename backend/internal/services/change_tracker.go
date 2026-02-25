@@ -41,7 +41,7 @@ func (ct *ChangeTracker) TrackChange(entityType, entityID, action, changes, chan
 		Action:     action,
 		Changes:    changes,
 		ChangedBy:  changedBy,
-		ChangedAt:  time.Now().UnixMilli(),
+		CreatedAt:  time.Now().UnixMilli(),
 	}
 
 	return ct.db.Create(&history).Error
@@ -59,10 +59,10 @@ func (ct *ChangeTracker) GetChanges(entityType, entityID string, since int64) ([
 		query = query.Where("entity_id = ?", entityID)
 	}
 	if since > 0 {
-		query = query.Where("changed_at > ?", since)
+		query = query.Where("created_at > ?", since)
 	}
 
-	err := query.Order("changed_at DESC").Limit(100).Find(&histories).Error
+	err := query.Order("created_at DESC").Limit(100).Find(&histories).Error
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (ct *ChangeTracker) GetChanges(entityType, entityID string, since int64) ([
 			Action:     h.Action,
 			Changes:    h.Changes,
 			ChangedBy:  h.ChangedBy,
-			ChangedAt:  h.ChangedAt,
+			ChangedAt:  h.CreatedAt,
 		}
 	}
 
@@ -91,8 +91,8 @@ func (ct *ChangeTracker) GetPendingChanges(projectID string, lastSync int64) ([]
 	err := ct.db.Raw(`
 		SELECT ch.* FROM change_histories ch
 		JOIN modules m ON ch.entity_id = m.id
-		WHERE m.project_id = ? AND ch.changed_at > ?
-		ORDER BY ch.changed_at DESC
+		WHERE m.project_id = ? AND ch.created_at > ?
+		ORDER BY ch.created_at DESC
 	`, projectID, lastSync).Scan(&histories).Error
 	if err != nil {
 		return nil, err
@@ -107,7 +107,7 @@ func (ct *ChangeTracker) GetPendingChanges(projectID string, lastSync int64) ([]
 			Action:     h.Action,
 			Changes:    h.Changes,
 			ChangedBy:  h.ChangedBy,
-			ChangedAt:  h.ChangedAt,
+			ChangedAt:  h.CreatedAt,
 		}
 	}
 

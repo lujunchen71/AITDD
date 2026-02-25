@@ -1,6 +1,6 @@
 import React from 'react';
 import { Dropdown, Tag, Button } from 'antd';
-import { MoreOutlined, EditOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { MoreOutlined, EditOutlined, DeleteOutlined, PlusOutlined, FileTextOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 
 interface ModuleTreeNodeProps {
@@ -13,6 +13,7 @@ interface ModuleTreeNodeProps {
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   onAddChild?: (parentId: string) => void;
+  onAddTask?: (moduleId: string) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -34,8 +35,15 @@ const ModuleTreeNode: React.FC<ModuleTreeNodeProps> = ({
   onEdit,
   onDelete,
   onAddChild,
+  onAddTask,
 }) => {
   const menuItems: MenuProps['items'] = [
+    {
+      key: 'add-task',
+      label: '创建任务',
+      icon: <FileTextOutlined />,
+      onClick: () => onAddTask?.(module.id),
+    },
     {
       key: 'add',
       label: '添加子模块',

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button, Tooltip } from 'antd';
 import { UnorderedListOutlined, DeploymentUnitOutlined } from '@ant-design/icons';
-import type { ViewMode } from '../../../types';
+import type { ViewMode } from '../../../../types';
 
 interface ViewSwitcherProps {
   currentMode: ViewMode;
@@ -32,7 +32,7 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
               ? 'linear-gradient(135deg, #e94560 0%, #ff6b6b 100%)' 
               : 'transparent',
             border: 'none',
-            color: currentMode === 'list' ? '#ffffff' : '#a0a0a0',
+            color: currentMode === 'list' ? '#0d3d80' : '#a0a0a0',
           }}
         />
       </Tooltip>
