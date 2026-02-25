@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -16,7 +16,8 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { Module, Task, TaskDependency, ModuleDependency } from '../../../../types';
 import { AppstoreOutlined, SettingOutlined } from '@ant-design/icons';
-import { Checkbox, Popover, Button, Tooltip } from 'antd';
+import { Checkbox, Popover, Button, Tooltip, message } from 'antd';
+import { modulePositionApi } from '../../../../services/api';
 
 interface ModuleGraphViewProps {
   modules: Module[];
@@ -75,11 +76,123 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
 }) => {
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(new Set());
   const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(defaultDisplaySettings);
+  
+  // 防抖保存的 ref
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // 更新显示设置
-  const updateDisplaySettings = (key: keyof DisplaySettings, value: boolean) => {
+  const updateDisplaySettings = (key: keyof DisplaySettings, value: boolean | number) => {
     setDisplaySettings(prev => ({ ...prev, [key]: value }));
   };
+
+  // 防抖保存单个模块位置
+  const debouncedSavePosition = useCallback(async (id: string, x: number, y: number) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        // id 格式为 "module-xxx"，需要提取实际的模块 id
+        const moduleId = id.replace('module-', '');
+        await modulePositionApi.updatePosition(moduleId, x, y);
+      } catch (error) {
+        console.error('Failed to save position:', error);
+      }
+    }, 500);
+  }, []);
+
+  // 批量保存位置
+  const savePositions = useCallback(async (positions: { [key: string]: { x: number; y: number } }) => {
+    try {
+      await modulePositionApi.batchUpdatePositions(
+        Object.entries(positions).map(([moduleId, pos]) => ({
+          moduleId,
+          positionX: pos.x,
+          positionY: pos.y,
+        }))
+      );
+      message.success('布局已保存');
+    } catch (error) {
+      console.error('Failed to save positions:', error);
+      message.error('保存布局失败');
+    }
+  }, []);
+
+  // 基于依赖关系的层次布局算法
+  const calculateAutoLayout = useCallback(() => {
+    const newPositions: { [moduleId: string]: { x: number; y: number } } = {};
+    
+    // 计算每个模块的入度
+    const inDegree: { [key: string]: number } = {};
+    const dependents: { [key: string]: string[] } = {}; // 被哪些模块依赖
+    
+    modules.forEach(m => {
+      inDegree[m.id] = 0;
+      dependents[m.id] = [];
+    });
+    
+    // 根据任务依赖关系计算模块间的依赖
+    taskDependencies.forEach(dep => {
+      const upstreamTask = tasks.find(t => t.id === dep.upstreamTaskId);
+      const downstreamTask = tasks.find(t => t.id === dep.downstreamTaskId);
+      
+      if (upstreamTask && downstreamTask) {
+        const upstreamModuleId = upstreamTask.moduleId;
+        const downstreamModuleId = downstreamTask.moduleId;
+        
+        // 只处理跨模块依赖
+        if (upstreamModuleId !== downstreamModuleId) {
+          inDegree[downstreamModuleId]++;
+          if (!dependents[upstreamModuleId].includes(downstreamModuleId)) {
+            dependents[upstreamModuleId].push(downstreamModuleId);
+          }
+        }
+      }
+    });
+    
+    // 拓扑排序分配层级
+    const levels: string[][] = [];
+    let remaining = [...modules.map(m => m.id)];
+    
+    while (remaining.length > 0) {
+      // 找出入度为0的节点
+      const currentLevel = remaining.filter(id => inDegree[id] === 0);
+      if (currentLevel.length === 0) break; // 防止循环
+      
+      levels.push(currentLevel);
+      
+      // 移除当前层节点，更新入度
+      currentLevel.forEach(id => {
+        remaining = remaining.filter(r => r !== id);
+        dependents[id].forEach(depId => {
+          inDegree[depId]--;
+        });
+      });
+    }
+    
+    // 如果还有剩余节点（循环依赖），添加到最后一层
+    if (remaining.length > 0) {
+      levels.push(remaining);
+    }
+    
+    // 分配位置
+    const LAYER_HEIGHT = 400;
+    const NODE_WIDTH = 380;
+    
+    levels.forEach((level, levelIndex) => {
+      const levelWidth = level.length * NODE_WIDTH;
+      const startX = -levelWidth / 2;
+      
+      level.forEach((moduleId, nodeIndex) => {
+        newPositions[moduleId] = {
+          x: startX + nodeIndex * NODE_WIDTH,
+          y: levelIndex * LAYER_HEIGHT
+        };
+      });
+    });
+    
+    return newPositions;
+  }, [modules, tasks, taskDependencies]);
 
   // 生成节点和边
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
@@ -172,12 +285,12 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
           markerEnd: {
             type: MarkerType.ArrowClosed,
             color: isCrossModule ? '#ff6b6b' : '#00d9ff',
-            width: 20,
-            height: 20,
+            width: isCrossModule ? 6 : 15,
+            height: isCrossModule ? 6 : 15,
           },
           style: {
             stroke: isCrossModule ? '#ff6b6b' : '#00d9ff',
-            strokeWidth: isCrossModule ? 4 : 2,  // 外部粗，内部细
+            strokeWidth: isCrossModule ? 1.5 : 2,  // 外部略粗，内部细
           },
           zIndex: 1000,
         });
@@ -191,10 +304,88 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   // 当 initialNodes/initialEdges 变化时更新节点和边
+  // 注意：更新节点时保留现有位置，避免折叠/展开时位置被重置
   React.useEffect(() => {
-    setNodes(initialNodes);
+    setNodes(prevNodes =>
+      initialNodes.map(node => {
+        const existingNode = prevNodes.find(n => n.id === node.id);
+        return existingNode
+          ? { ...node, position: existingNode.position }
+          : node;
+      })
+    );
     setEdges(initialEdges);
   }, [initialNodes, initialEdges, setNodes, setEdges]);
+
+  // 加载保存的位置（组件初始化时）
+  useEffect(() => {
+    const loadPositions = async () => {
+      // 如果没有模块数据，不加载位置
+      if (!modules || modules.length === 0) return;
+      
+      // 从第一个模块获取 projectId
+      const projectId = modules[0].projectId || 'default';
+      
+      try {
+        const response = await modulePositionApi.getPositions(projectId);
+        if (response.data?.positions && response.data.positions.length > 0) {
+          const positions = response.data.positions;
+          setNodes(nodes => nodes.map(node => {
+            // node.id 格式为 "module-xxx"
+            const moduleId = node.id.replace('module-', '');
+            const pos = positions.find(p => p.moduleId === moduleId);
+            // 只有当位置不为 null 时才更新
+            if (pos && pos.positionX != null && pos.positionY != null) {
+              return { ...node, position: { x: pos.positionX, y: pos.positionY } };
+            }
+            return node;
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to load positions:', error);
+      }
+    };
+    
+    loadPositions();
+  }, [modules, setNodes]);
+
+  // L 键自动布局
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'l' || e.key === 'L') {
+        // 检查是否在输入框中
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+          return;
+        }
+        
+        e.preventDefault();
+        const newPositions = calculateAutoLayout();
+        
+        // 应用位置到节点
+        setNodes(nodes => nodes.map(node => {
+          const moduleId = node.id.replace('module-', '');
+          const pos = newPositions[moduleId];
+          return pos ? { ...node, position: pos } : node;
+        }));
+        
+        // 保存到后端
+        savePositions(newPositions);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [calculateAutoLayout, setNodes, savePositions]);
+
+  // 节点拖拽结束时的处理
+  const onNodeDragStop = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      // 保存位置到后端（防抖）
+      debouncedSavePosition(node.id, node.position.x, node.position.y);
+    },
+    [debouncedSavePosition]
+  );
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -316,6 +507,24 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
           </div>
         </div>
       </div>
+      <div style={{ borderTop: '1px solid #3d3d5c', paddingTop: 12, marginBottom: 16 }}>
+        <div style={{ fontWeight: 600, marginBottom: 8, color: '#fff' }}>布局操作</div>
+        <Button
+          size="small"
+          onClick={() => {
+            const newPositions = calculateAutoLayout();
+            setNodes(nodes => nodes.map(node => {
+              const moduleId = node.id.replace('module-', '');
+              const pos = newPositions[moduleId];
+              return pos ? { ...node, position: pos } : node;
+            }));
+            savePositions(newPositions);
+          }}
+          style={{ width: '100%', marginBottom: 8 }}
+        >
+          自动布局 (快捷键 L)
+        </Button>
+      </div>
       <div style={{ borderTop: '1px solid #3d3d5c', paddingTop: 12 }}>
         <Button
           size="small"
@@ -336,6 +545,7 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
+        onNodeDragStop={onNodeDragStop}
         fitView
         attributionPosition="bottom-left"
         style={{ background: '#0f0f23' }}
@@ -484,7 +694,7 @@ const ModuleNodeComponent = ({ data }: { data: ModuleNodeData }) => {
               const { upstreamDeps, downstreamDeps } = getTaskDependencyInfo(task.id);
               const hasUpstream = upstreamDeps.length > 0;
               const hasDownstream = downstreamDeps.length > 0;
-              const hasDependency = hasUpstream || hasDownstream;
+              void (hasUpstream || hasDownstream); // 保留逻辑供未来扩展
               
               return (
                 <TaskNode
@@ -524,7 +734,7 @@ const TaskNode: React.FC<{
       const upstreamTask = tasks.find(t => t.id === dep.upstreamTaskId);
       return {
         task: upstreamTask,
-        contract: dep.interfaceContract || '未定义接口',
+        contract: dep.contractSummary || '未定义接口',
       };
     });
   };
@@ -535,7 +745,7 @@ const TaskNode: React.FC<{
       const downstreamTask = tasks.find(t => t.id === dep.downstreamTaskId);
       return {
         task: downstreamTask,
-        contract: dep.interfaceContract || '未定义接口',
+        contract: dep.contractSummary || '未定义接口',
       };
     });
   };
@@ -614,11 +824,11 @@ const TaskNode: React.FC<{
           tooltipScale={displaySettings.tooltipScale}
         />
       )}
-      {displaySettings.showError && task.logs && (
+      {displaySettings.showError && task.bugLog && (
         <InfoBadge
           icon="❌"
           title="错误信息"
-          content={task.logs}
+          content={task.bugLog}
           type="error"
           fontSize={displaySettings.fontSize}
           requireAltForTooltip={displaySettings.requireAltForTooltip}
@@ -650,15 +860,35 @@ const TaskNode: React.FC<{
         />
       )}
       {displaySettings.showStatus && (
-        <span style={{
-          fontSize: `${displaySettings.fontSize - 3}px`,
-          padding: '1px 6px',
-          background: 'rgba(255,255,255,0.2)',
-          borderRadius: '3px',
-          flexShrink: 0,
-        }}>
-          {task.status}
-        </span>
+        <Tooltip
+          title={
+            <div>
+              {task.issueDetails && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontWeight: 600, color: '#ff6b6b' }}>⚠️ 问题详情</div>
+                  <div>{task.issueDetails}</div>
+                </div>
+              )}
+              {task.bugLog && (
+                <div>
+                  <div style={{ fontWeight: 600, color: '#ffa500' }}>🐛 Bug 日志</div>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>{task.bugLog}</div>
+                </div>
+              )}
+              {!task.issueDetails && !task.bugLog && '无问题记录'}
+            </div>
+          }
+        >
+          <span style={{
+            fontSize: `${displaySettings.fontSize - 3}px`,
+            padding: '1px 6px',
+            background: 'rgba(255,255,255,0.2)',
+            borderRadius: '3px',
+            flexShrink: 0,
+          }}>
+            {task.status}
+          </span>
+        </Tooltip>
       )}
       {/* 右侧 Handle - 用于连接下游依赖 */}
       <Handle
@@ -722,10 +952,10 @@ const InfoBadge: React.FC<{
 
   const color = getColor();
   const scaledFontSize = Math.round(fontSize * tooltipScale);
-  const scaledWidth = Math.round(450 * tooltipScale);
+  const tooltipWidth = Math.round(350 * tooltipScale);
 
   const tooltipContent = (
-    <div style={{ minWidth: scaledWidth, maxWidth: scaledWidth + 100 }}>
+    <div style={{ width: tooltipWidth }}>
       <div style={{
         fontWeight: 600,
         fontSize: scaledFontSize + 2,
@@ -742,8 +972,6 @@ const InfoBadge: React.FC<{
         borderRadius: 4,
         fontSize: scaledFontSize,
         color: '#ccc',
-        maxHeight: 200 * tooltipScale,
-        overflow: 'auto',
         whiteSpace: 'pre-wrap',
         lineHeight: 1.5,
       }}>
@@ -786,7 +1014,7 @@ const InfoBadge: React.FC<{
     <Tooltip
       title={tooltipContent}
       color="#1a1a2e"
-      overlayInnerStyle={{ padding: 16 * tooltipScale, maxWidth: (520 + 100) * tooltipScale }}
+      overlayInnerStyle={{ padding: 16 * tooltipScale, width: tooltipWidth + 32 * tooltipScale }}
       mouseEnterDelay={0}
       mouseLeaveDelay={0.1}
       open={showTooltip}
@@ -806,6 +1034,27 @@ const InfoBadge: React.FC<{
   );
 };
 
+// 解析契约详情 JSON
+interface ContractDetailItem {
+  label: string;
+  contract_api: string;
+  from?: string;
+}
+
+interface ContractDetail {
+  title: string;
+  list: ContractDetailItem[];
+}
+
+const parseContractDetailJSON = (jsonStr: string | undefined): ContractDetail | null => {
+  if (!jsonStr) return null;
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    return null;
+  }
+};
+
 // 依赖箭头组件 - 带Tooltip显示上下游接口信息
 const DependencyBadge: React.FC<{
   type: 'upstream' | 'downstream';
@@ -815,9 +1064,9 @@ const DependencyBadge: React.FC<{
   fontSize?: number;
   requireAltForTooltip?: boolean;
   tooltipScale?: number;
-}> = ({ type, count, taskInfo, contractDetail, fontSize = 12, requireAltForTooltip = true, tooltipScale = 1 }) => {
+}> = ({ type, count, taskInfo: _taskInfo, contractDetail, fontSize = 12, requireAltForTooltip = true, tooltipScale = 1 }) => {
   const [isAltPressed, setIsAltPressed] = React.useState(false);
-  const [showTooltip, setShowTooltip] = React.useState(false);
+  void React.useState(false); // tooltip state reserved for future use
 
   React.useEffect(() => {
     if (!requireAltForTooltip) return;
@@ -841,14 +1090,17 @@ const DependencyBadge: React.FC<{
   const color = isUpstream ? '#f59e0b' : '#00d9ff';
   const bgColor = isUpstream ? '#f59e0b' : '#00d9ff';
   const textColor = isUpstream ? '#000' : '#000';
-  const title = isUpstream ? '上游依赖接口' : '下游依赖接口';
+  const title = isUpstream ? '上游契约接口' : '下游契约接口';
   const arrow = isUpstream ? '↑' : '↓';
 
   const scaledFontSize = Math.round(fontSize * tooltipScale);
-  const scaledWidth = Math.round(450 * tooltipScale);
+  const tooltipWidth = Math.round(350 * tooltipScale);
+
+  // 解析契约详情
+  const contractData = parseContractDetailJSON(contractDetail);
 
   const tooltipContent = (
-    <div style={{ minWidth: scaledWidth, maxWidth: scaledWidth + 100 }}>
+    <div style={{ width: tooltipWidth }}>
       <div style={{
         fontWeight: 600,
         fontSize: scaledFontSize + 2,
@@ -859,15 +1111,80 @@ const DependencyBadge: React.FC<{
       }}>
         {title}（共{count}个依赖）
       </div>
-      {contractDetail && (
+      
+      {/* 契约描述 - 显示title */}
+      {contractData?.title && (
+        <div style={{
+          color: '#aaa',
+          fontSize: scaledFontSize,
+          marginBottom: 12,
+          fontStyle: 'italic',
+        }}>
+          {contractData.title}
+        </div>
+      )}
+      
+      {/* 接口列表 */}
+      {contractData?.list && contractData.list.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: scaledFontSize, color: '#888', marginBottom: 8, fontWeight: 500 }}>
+            接口列表：
+          </div>
+          {contractData.list.map((item, idx) => (
+            <div key={idx} style={{
+              background: `${color}15`,
+              padding: 10,
+              borderRadius: 4,
+              marginBottom: 6,
+              borderLeft: `3px solid ${color}`,
+            }}>
+              <div style={{ color: '#e0e0e0', fontSize: scaledFontSize, marginBottom: 6 }}>
+                {item.label}
+              </div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap',
+              }}>
+                <span style={{
+                  color: color,
+                  fontSize: scaledFontSize - 1,
+                  fontFamily: 'monospace',
+                  background: '#1a1a2e',
+                  padding: '4px 8px',
+                  borderRadius: 3,
+                }}>
+                  {item.contract_api}
+                </span>
+                {item.from && (
+                  <>
+                    <span style={{ color: '#666', fontSize: scaledFontSize - 2 }}>|</span>
+                    <span style={{
+                      color: '#a78bfa',
+                      fontSize: scaledFontSize - 2,
+                      background: '#2d2d44',
+                      padding: '2px 6px',
+                      borderRadius: 3,
+                    }}>
+                      {item.from}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* 如果没有解析成功，显示原始内容 */}
+      {!contractData && contractDetail && (
         <div style={{
           background: `${color}15`,
           padding: 10,
           borderRadius: 4,
           fontSize: scaledFontSize,
           color: '#ccc',
-          maxHeight: 150 * tooltipScale,
-          overflow: 'auto',
           whiteSpace: 'pre-wrap',
           lineHeight: 1.5,
           marginBottom: 8,
@@ -875,23 +1192,6 @@ const DependencyBadge: React.FC<{
           {contractDetail}
         </div>
       )}
-      <div style={{ marginTop: 8 }}>
-        <div style={{ fontSize: scaledFontSize, color: '#888', marginBottom: 6 }}>关联任务：</div>
-        {taskInfo.map((info, idx) => (
-          <div key={idx} style={{
-            background: '#2d2d44',
-            padding: 10,
-            borderRadius: 4,
-            marginBottom: 6,
-            fontSize: scaledFontSize,
-          }}>
-            <div style={{ color: '#fff', marginBottom: 4, fontWeight: 500 }}>📋 {info.task?.name || '未知任务'}</div>
-            <div style={{ color: color, fontSize: fontSize - 1, background: '#1a1a2e', padding: 6, borderRadius: 3 }}>
-              {info.contract}
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 
@@ -927,7 +1227,7 @@ const DependencyBadge: React.FC<{
     <Tooltip
       title={tooltipContent}
       color="#1a1a2e"
-      overlayInnerStyle={{ padding: 16 * tooltipScale, maxWidth: (580) * tooltipScale }}
+      overlayInnerStyle={{ padding: 16 * tooltipScale, width: tooltipWidth + 32 * tooltipScale }}
       mouseEnterDelay={0}
       mouseLeaveDelay={0.1}
     >
