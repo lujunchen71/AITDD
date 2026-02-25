@@ -1,0 +1,1275 @@
+{
+  "project": {
+    "name": "AITDD Painter",
+    "description": "基于PyQt6的任务可视化绘图工具，用于创建模块和任务节点，绘制依赖关系，并同步到AITDD系统"
+  },
+  "modules": [
+    {
+      "id": "mod-ui-main",
+      "name": "主界面模块",
+      "description": "绘图程序主窗口UI组件，包含画布、工具栏和属性面板",
+      "status": "developing",
+      "file_path": "painter-app/ui/main_window.py"
+    },
+    {
+      "id": "mod-ui-canvas",
+      "name": "画布模块",
+      "description": "任务节点绘图画布，支持缩放、平移和网格显示",
+      "status": "designing",
+      "file_path": "painter-app/ui/canvas.py"
+    },
+    {
+      "id": "mod-ui-nodes",
+      "name": "节点组件模块",
+      "description": "任务节点和模块节点的可视化组件",
+      "status": "designing",
+      "file_path": "painter-app/ui/nodes.py"
+    },
+    {
+      "id": "mod-core-models",
+      "name": "数据模型模块",
+      "description": "任务、模块、依赖关系的数据模型定义",
+      "status": "developing",
+      "file_path": "painter-app/core/models.py"
+    },
+    {
+      "id": "mod-core-sync",
+      "name": "同步服务模块",
+      "description": "与AITDD后端API同步数据的服务",
+      "status": "designing",
+      "file_path": "painter-app/core/sync_service.py"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-main-window",
+      "name": "主窗口框架",
+      "description": "创建QMainWindow主窗口类，设置窗口属性、菜单栏、工具栏和状态栏",
+      "moduleId": "mod-ui-main",
+      "status": "completed",
+      "issue_details": "",
+      "prompt": "创建PainterMainWindow类继承自QMainWindow。\n\n要求：\n1. 设置窗口标题为'AITDD Task Painter'\n2. 窗口大小1400x900，可调整\n3. 创建菜单栏：文件、编辑、视图\n4. 创建工具栏：缩放按钮、重置视图按钮\n5. 创建状态栏显示操作提示\n6. 使用QSplitter分隔左侧工具面板和中央画布\n\n输出文件：painter-app/ui/main_window.py",
+      "upstreamContractDetail": {
+        "title": "无上游依赖，这是基础组件",
+        "list": []
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "获取中央widget用于添加画布",
+            "contract_api": "get_central_widget() -> QWidget",
+            "from": "task-main-window"
+          },
+          {
+            "label": "获取菜单栏",
+            "contract_api": "get_menu_bar() -> QMenuBar",
+            "from": "task-main-window"
+          },
+          {
+            "label": "获取状态栏",
+            "contract_api": "get_status_bar() -> QStatusBar",
+            "from": "task-main-window"
+          },
+          {
+            "label": "设置状态栏消息",
+            "contract_api": "set_status_message(msg: str)",
+            "from": "task-main-window"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证窗口标题是否正确设置",
+          "api": "test_window_title()"
+        },
+        {
+          "target": "验证窗口大小是否为1400x900",
+          "api": "test_window_size()"
+        },
+        {
+          "target": "验证菜单栏是否存在",
+          "api": "test_menu_bar_exists()"
+        },
+        {
+          "target": "验证状态栏是否存在",
+          "api": "test_status_bar_exists()"
+        }
+      ],
+      "test_result": [
+        "test_window_title() - 通过: 窗口标题为'AITDD Task Painter'",
+        "test_window_size() - 通过: 窗口大小为1400x900",
+        "test_menu_bar_exists() - 通过: 菜单栏包含文件、编辑、视图三个菜单",
+        "test_status_bar_exists() - 通过: 状态栏正常显示"
+      ],
+      "codePaths": "[\"painter-app/ui/main_window.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-data-models",
+      "name": "数据模型定义",
+      "description": "定义TaskData、ModuleData、DependencyData和ProjectData数据类",
+      "moduleId": "mod-core-models",
+      "status": "completed",
+      "issue_details": "",
+      "prompt": "创建数据模型类使用Python dataclass。\n\n要求：\n1. TaskData: id, name, description, moduleId, status, prompt, upstreamContractDetail, downstreamContractDetail, tests, codePaths, logs, humanAssistance, x, y, width, height\n2. ModuleData: id, name, description, status, file_path, x, y, width, height, color\n3. DependencyData: id, upstreamTaskId, downstreamTaskId, interfaceContract\n4. ProjectData: name, description\n5. 为每个类提供默认值和自动生成ID\n6. 添加to_dict()和from_dict()方法\n\n输出文件：painter-app/core/models.py",
+      "upstreamContractDetail": {
+        "title": "无上游依赖，这是基础数据结构",
+        "list": []
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "任务数据模型",
+            "contract_api": "TaskData类",
+            "from": "task-data-models"
+          },
+          {
+            "label": "模块数据模型",
+            "contract_api": "ModuleData类",
+            "from": "task-data-models"
+          },
+          {
+            "label": "依赖关系数据模型",
+            "contract_api": "DependencyData类",
+            "from": "task-data-models"
+          },
+          {
+            "label": "项目数据模型",
+            "contract_api": "ProjectData类",
+            "from": "task-data-models"
+          },
+          {
+            "label": "所有类支持序列化和反序列化",
+            "contract_api": "to_dict(), from_dict()",
+            "from": "task-data-models"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证TaskData创建和属性",
+          "api": "test_task_data_creation()"
+        },
+        {
+          "target": "验证ModuleData创建和属性",
+          "api": "test_module_data_creation()"
+        },
+        {
+          "target": "验证DependencyData创建和属性",
+          "api": "test_dependency_data_creation()"
+        },
+        {
+          "target": "验证序列化和反序列化功能",
+          "api": "test_serialization()"
+        }
+      ],
+      "test_result": [
+        "test_task_data_creation() - 通过: TaskData包含所有必需字段",
+        "test_module_data_creation() - 通过: ModuleData包含所有必需字段",
+        "test_dependency_data_creation() - 通过: DependencyData包含所有必需字段",
+        "test_serialization() - 通过: to_dict()和from_dict()正常工作"
+      ],
+      "codePaths": "[\"painter-app/core/models.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-canvas-scene",
+      "name": "画布场景",
+      "description": "创建QGraphicsScene子类，管理节点和连线的场景",
+      "moduleId": "mod-ui-canvas",
+      "status": "ready",
+      "issue_details": "",
+      "prompt": "创建TaskScene类继承自QGraphicsScene。\n\n要求：\n1. 管理ModuleNode和TaskNode的添加、删除、查询\n2. 管理DependencyLine依赖连线\n3. 绘制50px网格背景\n4. 场景范围-2000到2000\n5. 提供to_json()方法导出为AITDD JSON格式\n6. 提供from_json()方法从JSON导入\n7. 节点移动时自动更新连线\n8. 发射data_changed信号\n\n输出文件：painter-app/ui/canvas.py",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-data-models 提供",
+        "list": [
+          {
+            "label": "任务、模块、依赖、项目数据类",
+            "contract_api": "TaskData, ModuleData, DependencyData, ProjectData",
+            "from": "task-data-models"
+          },
+          {
+            "label": "序列化方法",
+            "contract_api": "to_dict(), from_dict()",
+            "from": "task-data-models"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "添加模块节点",
+            "contract_api": "add_module(data: ModuleData) -> ModuleNode",
+            "from": "task-canvas-scene"
+          },
+          {
+            "label": "添加任务节点",
+            "contract_api": "add_task(data: TaskData) -> TaskNode",
+            "from": "task-canvas-scene"
+          },
+          {
+            "label": "添加依赖连线",
+            "contract_api": "add_dependency(data: DependencyData) -> DependencyLine",
+            "from": "task-canvas-scene"
+          },
+          {
+            "label": "导出为JSON",
+            "contract_api": "to_json() -> dict",
+            "from": "task-canvas-scene"
+          },
+          {
+            "label": "从JSON导入",
+            "contract_api": "from_json(data: dict)",
+            "from": "task-canvas-scene"
+          },
+          {
+            "label": "数据变更信号",
+            "contract_api": "data_changed: Signal",
+            "from": "task-canvas-scene"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证场景创建成功",
+          "api": "test_scene_creation()"
+        },
+        {
+          "target": "验证添加模块节点功能",
+          "api": "test_add_module()"
+        },
+        {
+          "target": "验证添加任务节点功能",
+          "api": "test_add_task()"
+        },
+        {
+          "target": "验证添加依赖连线功能",
+          "api": "test_add_dependency()"
+        },
+        {
+          "target": "验证JSON导出功能",
+          "api": "test_json_export()"
+        },
+        {
+          "target": "验证JSON导入功能",
+          "api": "test_json_import()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"painter-app/ui/canvas.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-canvas-view",
+      "name": "画布视图",
+      "description": "创建QGraphicsView子类，支持缩放、平移和交互",
+      "moduleId": "mod-ui-canvas",
+      "status": "ready",
+      "issue_details": "",
+      "prompt": "创建TaskCanvasView类继承自QGraphicsView。\n\n要求：\n1. 支持鼠标滚轮缩放（0.1x - 5x）\n2. 支持鼠标中键平移\n3. 支持框选多个节点\n4. 支持Delete键删除选中节点\n5. 抗锯齿渲染\n6. 点击空白处取消选择\n7. 初始视图居中显示\n\n输出文件：painter-app/ui/canvas_view.py",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-canvas-scene 提供",
+        "list": [
+          {
+            "label": "TaskScene场景类用于设置到视图中",
+            "contract_api": "TaskScene",
+            "from": "task-canvas-scene"
+          },
+          {
+            "label": "节点和连线管理功能",
+            "contract_api": "add_module(), add_task(), add_dependency()",
+            "from": "task-canvas-scene"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "放大视图",
+            "contract_api": "zoom_in()",
+            "from": "task-canvas-view"
+          },
+          {
+            "label": "缩小视图",
+            "contract_api": "zoom_out()",
+            "from": "task-canvas-view"
+          },
+          {
+            "label": "重置视图到初始状态",
+            "contract_api": "reset_view()",
+            "from": "task-canvas-view"
+          },
+          {
+            "label": "自适应内容大小",
+            "contract_api": "fit_to_content()",
+            "from": "task-canvas-view"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证视图创建成功",
+          "api": "test_view_creation()"
+        },
+        {
+          "target": "验证放大功能",
+          "api": "test_zoom_in()"
+        },
+        {
+          "target": "验证缩小功能",
+          "api": "test_zoom_out()"
+        },
+        {
+          "target": "验证重置视图功能",
+          "api": "test_reset_view()"
+        },
+        {
+          "target": "验证平移功能",
+          "api": "test_pan()"
+        },
+        {
+          "target": "验证框选功能",
+          "api": "test_selection()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"painter-app/ui/canvas_view.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-module-node",
+      "name": "模块节点组件",
+      "description": "创建模块节点的可视化组件，显示模块名称和描述",
+      "moduleId": "mod-ui-nodes",
+      "status": "ready",
+      "issue_details": "",
+      "prompt": "创建ModuleNode类继承自QGraphicsRectItem。\n\n要求：\n1. 节点大小200x120，圆角矩形\n2. 顶部标题栏显示模块名称，背景使用模块颜色\n3. 标题下方显示描述（最多40字符截断）\n4. 支持拖拽移动\n5. 支持选中高亮（蓝色边框）\n6. 位置变化时更新data.x和data.y\n7. 双击打开属性编辑\n\n输出文件：painter-app/ui/nodes/module_node.py",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-data-models 提供",
+        "list": [
+          {
+            "label": "ModuleData数据类",
+            "contract_api": "ModuleData",
+            "from": "task-data-models"
+          },
+          {
+            "label": "包含name, description, status, color等属性",
+            "contract_api": "ModuleData属性",
+            "from": "task-data-models"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "获取/设置模块数据",
+            "contract_api": "data: ModuleData",
+            "from": "task-module-node"
+          },
+          {
+            "label": "更新节点外观",
+            "contract_api": "update_appearance()",
+            "from": "task-module-node"
+          },
+          {
+            "label": "位置变化时通知场景更新连线",
+            "contract_api": "itemChange()",
+            "from": "task-module-node"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证节点创建成功",
+          "api": "test_node_creation()"
+        },
+        {
+          "target": "验证节点外观正确",
+          "api": "test_node_appearance()"
+        },
+        {
+          "target": "验证拖拽移动功能",
+          "api": "test_drag_move()"
+        },
+        {
+          "target": "验证选中功能",
+          "api": "test_selection()"
+        },
+        {
+          "target": "验证数据更新功能",
+          "api": "test_data_update()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"painter-app/ui/nodes/module_node.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-task-node",
+      "name": "任务节点组件",
+      "description": "创建任务节点的可视化组件，显示任务名称、状态和描述",
+      "moduleId": "mod-ui-nodes",
+      "status": "ready",
+      "issue_details": "",
+      "prompt": "创建TaskNode类继承自QGraphicsRectItem。\n\n要求：\n1. 节点大小180x100，白色背景\n2. 左侧5px状态指示条，颜色根据状态变化\n3. 第一行显示任务名称（粗体）\n4. 第二行显示状态标签（彩色）\n5. 第三行显示描述（最多30字符截断）\n6. 底部显示任务ID（灰色小字）\n7. 支持拖拽移动和选中\n8. 状态颜色：ready绿色, in_progress紫色, completed深绿色, failed红色, blocked灰色\n\n输出文件：painter-app/ui/nodes/task_node.py",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-data-models 提供",
+        "list": [
+          {
+            "label": "TaskData数据类",
+            "contract_api": "TaskData",
+            "from": "task-data-models"
+          },
+          {
+            "label": "包含name, description, status等属性",
+            "contract_api": "TaskData属性",
+            "from": "task-data-models"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "获取/设置任务数据",
+            "contract_api": "data: TaskData",
+            "from": "task-task-node"
+          },
+          {
+            "label": "更新节点外观",
+            "contract_api": "update_appearance()",
+            "from": "task-task-node"
+          },
+          {
+            "label": "状态颜色映射",
+            "contract_api": "status_colors: Dict",
+            "from": "task-task-node"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证任务节点创建成功",
+          "api": "test_task_node_creation()"
+        },
+        {
+          "target": "验证状态颜色正确",
+          "api": "test_status_colors()"
+        },
+        {
+          "target": "验证外观更新功能",
+          "api": "test_appearance_update()"
+        },
+        {
+          "target": "验证拖拽移动功能",
+          "api": "test_drag_move()"
+        },
+        {
+          "target": "验证选中功能",
+          "api": "test_selection()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"painter-app/ui/nodes/task_node.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-dependency-line",
+      "name": "依赖连线组件",
+      "description": "创建依赖关系的可视化连线，带箭头指示方向",
+      "moduleId": "mod-ui-nodes",
+      "status": "ready",
+      "issue_details": "",
+      "prompt": "创建DependencyLine类继承自QGraphicsLineItem。\n\n要求：\n1. 虚线样式，蓝色(#1890ff)，2px宽度\n2. 从源任务节点中心指向目标任务节点中心\n3. 目标端带箭头（10px大小）\n4. 节点移动时自动更新连线位置\n5. 连线ZValue为0（在节点下方）\n6. 鼠标悬停显示接口契约信息\n\n输出文件：painter-app/ui/nodes/dependency_line.py",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-task-node 和 *task-data-models 提供",
+        "list": [
+          {
+            "label": "TaskNode类用于获取节点位置",
+            "contract_api": "TaskNode",
+            "from": "task-task-node"
+          },
+          {
+            "label": "获取节点边界",
+            "contract_api": "sceneBoundingRect()",
+            "from": "task-task-node"
+          },
+          {
+            "label": "DependencyData数据类",
+            "contract_api": "DependencyData",
+            "from": "task-data-models"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "源任务节点",
+            "contract_api": "source: TaskNode",
+            "from": "task-dependency-line"
+          },
+          {
+            "label": "目标任务节点",
+            "contract_api": "target: TaskNode",
+            "from": "task-dependency-line"
+          },
+          {
+            "label": "更新连线位置",
+            "contract_api": "update_line()",
+            "from": "task-dependency-line"
+          },
+          {
+            "label": "依赖数据",
+            "contract_api": "data: DependencyData",
+            "from": "task-dependency-line"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证连线创建成功",
+          "api": "test_line_creation()"
+        },
+        {
+          "target": "验证箭头绘制正确",
+          "api": "test_arrow_drawing()"
+        },
+        {
+          "target": "验证连线更新功能",
+          "api": "test_line_update()"
+        },
+        {
+          "target": "验证悬停提示功能",
+          "api": "test_hover_tooltip()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"painter-app/ui/nodes/dependency_line.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-property-panel",
+      "name": "属性面板",
+      "description": "创建右侧属性编辑面板，用于编辑选中节点的属性",
+      "moduleId": "mod-ui-main",
+      "status": "ready",
+      "issue_details": "",
+      "prompt": "创建PropertyPanel类继承自QWidget。\n\n要求：\n1. 使用QFormLayout布局\n2. ID字段只读（QLineEdit）\n3. 名称字段（QLineEdit）\n4. 状态下拉框（ready/claimed/in_progress/pending_review/completed/failed/blocked）\n5. 描述文本框（QTextEdit，最多80px高度）\n6. Prompt文本框（仅任务节点显示）\n7. 上游契约文本框（仅任务节点显示）\n8. 下游契约文本框（仅任务节点显示）\n9. 属性变更时发射property_changed信号\n\n输出文件：painter-app/ui/property_panel.py",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-main-window 和 *task-data-models 提供",
+        "list": [
+          {
+            "label": "主窗口布局用于添加属性面板",
+            "contract_api": "主窗口布局",
+            "from": "task-main-window"
+          },
+          {
+            "label": "TaskData, ModuleData数据类",
+            "contract_api": "TaskData, ModuleData",
+            "from": "task-data-models"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "设置当前编辑的节点",
+            "contract_api": "set_item(item)",
+            "from": "task-property-panel"
+          },
+          {
+            "label": "清空所有字段",
+            "contract_api": "clear_fields()",
+            "from": "task-property-panel"
+          },
+          {
+            "label": "属性变更信号",
+            "contract_api": "property_changed: Signal",
+            "from": "task-property-panel"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证面板创建成功",
+          "api": "test_panel_creation()"
+        },
+        {
+          "target": "验证设置任务节点功能",
+          "api": "test_set_task_item()"
+        },
+        {
+          "target": "验证设置模块节点功能",
+          "api": "test_set_module_item()"
+        },
+        {
+          "target": "验证属性变更信号",
+          "api": "test_property_changed()"
+        },
+        {
+          "target": "验证清空字段功能",
+          "api": "test_clear_fields()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"painter-app/ui/property_panel.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-tool-panel",
+      "name": "工具面板",
+      "description": "创建左侧工具面板，包含添加节点和操作按钮",
+      "moduleId": "mod-ui-main",
+      "status": "ready",
+      "issue_details": "",
+      "prompt": "创建ToolPanel类继承自QWidget。\n\n要求：\n1. 项目信息组：项目名称输入框\n2. 添加节点组：添加模块按钮、添加任务按钮、连接模式按钮\n3. 操作组：保存JSON按钮、加载JSON按钮、同步到服务器按钮、直接导入数据库按钮\n4. 统计组：显示模块数、任务数、依赖数\n5. 连接模式按钮可切换状态\n6. 所有按钮带图标emoji\n\n输出文件：painter-app/ui/tool_panel.py",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-main-window 和 *task-canvas-scene 提供",
+        "list": [
+          {
+            "label": "主窗口布局用于添加工具面板",
+            "contract_api": "主窗口布局",
+            "from": "task-main-window"
+          },
+          {
+            "label": "统计信息（模块数、任务数、依赖数）",
+            "contract_api": "场景统计信息",
+            "from": "task-canvas-scene"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "更新统计信息",
+            "contract_api": "update_stats(modules, tasks, deps)",
+            "from": "task-tool-panel"
+          },
+          {
+            "label": "添加模块信号",
+            "contract_api": "add_module_clicked: Signal",
+            "from": "task-tool-panel"
+          },
+          {
+            "label": "添加任务信号",
+            "contract_api": "add_task_clicked: Signal",
+            "from": "task-tool-panel"
+          },
+          {
+            "label": "连接模式切换信号",
+            "contract_api": "connection_mode_toggled: Signal",
+            "from": "task-tool-panel"
+          },
+          {
+            "label": "保存信号",
+            "contract_api": "save_clicked: Signal",
+            "from": "task-tool-panel"
+          },
+          {
+            "label": "加载信号",
+            "contract_api": "load_clicked: Signal",
+            "from": "task-tool-panel"
+          },
+          {
+            "label": "同步信号",
+            "contract_api": "sync_clicked: Signal",
+            "from": "task-tool-panel"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证面板创建成功",
+          "api": "test_panel_creation()"
+        },
+        {
+          "target": "验证按钮信号正确",
+          "api": "test_button_signals()"
+        },
+        {
+          "target": "验证统计更新功能",
+          "api": "test_stats_update()"
+        },
+        {
+          "target": "验证连接模式切换功能",
+          "api": "test_connection_mode_toggle()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"painter-app/ui/tool_panel.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-sync-service",
+      "name": "同步服务",
+      "description": "创建与AITDD后端API同步数据的服务类",
+      "moduleId": "mod-core-sync",
+      "status": "ready",
+      "issue_details": "",
+      "prompt": "创建SyncService类。\n\n要求：\n1. __init__(base_url: str): 初始化，默认http://localhost:34567/api/v1\n2. sync_project(data: dict) -> bool: 同步项目信息\n3. sync_modules(modules: list, project_id: str) -> bool: 同步模块列表\n4. sync_tasks(tasks: list) -> bool: 同步任务列表\n5. sync_dependencies(deps: list) -> bool: 同步依赖关系\n6. sync_all(data: dict) -> bool: 完整同步所有数据\n7. 使用requests库发送HTTP请求\n8. 处理网络错误和超时\n9. 返回同步结果和错误信息\n\n输出文件：painter-app/core/sync_service.py",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-data-models 提供",
+        "list": [
+          {
+            "label": "TaskData, ModuleData, DependencyData, ProjectData数据类",
+            "contract_api": "TaskData, ModuleData, DependencyData, ProjectData",
+            "from": "task-data-models"
+          },
+          {
+            "label": "to_json()方法获取可序列化数据",
+            "contract_api": "to_json()",
+            "from": "task-data-models"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "同步所有数据",
+            "contract_api": "sync_all(data: dict) -> Tuple[bool, str]",
+            "from": "task-sync-service"
+          },
+          {
+            "label": "获取当前项目ID",
+            "contract_api": "get_project_id() -> str",
+            "from": "task-sync-service"
+          },
+          {
+            "label": "最后的错误信息",
+            "contract_api": "last_error: str",
+            "from": "task-sync-service"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证服务创建成功",
+          "api": "test_service_creation()"
+        },
+        {
+          "target": "验证项目同步功能",
+          "api": "test_sync_project()"
+        },
+        {
+          "target": "验证模块同步功能",
+          "api": "test_sync_modules()"
+        },
+        {
+          "target": "验证任务同步功能",
+          "api": "test_sync_tasks()"
+        },
+        {
+          "target": "验证依赖同步功能",
+          "api": "test_sync_dependencies()"
+        },
+        {
+          "target": "验证错误处理功能",
+          "api": "test_error_handling()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"painter-app/core/sync_service.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-db-import",
+      "name": "数据库直接导入",
+      "description": "创建直接导入SQLite数据库的功能，绕过API",
+      "moduleId": "mod-core-sync",
+      "status": "ready",
+      "issue_details": "",
+      "prompt": "创建DatabaseImporter类。\n\n要求：\n1. __init__(db_path: str): 初始化，默认~/.aitdd/aitdd.db\n2. check_database_exists() -> bool: 检查数据库文件是否存在\n3. get_project_id() -> str: 获取或创建项目ID\n4. clear_old_data(): 清理旧的模块、任务、依赖数据\n5. import_modules(modules: list, project_id: str): 导入模块\n6. import_tasks(tasks: list): 导入任务\n7. import_dependencies(deps: list): 导入依赖\n8. import_all(data: dict) -> Tuple[bool, str]: 完整导入\n9. 使用sqlite3库操作数据库\n10. 事务支持，失败回滚\n\n输出文件：painter-app/core/db_importer.py",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-data-models 和 *task-sync-service 提供",
+        "list": [
+          {
+            "label": "数据模型类",
+            "contract_api": "数据模型类",
+            "from": "task-data-models"
+          },
+          {
+            "label": "相同的数据格式规范",
+            "contract_api": "数据格式规范",
+            "from": "task-sync-service"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "导入所有数据",
+            "contract_api": "import_all(data: dict) -> Tuple[bool, str]",
+            "from": "task-db-import"
+          },
+          {
+            "label": "检查数据库",
+            "contract_api": "check_database_exists() -> bool",
+            "from": "task-db-import"
+          },
+          {
+            "label": "最后的错误信息",
+            "contract_api": "last_error: str",
+            "from": "task-db-import"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证导入器创建成功",
+          "api": "test_importer_creation()"
+        },
+        {
+          "target": "验证检查数据库功能",
+          "api": "test_check_database()"
+        },
+        {
+          "target": "验证模块导入功能",
+          "api": "test_import_modules()"
+        },
+        {
+          "target": "验证任务导入功能",
+          "api": "test_import_tasks()"
+        },
+        {
+          "target": "验证依赖导入功能",
+          "api": "test_import_dependencies()"
+        },
+        {
+          "target": "验证事务回滚功能",
+          "api": "test_transaction_rollback()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"painter-app/core/db_importer.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-connection-mode",
+      "name": "连接模式交互",
+      "description": "实现点击两个任务节点创建依赖关系的交互功能",
+      "moduleId": "mod-ui-main",
+      "status": "ready",
+      "issue_details": "",
+      "prompt": "在MainWindow中实现连接模式交互逻辑。\n\n要求：\n1. 点击\"连接模式\"按钮进入连接模式\n2. 连接模式下鼠标样式变为十字\n3. 点击第一个任务节点作为源任务，高亮显示\n4. 点击第二个任务节点作为目标任务\n5. 自动创建依赖关系并添加到场景\n6. ESC键取消连接模式\n7. 再次点击连接模式按钮退出\n8. 状态栏显示操作提示\n\n输出文件：painter-app/ui/main_window.py (添加方法)",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-tool-panel, *task-canvas-scene, *task-dependency-line 提供",
+        "list": [
+          {
+            "label": "connection_mode_toggled信号",
+            "contract_api": "connection_mode_toggled: Signal",
+            "from": "task-tool-panel"
+          },
+          {
+            "label": "add_dependency()方法",
+            "contract_api": "add_dependency()",
+            "from": "task-canvas-scene"
+          },
+          {
+            "label": "DependencyLine类",
+            "contract_api": "DependencyLine",
+            "from": "task-dependency-line"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "切换连接模式",
+            "contract_api": "toggle_connection_mode(enabled: bool)",
+            "from": "task-connection-mode"
+          },
+          {
+            "label": "处理节点点击",
+            "contract_api": "on_node_clicked(node)",
+            "from": "task-connection-mode"
+          },
+          {
+            "label": "创建依赖",
+            "contract_api": "create_dependency(source, target)",
+            "from": "task-connection-mode"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证进入连接模式",
+          "api": "test_enter_connection_mode()"
+        },
+        {
+          "target": "验证选择源任务",
+          "api": "test_select_source_task()"
+        },
+        {
+          "target": "验证选择目标任务",
+          "api": "test_select_target_task()"
+        },
+        {
+          "target": "验证创建依赖",
+          "api": "test_create_dependency()"
+        },
+        {
+          "target": "验证ESC取消",
+          "api": "test_cancel_with_esc()"
+        },
+        {
+          "target": "验证退出连接模式",
+          "api": "test_exit_connection_mode()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"painter-app/ui/main_window.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-json-io",
+      "name": "JSON导入导出",
+      "description": "实现保存和加载JSON文件的完整功能",
+      "moduleId": "mod-ui-main",
+      "status": "ready",
+      "issue_details": "",
+      "prompt": "在MainWindow中实现JSON文件导入导出。\n\n要求：\n1. _save_json(): 打开文件对话框保存JSON\n2. _load_json(): 打开文件对话框加载JSON\n3. 使用QFileDialog选择文件\n4. 保存时调用scene.to_json()获取数据\n5. 加载时调用scene.from_json(data)恢复数据\n6. 文件格式符合aitdd_data.md规范\n7. 加载后更新属性面板和统计信息\n8. 状态栏显示操作结果\n\n输出文件：painter-app/ui/main_window.py (添加方法)",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-canvas-scene, *task-tool-panel 提供",
+        "list": [
+          {
+            "label": "to_json()方法",
+            "contract_api": "to_json()",
+            "from": "task-canvas-scene"
+          },
+          {
+            "label": "from_json()方法",
+            "contract_api": "from_json()",
+            "from": "task-canvas-scene"
+          },
+          {
+            "label": "update_stats()方法",
+            "contract_api": "update_stats()",
+            "from": "task-tool-panel"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "保存JSON文件",
+            "contract_api": "_save_json()",
+            "from": "task-json-io"
+          },
+          {
+            "label": "加载JSON文件",
+            "contract_api": "_load_json()",
+            "from": "task-json-io"
+          },
+          {
+            "label": "当前文件路径",
+            "contract_api": "current_file: str",
+            "from": "task-json-io"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证保存JSON功能",
+          "api": "test_save_json()"
+        },
+        {
+          "target": "验证加载JSON功能",
+          "api": "test_load_json()"
+        },
+        {
+          "target": "验证文件对话框",
+          "api": "test_file_dialog()"
+        },
+        {
+          "target": "验证JSON格式",
+          "api": "test_json_format()"
+        },
+        {
+          "target": "验证错误处理",
+          "api": "test_error_handling()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"painter-app/ui/main_window.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    },
+    {
+      "id": "task-integration",
+      "name": "主窗口集成",
+      "description": "将所有组件集成到主窗口，完成完整功能",
+      "moduleId": "mod-ui-main",
+      "status": "ready",
+      "issue_details": "",
+      "prompt": "完成MainWindow的完整集成。\n\n要求：\n1. 创建中央widget和布局\n2. 创建TaskScene和TaskCanvasView\n3. 创建ToolPanel和PropertyPanel\n4. 使用QSplitter分隔面板\n5. 连接所有信号和槽\n6. 实现新建项目功能\n7. 实现删除选中功能\n8. 实现视图重置功能\n9. 选择节点时更新属性面板\n10. 数据变更时更新统计信息\n\n输出文件：painter-app/ui/main_window.py (完整实现)",
+      "upstreamContractDetail": {
+        "title": "依赖所有其他任务提供",
+        "list": [
+          {
+            "label": "场景管理",
+            "contract_api": "task-canvas-scene",
+            "from": "task-canvas-scene"
+          },
+          {
+            "label": "视图交互",
+            "contract_api": "task-canvas-view",
+            "from": "task-canvas-view"
+          },
+          {
+            "label": "工具面板",
+            "contract_api": "task-tool-panel",
+            "from": "task-tool-panel"
+          },
+          {
+            "label": "属性面板",
+            "contract_api": "task-property-panel",
+            "from": "task-property-panel"
+          },
+          {
+            "label": "同步服务",
+            "contract_api": "task-sync-service",
+            "from": "task-sync-service"
+          },
+          {
+            "label": "数据库导入",
+            "contract_api": "task-db-import",
+            "from": "task-db-import"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "启动入口",
+            "contract_api": "main()",
+            "from": "task-integration"
+          },
+          {
+            "label": "完整的用户交互流程",
+            "contract_api": "用户交互",
+            "from": "task-integration"
+          },
+          {
+            "label": "数据持久化",
+            "contract_api": "数据持久化",
+            "from": "task-integration"
+          },
+          {
+            "label": "与AITDD系统集成",
+            "contract_api": "系统集成",
+            "from": "task-integration"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证主窗口创建",
+          "api": "test_main_window_creation()"
+        },
+        {
+          "target": "验证面板集成",
+          "api": "test_panel_integration()"
+        },
+        {
+          "target": "验证信号连接",
+          "api": "test_signal_connections()"
+        },
+        {
+          "target": "验证完整工作流",
+          "api": "test_full_workflow()"
+        },
+        {
+          "target": "验证同步集成",
+          "api": "test_sync_integration()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"painter-app/ui/main_window.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}"
+    }
+  ],
+  "taskDependencies": [
+    {
+      "id": "dep-001",
+      "upstreamTaskId": "task-data-models",
+      "downstreamTaskId": "task-canvas-scene",
+      "interfaceContract": "TaskData, ModuleData, DependencyData, ProjectData 数据类"
+    },
+    {
+      "id": "dep-002",
+      "upstreamTaskId": "task-data-models",
+      "downstreamTaskId": "task-module-node",
+      "interfaceContract": "ModuleData 数据类"
+    },
+    {
+      "id": "dep-003",
+      "upstreamTaskId": "task-data-models",
+      "downstreamTaskId": "task-task-node",
+      "interfaceContract": "TaskData 数据类"
+    },
+    {
+      "id": "dep-004",
+      "upstreamTaskId": "task-task-node",
+      "downstreamTaskId": "task-dependency-line",
+      "interfaceContract": "TaskNode 类, sceneBoundingRect() 方法"
+    },
+    {
+      "id": "dep-005",
+      "upstreamTaskId": "task-data-models",
+      "downstreamTaskId": "task-dependency-line",
+      "interfaceContract": "DependencyData 数据类"
+    },
+    {
+      "id": "dep-006",
+      "upstreamTaskId": "task-canvas-scene",
+      "downstreamTaskId": "task-canvas-view",
+      "interfaceContract": "TaskScene 场景类"
+    },
+    {
+      "id": "dep-007",
+      "upstreamTaskId": "task-main-window",
+      "downstreamTaskId": "task-property-panel",
+      "interfaceContract": "主窗口布局"
+    },
+    {
+      "id": "dep-008",
+      "upstreamTaskId": "task-data-models",
+      "downstreamTaskId": "task-property-panel",
+      "interfaceContract": "TaskData, ModuleData 数据类"
+    },
+    {
+      "id": "dep-009",
+      "upstreamTaskId": "task-main-window",
+      "downstreamTaskId": "task-tool-panel",
+      "interfaceContract": "主窗口布局"
+    },
+    {
+      "id": "dep-010",
+      "upstreamTaskId": "task-canvas-scene",
+      "downstreamTaskId": "task-tool-panel",
+      "interfaceContract": "统计信息（模块数、任务数、依赖数）"
+    },
+    {
+      "id": "dep-011",
+      "upstreamTaskId": "task-data-models",
+      "downstreamTaskId": "task-sync-service",
+      "interfaceContract": "数据模型类, to_json() 方法"
+    },
+    {
+      "id": "dep-012",
+      "upstreamTaskId": "task-data-models",
+      "downstreamTaskId": "task-db-import",
+      "interfaceContract": "数据模型类"
+    },
+    {
+      "id": "dep-013",
+      "upstreamTaskId": "task-tool-panel",
+      "downstreamTaskId": "task-connection-mode",
+      "interfaceContract": "connection_mode_toggled 信号"
+    },
+    {
+      "id": "dep-014",
+      "upstreamTaskId": "task-canvas-scene",
+      "downstreamTaskId": "task-connection-mode",
+      "interfaceContract": "add_dependency() 方法"
+    },
+    {
+      "id": "dep-015",
+      "upstreamTaskId": "task-dependency-line",
+      "downstreamTaskId": "task-connection-mode",
+      "interfaceContract": "DependencyLine 类"
+    },
+    {
+      "id": "dep-016",
+      "upstreamTaskId": "task-canvas-scene",
+      "downstreamTaskId": "task-json-io",
+      "interfaceContract": "to_json(), from_json() 方法"
+    },
+    {
+      "id": "dep-017",
+      "upstreamTaskId": "task-tool-panel",
+      "downstreamTaskId": "task-json-io",
+      "interfaceContract": "update_stats() 方法"
+    },
+    {
+      "id": "dep-018",
+      "upstreamTaskId": "task-main-window",
+      "downstreamTaskId": "task-integration",
+      "interfaceContract": "主窗口框架"
+    },
+    {
+      "id": "dep-019",
+      "upstreamTaskId": "task-canvas-scene",
+      "downstreamTaskId": "task-integration",
+      "interfaceContract": "场景管理"
+    },
+    {
+      "id": "dep-020",
+      "upstreamTaskId": "task-canvas-view",
+      "downstreamTaskId": "task-integration",
+      "interfaceContract": "视图交互"
+    },
+    {
+      "id": "dep-021",
+      "upstreamTaskId": "task-tool-panel",
+      "downstreamTaskId": "task-integration",
+      "interfaceContract": "工具面板"
+    },
+    {
+      "id": "dep-022",
+      "upstreamTaskId": "task-property-panel",
+      "downstreamTaskId": "task-integration",
+      "interfaceContract": "属性面板"
+    },
+    {
+      "id": "dep-023",
+      "upstreamTaskId": "task-sync-service",
+      "downstreamTaskId": "task-integration",
+      "interfaceContract": "同步服务"
+    },
+    {
+      "id": "dep-024",
+      "upstreamTaskId": "task-db-import",
+      "downstreamTaskId": "task-integration",
+      "interfaceContract": "数据库导入"
+    },
+    {
+      "id": "dep-025",
+      "upstreamTaskId": "task-connection-mode",
+      "downstreamTaskId": "task-integration",
+      "interfaceContract": "连接模式交互"
+    },
+    {
+      "id": "dep-026",
+      "upstreamTaskId": "task-json-io",
+      "downstreamTaskId": "task-integration",
+      "interfaceContract": "JSON导入导出"
+    }
+  ]
+}

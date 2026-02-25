@@ -371,3 +371,96 @@ func (s *ModuleService) UpdateModuleDependency(moduleID, dependencyID, dependenc
 
 	return &dependency, nil
 }
+
+// ModulePositionInfo 模块位置信息
+type ModulePositionInfo struct {
+	ModuleID  string  `json:"moduleId"`
+	PositionX float64 `json:"positionX"`
+	PositionY float64 `json:"positionY"`
+}
+
+// GetModulePositions 获取项目所有模块的位置
+func (s *ModuleService) GetModulePositions(projectID string) ([]ModulePositionInfo, error) {
+	var modules []models.Module
+	if err := database.DB.Select("id, position_x, position_y").
+		Where("project_id = ?", projectID).
+		Find(&modules).Error; err != nil {
+		return nil, err
+	}
+
+	positions := make([]ModulePositionInfo, 0, len(modules))
+	for _, m := range modules {
+		pos := ModulePositionInfo{
+			ModuleID: m.ID,
+		}
+		if m.PositionX != nil {
+			pos.PositionX = *m.PositionX
+		}
+		if m.PositionY != nil {
+			pos.PositionY = *m.PositionY
+		}
+		positions = append(positions, pos)
+	}
+
+	return positions, nil
+}
+
+// UpdateModulePosition 更新单个模块位置
+func (s *ModuleService) UpdateModulePosition(moduleID string, positionX, positionY float64) (*models.Module, error) {
+	var module models.Module
+	if err := database.DB.First(&module, "id = ?", moduleID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("模块不存在")
+		}
+		return nil, err
+	}
+
+	now := time.Now().UnixMilli()
+	updates := map[string]interface{}{
+		"position_x":          positionX,
+		"position_y":          positionY,
+		"position_updated_at": now,
+	}
+
+	if err := database.DB.Model(&module).Updates(updates).Error; err != nil {
+		return nil, err
+	}
+
+	// 重新获取更新后的模块
+	return s.GetModule(moduleID)
+}
+
+// BatchUpdateModulePositions 批量更新模块位置
+func (s *ModuleService) BatchUpdateModulePositions(positions []ModulePositionInfo) (int, error) {
+	if len(positions) == 0 {
+		return 0, nil
+	}
+
+	now := time.Now().UnixMilli()
+	updated := 0
+
+	tx := database.DB.Begin()
+	for _, pos := range positions {
+		updates := map[string]interface{}{
+			"position_x":          pos.PositionX,
+			"position_y":          pos.PositionY,
+			"position_updated_at": now,
+		}
+		result := tx.Model(&models.Module{}).
+			Where("id = ?", pos.ModuleID).
+			Updates(updates)
+		if result.Error != nil {
+			tx.Rollback()
+			return 0, result.Error
+		}
+		if result.RowsAffected > 0 {
+			updated++
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return 0, err
+	}
+
+	return updated, nil
+}

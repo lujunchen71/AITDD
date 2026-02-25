@@ -138,3 +138,26 @@ export const moduleDependencyApi = {
     return api.delete<{ deleted: boolean }>(`/modules/${moduleId}/dependencies/${dependencyId}`);
   },
 };
+
+// 模块位置API
+export const modulePositionApi = {
+  // 获取所有模块位置
+  getPositions(projectId: string) {
+    return api.get<{ positions: Array<{ moduleId: string; positionX: number | null; positionY: number | null }> }>(
+      `/modules/positions?projectId=${encodeURIComponent(projectId)}`
+    );
+  },
+
+  // 更新单个模块位置
+  updatePosition(id: string, x: number, y: number) {
+    return api.put<{ success: boolean }>(`/modules/${id}/position`, {
+      positionX: x,
+      positionY: y,
+    });
+  },
+
+  // 批量更新模块位置
+  batchUpdatePositions(positions: Array<{ moduleId: string; positionX: number; positionY: number }>) {
+    return api.put<{ success: boolean }>('/modules/positions', { positions });
+  },
+};

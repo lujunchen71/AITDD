@@ -31,6 +31,9 @@ export interface Module {
   lockedBy?: string | null;
   lockedAt?: number | null;
   lockExpiresAt?: number | null;
+  position_x?: number;
+  position_y?: number;
+  position_updated_at?: number;
   createdAt: number;
   updatedAt: number;
   version: number;
@@ -84,23 +87,26 @@ export interface UpdateModuleDependencyRequest {
 /** 任务状态枚举 - 与后端 models.Task 对齐 */
 export type TaskStatus = 'ready' | 'claimed' | 'in_progress' | 'pending_review' | 'completed' | 'failed' | 'blocked';
 
-/** 契约接口 - 结构化数据 */
-export interface ContractInterface {
-  name: string;
-  type: 'function' | 'class' | 'api' | 'cli';
-  signature: string;
-  description: string;
-  inputs: unknown[];
-  outputs: unknown[];
+/** 契约接口项 - 新格式 */
+export interface ContractInterfaceItem {
+  label: string;
+  contract_api: string;
+  from?: string;  // 标明该 API 来自哪个 task_id
 }
 
+/** 契约详情 - 新格式 (JSON字典) */
 export interface ContractDetail {
-  interfaces: ContractInterface[];
-  dataStructures: unknown[];
-  version: string;
+  title: string;
+  list: ContractInterfaceItem[];
 }
 
-/** 测试用例 */
+/** 测试项 - 新格式 */
+export interface TestItem {
+  target: string;
+  api: string;
+}
+
+/** 测试用例 - 旧格式保留兼容 */
 export interface TestCase {
   id: string;
   name: string;
@@ -145,8 +151,10 @@ export interface Task {
   upstreamContractDetail?: string; // JSON string of ContractDetail
   downstreamContractDetail?: string; // JSON string of ContractDetail
   prompt?: string;
-  tests?: string; // JSON string of TestCase[]
-  logs?: string; // JSON string of LogEntry[]
+  tests?: string; // JSON string of TestItem[]
+  testResult?: string; // JSON string of string[] (test evidence strings)
+  bugLog?: string; // JSON string of LogEntry[] (原 logs)
+  issueDetails?: string; // AI 发现问题时记录
   codePaths?: string; // JSON string of string[]
   humanAssistance?: string; // JSON string of HumanAssistance
   locked: boolean;

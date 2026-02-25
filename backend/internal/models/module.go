@@ -22,6 +22,10 @@ type Module struct {
 	LockedBy                 *string `json:"lockedBy" gorm:"type:text"`
 	LockedAt                 *int64  `json:"lockedAt" gorm:"type:integer"`
 	LockExpiresAt            *int64  `json:"lockExpiresAt" gorm:"type:integer"`
+	// 位置字段
+	PositionX                *float64 `json:"positionX" gorm:"type:real"`
+	PositionY                *float64 `json:"positionY" gorm:"type:real"`
+	PositionUpdatedAt        *int64   `json:"positionUpdatedAt" gorm:"type:integer"`
 	CreatedAt                int64   `json:"createdAt" gorm:"not null"`
 	UpdatedAt                int64   `json:"updatedAt" gorm:"not null"`
 	Version                  int     `json:"version" gorm:"not null;default:1"`

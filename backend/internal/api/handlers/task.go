@@ -179,7 +179,7 @@ func UpdateTask(c *gin.Context) {
 		task.Tests = *req.Tests
 	}
 	if req.Logs != nil {
-		task.Logs = *req.Logs
+		task.BugLog = *req.Logs
 	}
 	if req.CodePaths != nil {
 		task.CodePaths = *req.CodePaths

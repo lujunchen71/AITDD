@@ -29,12 +29,128 @@ AITDD 是一个 AI 辅助的可视化任务治理系统，为第三方 AI 编程
 ### 后端
 - Go 1.21+
 - SQLite 3
+- Delve (调试器，可选)
 
 ### 前端
 - Node.js 18+
 - npm 9+
 
 ## 🛠️ 安装与运行
+
+### 环境安装指南
+
+#### 1. Go 语言环境安装
+
+如果你还没有安装 Go 语言环境，需要先访问 Go 官方下载页面下载对应操作系统的安装包进行安装：
+
+**下载地址**: https://go.dev/dl/
+
+**安装后验证**:
+```bash
+go version
+```
+
+#### 2. 设置 Go 调试器 (Delve)
+
+Delve 是 Go 语言的调试器，用于开发调试：
+
+```bash
+go install github.com/go-delve/delve/cmd/dlv@latest
+```
+
+**验证安装**:
+```bash
+dlv version
+```
+
+> 💡 **提示**: 确保 Go 的 bin 目录已添加到系统 PATH 环境变量中（通常为 `$GOPATH/bin` 或 `$HOME/go/bin`）
+
+#### 3. Node.js 环境安装
+
+访问 Node.js 官网下载并安装 LTS 版本：https://nodejs.org/
+
+**验证安装**:
+```bash
+node --version
+npm --version
+```
+
+### 前端依赖安装
+
+前端项目基于 React + TypeScript，需要安装以下依赖：
+
+#### 核心框架依赖
+```bash
+cd frontend
+npm install react react-dom
+```
+
+#### TypeScript 类型支持
+```bash
+npm install -D typescript @types/react @types/react-dom
+```
+
+> 💡 **说明**: TypeScript 配合 React 使用时，必须安装 `@types/react` 和 `@types/react-dom` 来提供 React 的类型定义。
+
+#### 路由依赖
+项目中有多个功能模块（dashboard、modules、tasks等），需要路由来组织：
+
+```bash
+npm install react-router-dom
+```
+
+> 💡 **说明**: `react-router-dom` 的 TypeScript 类型已内置，无需额外安装。
+
+#### 状态管理 (Zustand)
+项目使用 Zustand 进行状态管理：
+
+```bash
+npm install zustand
+```
+
+如果需要 Immer 支持（不可变数据更新）：
+
+```bash
+npm install immer
+# 或使用 Zustand 的 immer 中间件
+npm install zustand-middleware
+```
+
+#### 开发工具和构建相关
+
+项目使用 Vite 作为构建工具：
+
+```bash
+# Vite 核心和 React 插件
+npm install -D vite @vitejs/plugin-react
+
+# TypeScript 相关
+npm install -D typescript @types/node
+
+# 如果需要路径别名支持（如 @/ 指向 src/）
+npm install -D vite-tsconfig-paths
+```
+
+#### TypeScript 类型定义配置
+
+项目的 `src/types/` 目录用于存放全局类型定义，需要在 `tsconfig.json` 中配置：
+
+```json
+{
+  "compilerOptions": {
+    "typeRoots": ["./node_modules/@types", "./src/types"]
+  }
+}
+```
+
+#### 一键安装所有前端依赖
+
+```bash
+cd frontend
+npm install
+```
+
+> 💡 **说明**: `package.json` 中已配置好所有依赖，执行 `npm install` 即可自动安装所有必需的包。
 
 ### 快速启动
 

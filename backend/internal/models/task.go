@@ -15,12 +15,14 @@ type Task struct {
 	Status                 string  `json:"status" gorm:"not null;default:'ready';type:text;index"`
 	Assignee               *string `json:"assignee" gorm:"type:text"`
 	UpstreamContractDetail string  `json:"upstreamContractDetail" gorm:"type:text"`
-	DownstreamContractDetail string `json:"downstreamContractDetail" gorm:"type:text"`
+	DownstreamContractDetail string  `json:"downstreamContractDetail" gorm:"type:text"`
 	Prompt                 string  `json:"prompt" gorm:"type:text"`
-	Tests                  string  `json:"tests" gorm:"type:text"` // JSON array
-	Logs                   string  `json:"logs" gorm:"type:text"` // JSON array
+	Tests                  string  `json:"tests" gorm:"type:text"` // JSON array of TestItem objects
+	TestResult             string  `json:"testResult" gorm:"type:text"` // JSON array of test evidence strings
+	BugLog                 string  `json:"bugLog" gorm:"column:bug_log;type:text"` // JSON array
 	CodePaths              string  `json:"codePaths" gorm:"type:text"` // JSON array
 	HumanAssistance        string  `json:"humanAssistance" gorm:"type:text"` // JSON object
+	IssueDetails           string  `json:"issueDetails" gorm:"column:issue_details;type:text;default:''"` // 新增字段
 	Locked                 bool    `json:"locked" gorm:"not null;default:false"`
 	LockedBy               *string `json:"lockedBy" gorm:"type:text"`
 	LockedAt               *int64  `json:"lockedAt" gorm:"type:integer"`

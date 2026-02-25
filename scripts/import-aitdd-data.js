@@ -93,9 +93,11 @@ db.exec(`
       downstream_contract_detail TEXT,
       prompt TEXT,
       tests TEXT,
-      logs TEXT,
+      test_result TEXT,
+      bug_log TEXT,
       code_paths TEXT,
       human_assistance TEXT,
+      issue_details TEXT,
       locked INTEGER NOT NULL DEFAULT 0,
       locked_by TEXT,
       locked_at INTEGER,
@@ -180,32 +182,70 @@ const importData = db.transaction(() => {
   // 4. 插入任务
   console.log('\n📝 插入任务...');
   const insertTask = db.prepare(`
-    INSERT INTO tasks (
-      id, module_id, name, description, status,
-      upstream_contract_detail, downstream_contract_detail,
-      prompt, tests, logs, code_paths, human_assistance,
-      locked, created_at, updated_at, version, sync_status
+    INSERT OR REPLACE INTO tasks (
+      id, module_id, name, description, status, assignee,
+      upstream_contract_detail, downstream_contract_detail, prompt,
+      tests, test_result, bug_log, code_paths, human_assistance, issue_details,
+      locked, locked_by, locked_at, lock_expires_at,
+      created_at, updated_at, version, sync_status
+    ) VALUES (
+      @id, @moduleId, @name, @description, @status, @assignee,
+      @upstreamContractDetail, @downstreamContractDetail, @prompt,
+      @tests, @testResult, @bugLog, @codePaths, @humanAssistance, @issueDetails,
+      @locked, @lockedBy, @lockedAt, @lockExpiresAt,
+      @createdAt, @updatedAt, @version, @syncStatus
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 1, 'SYNCED')
   `);
   
+  // 辅助函数：将契约详情对象序列化为JSON字符串
+  const serializeContractDetail = (detail) => {
+    if (!detail) return '';
+    if (typeof detail === 'string') return detail;
+    return JSON.stringify(detail);
+  };
+  
+  // 辅助函数：将测试数组序列化为JSON字符串
+  const serializeTests = (tests) => {
+    if (!tests) return '[]';
+    if (typeof tests === 'string') return tests;
+    return JSON.stringify(tests);
+  };
+  
+  // 辅助函数：将测试结果数组序列化为JSON字符串
+  const serializeTestResult = (testResult) => {
+    if (!testResult) return '[]';
+    if (typeof testResult === 'string') return testResult;
+    return JSON.stringify(testResult);
+  };
+  
   for (const task of jsonData.tasks || []) {
-    insertTask.run(
-      task.id,
-      task.moduleId,
-      task.name,
-      task.description || '',
-      task.status || 'ready',
-      task.upstreamContractDetail || '',
-      task.downstreamContractDetail || '',
-      task.prompt || '',
-      typeof task.tests === 'string' ? task.tests : JSON.stringify(task.tests || []),
-      task.logs || '',
-      typeof task.codePaths === 'string' ? task.codePaths : JSON.stringify(task.codePaths || []),
-      typeof task.humanAssistance === 'string' ? task.humanAssistance : JSON.stringify(task.humanAssistance || {}),
-      now,
-      now
-    );
+    insertTask.run({
+      id: task.id,
+      moduleId: task.moduleId,
+      name: task.name,
+      description: task.description || '',
+      status: task.status || 'ready',
+      assignee: task.assignee || null,
+      upstreamContractDetail: serializeContractDetail(task.upstreamContractDetail),
+      downstreamContractDetail: serializeContractDetail(task.downstreamContractDetail),
+      prompt: task.prompt || '',
+      tests: serializeTests(task.tests),
+      testResult: serializeTestResult(task.testResult || task.test_result || []),
+      bugLog: task.bugLog || task.bug_log || task.logs || '',  // 兼容旧字段名
+      codePaths: JSON.stringify(task.codePaths || task.code_paths || []),
+      humanAssistance: typeof task.humanAssistance === 'object'
+        ? JSON.stringify(task.humanAssistance)
+        : (task.humanAssistance || '{}'),
+      issueDetails: task.issueDetails || task.issue_details || '',  // 新增
+      locked: task.locked ? 1 : 0,
+      lockedBy: task.lockedBy || task.locked_by || null,
+      lockedAt: task.lockedAt || task.locked_at || null,
+      lockExpiresAt: task.lockExpiresAt || task.lock_expires_at || null,
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+      syncStatus: 'SYNCED'
+    });
     console.log(`   任务: ${task.name} (${task.id}) - ${task.status}`);
   }
 

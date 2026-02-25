@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -40,6 +41,30 @@ func NewMCPServer() *MCPServer {
 	s.registerTools()
 
 	return s
+}
+
+// getParam 从请求参数中获取字符串值
+func getParam(request mcp.CallToolRequest, key string) (string, bool) {
+	args, ok := request.Params.Arguments.(map[string]any)
+	if !ok {
+		return "", false
+	}
+	val, exists := args[key]
+	if !exists {
+		return "", false
+	}
+	strVal, ok := val.(string)
+	return strVal, ok
+}
+
+// getParamAny 从请求参数中获取任意类型值
+func getParamAny(request mcp.CallToolRequest, key string) (any, bool) {
+	args, ok := request.Params.Arguments.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	val, exists := args[key]
+	return val, exists
 }
 
 // registerTools 注册所有 MCP 工具
@@ -171,168 +196,170 @@ func (s *MCPServer) registerTools() {
 
 // 工具处理函数实现
 
-func (s *MCPServer) handleGetProjectSummary(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
+func (s *MCPServer) handleGetProjectSummary(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	resp, err := http.Get(s.apiURL + "/project")
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleGetConstitution(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
+func (s *MCPServer) handleGetConstitution(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	resp, err := http.Get(s.apiURL + "/project/constitution")
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleGetAllModules(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	projectID := request.Params.Arguments["projectId"]
-	if projectID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少 projectId 参数"}}}, nil
+func (s *MCPServer) handleGetAllModules(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	projectID, ok := getParam(request, "projectId")
+	if !ok {
+		return mcp.NewToolResultText("缺少 projectId 参数"), nil
 	}
 
 	resp, err := http.Get(fmt.Sprintf("%s/modules?projectId=%s", s.apiURL, projectID))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleGetModuleOverview(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	moduleID := request.Params.Arguments["moduleId"]
-	if moduleID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少 moduleId 参数"}}}, nil
+func (s *MCPServer) handleGetModuleOverview(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	moduleID, ok := getParam(request, "moduleId")
+	if !ok {
+		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
 	}
 
 	resp, err := http.Get(fmt.Sprintf("%s/modules/%s", s.apiURL, moduleID))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleGetModuleTaskIDs(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	moduleID := request.Params.Arguments["moduleId"]
-	if moduleID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少 moduleId 参数"}}}, nil
+func (s *MCPServer) handleGetModuleTaskIDs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	moduleID, ok := getParam(request, "moduleId")
+	if !ok {
+		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
 	}
 
 	resp, err := http.Get(fmt.Sprintf("%s/modules/%s/tasks?fields=id", s.apiURL, moduleID))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleGetTaskDetails(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	taskID := request.Params.Arguments["taskId"]
-	if taskID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少 taskId 参数"}}}, nil
+func (s *MCPServer) handleGetTaskDetails(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	taskID, ok := getParam(request, "taskId")
+	if !ok {
+		return mcp.NewToolResultText("缺少 taskId 参数"), nil
 	}
 
 	resp, err := http.Get(fmt.Sprintf("%s/tasks/%s", s.apiURL, taskID))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleUpdateTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	taskID := request.Params.Arguments["taskId"]
-	if taskID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少 taskId 参数"}}}, nil
+func (s *MCPServer) handleUpdateTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	taskID, ok := getParam(request, "taskId")
+	if !ok {
+		return mcp.NewToolResultText("缺少 taskId 参数"), nil
 	}
 
 	// 构建更新数据
 	updateData := make(map[string]interface{})
-	if name := request.Params.Arguments["name"]; name != nil {
+	if name, ok := getParamAny(request, "name"); ok {
 		updateData["name"] = name
 	}
-	if description := request.Params.Arguments["description"]; description != nil {
+	if description, ok := getParamAny(request, "description"); ok {
 		updateData["description"] = description
 	}
-	if status := request.Params.Arguments["status"]; status != nil {
+	if status, ok := getParamAny(request, "status"); ok {
 		updateData["status"] = status
 	}
-	if prompt := request.Params.Arguments["prompt"]; prompt != nil {
+	if prompt, ok := getParamAny(request, "prompt"); ok {
 		updateData["prompt"] = prompt
 	}
 
 	jsonData, _ := json.Marshal(updateData)
-	resp, err := http.Put(fmt.Sprintf("%s/tasks/%s", s.apiURL, taskID), "application/json", jsonData)
+	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/tasks/%s", s.apiURL, taskID), bytes.NewBuffer(jsonData))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleCreateTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	moduleID := request.Params.Arguments["moduleId"]
-	if moduleID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少 moduleId 参数"}}}, nil
+func (s *MCPServer) handleCreateTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	moduleID, ok := getParam(request, "moduleId")
+	if !ok {
+		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
 	}
 
-	name := request.Params.Arguments["name"]
-	if name == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少 name 参数"}}}, nil
+	name, ok := getParam(request, "name")
+	if !ok {
+		return mcp.NewToolResultText("缺少 name 参数"), nil
 	}
 
 	// 构建创建数据
@@ -340,74 +367,74 @@ func (s *MCPServer) handleCreateTask(ctx context.Context, request mcp.CallToolRe
 		"moduleId": moduleID,
 		"name":     name,
 	}
-	if description := request.Params.Arguments["description"]; description != nil {
+	if description, ok := getParamAny(request, "description"); ok {
 		createData["description"] = description
 	}
-	if prompt := request.Params.Arguments["prompt"]; prompt != nil {
+	if prompt, ok := getParamAny(request, "prompt"); ok {
 		createData["prompt"] = prompt
 	}
 
 	jsonData, _ := json.Marshal(createData)
-	resp, err := http.Post(fmt.Sprintf("%s/tasks", s.apiURL), "application/json", jsonData)
+	resp, err := http.Post(fmt.Sprintf("%s/tasks", s.apiURL), "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleDeleteTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	taskID := request.Params.Arguments["taskId"]
-	if taskID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少 taskId 参数"}}}, nil
+func (s *MCPServer) handleDeleteTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	taskID, ok := getParam(request, "taskId")
+	if !ok {
+		return mcp.NewToolResultText("缺少 taskId 参数"), nil
 	}
 
 	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/tasks/%s", s.apiURL, taskID), nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleDeleteModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	moduleID := request.Params.Arguments["moduleId"]
-	if moduleID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少 moduleId 参数"}}}, nil
+func (s *MCPServer) handleDeleteModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	moduleID, ok := getParam(request, "moduleId")
+	if !ok {
+		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
 	}
 
 	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/modules/%s", s.apiURL, moduleID), nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleOpenFrontend(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
+func (s *MCPServer) handleOpenFrontend(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// 尝试打开浏览器
 	url := "http://localhost:5173"
 	
@@ -425,7 +452,7 @@ func (s *MCPServer) handleOpenFrontend(ctx context.Context, request mcp.CallTool
 	// 执行命令 (这里简化处理，实际需要使用 os/exec)
 	_ = cmd
 
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "已尝试打开前端页面：" + url}}}, nil
+	return mcp.NewToolResultText("已尝试打开前端页面：" + url), nil
 }
 
 func isWindows() bool {
@@ -437,65 +464,74 @@ func isMacOS() bool {
 	return false
 }
 
-func (s *MCPServer) handleSendNotification(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	toTaskID := request.Params.Arguments["toTaskId"]
-	if toTaskID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少 toTaskId 参数"}}}, nil
+func (s *MCPServer) handleSendNotification(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	toTaskID, ok := getParam(request, "toTaskId")
+	if !ok {
+		return mcp.NewToolResultText("缺少 toTaskId 参数"), nil
 	}
 
 	// 构建通知数据
 	notificationData := map[string]interface{}{
 		"toTaskId": toTaskID,
-		"type":     request.Params.Arguments["type"],
-		"title":    request.Params.Arguments["title"],
-		"message":  request.Params.Arguments["message"],
+		"type":     "",
+		"title":    "",
+		"message":  "",
+	}
+	if t, ok := getParamAny(request, "type"); ok {
+		notificationData["type"] = t
+	}
+	if t, ok := getParamAny(request, "title"); ok {
+		notificationData["title"] = t
+	}
+	if m, ok := getParamAny(request, "message"); ok {
+		notificationData["message"] = m
 	}
 
 	jsonData, _ := json.Marshal(notificationData)
-	resp, err := http.Post(fmt.Sprintf("%s/notifications", s.apiURL), "application/json", jsonData)
+	resp, err := http.Post(fmt.Sprintf("%s/notifications", s.apiURL), "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleReadNotifications(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	toTaskID := request.Params.Arguments["toTaskId"]
+func (s *MCPServer) handleReadNotifications(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	toTaskID, _ := getParam(request, "toTaskId")
 	
 	url := fmt.Sprintf("%s/notifications?read=false", s.apiURL)
-	if toTaskID != nil {
+	if toTaskID != "" {
 		url += fmt.Sprintf("&toTaskId=%s", toTaskID)
 	}
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleLockResource(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	resourceType := request.Params.Arguments["resourceType"]
-	resourceID := request.Params.Arguments["resourceId"]
+func (s *MCPServer) handleLockResource(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	resourceType, ok1 := getParam(request, "resourceType")
+	resourceID, ok2 := getParam(request, "resourceId")
 
-	if resourceType == nil || resourceID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少必要参数"}}}, nil
+	if !ok1 || !ok2 {
+		return mcp.NewToolResultText("缺少必要参数"), nil
 	}
 
 	lockData := map[string]interface{}{
@@ -504,27 +540,27 @@ func (s *MCPServer) handleLockResource(ctx context.Context, request mcp.CallTool
 	}
 
 	jsonData, _ := json.Marshal(lockData)
-	resp, err := http.Post(fmt.Sprintf("%s/lock", s.apiURL), "application/json", jsonData)
+	resp, err := http.Post(fmt.Sprintf("%s/lock", s.apiURL), "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleUnlockResource(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	resourceType := request.Params.Arguments["resourceType"]
-	resourceID := request.Params.Arguments["resourceId"]
+func (s *MCPServer) handleUnlockResource(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	resourceType, ok1 := getParam(request, "resourceType")
+	resourceID, ok2 := getParam(request, "resourceId")
 
-	if resourceType == nil || resourceID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少必要参数"}}}, nil
+	if !ok1 || !ok2 {
+		return mcp.NewToolResultText("缺少必要参数"), nil
 	}
 
 	unlockData := map[string]interface{}{
@@ -533,161 +569,161 @@ func (s *MCPServer) handleUnlockResource(ctx context.Context, request mcp.CallTo
 	}
 
 	jsonData, _ := json.Marshal(unlockData)
-	resp, err := http.Post(fmt.Sprintf("%s/lock/unlock", s.apiURL), "application/json", jsonData)
+	resp, err := http.Post(fmt.Sprintf("%s/lock/unlock", s.apiURL), "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleGetLockStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	resourceType := request.Params.Arguments["resourceType"]
-	resourceID := request.Params.Arguments["resourceId"]
+func (s *MCPServer) handleGetLockStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	resourceType, ok1 := getParam(request, "resourceType")
+	resourceID, ok2 := getParam(request, "resourceId")
 
-	if resourceType == nil || resourceID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少必要参数"}}}, nil
+	if !ok1 || !ok2 {
+		return mcp.NewToolResultText("缺少必要参数"), nil
 	}
 
 	resp, err := http.Get(fmt.Sprintf("%s/lock/status?resourceType=%s&resourceId=%s", s.apiURL, resourceType, resourceID))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleCreateModuleDependency(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	moduleID := request.Params.Arguments["moduleId"]
-	dependsOnModuleID := request.Params.Arguments["dependsOnModuleId"]
+func (s *MCPServer) handleCreateModuleDependency(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	moduleID, ok1 := getParam(request, "moduleId")
+	dependsOnModuleID, ok2 := getParam(request, "dependsOnModuleId")
 
-	if moduleID == nil || dependsOnModuleID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少必要参数"}}}, nil
+	if !ok1 || !ok2 {
+		return mcp.NewToolResultText("缺少必要参数"), nil
 	}
 
 	depData := map[string]interface{}{
 		"dependsOnModuleId": dependsOnModuleID,
 	}
-	if depType := request.Params.Arguments["dependencyType"]; depType != nil {
+	if depType, ok := getParamAny(request, "dependencyType"); ok {
 		depData["dependencyType"] = depType
 	}
-	if contract := request.Params.Arguments["contractSummary"]; contract != nil {
+	if contract, ok := getParamAny(request, "contractSummary"); ok {
 		depData["contractSummary"] = contract
 	}
 
 	jsonData, _ := json.Marshal(depData)
-	resp, err := http.Post(fmt.Sprintf("%s/modules/%s/dependencies", s.apiURL, moduleID), "application/json", jsonData)
+	resp, err := http.Post(fmt.Sprintf("%s/modules/%s/dependencies", s.apiURL, moduleID), "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleGetModuleDependencies(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	moduleID := request.Params.Arguments["moduleId"]
-	if moduleID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少 moduleId 参数"}}}, nil
+func (s *MCPServer) handleGetModuleDependencies(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	moduleID, ok := getParam(request, "moduleId")
+	if !ok {
+		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
 	}
 
 	resp, err := http.Get(fmt.Sprintf("%s/modules/%s/dependencies", s.apiURL, moduleID))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleCreateTaskDependency(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	upstreamTaskID := request.Params.Arguments["upstreamTaskId"]
-	downstreamTaskID := request.Params.Arguments["downstreamTaskId"]
+func (s *MCPServer) handleCreateTaskDependency(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	upstreamTaskID, ok1 := getParam(request, "upstreamTaskId")
+	downstreamTaskID, ok2 := getParam(request, "downstreamTaskId")
 
-	if upstreamTaskID == nil || downstreamTaskID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少必要参数"}}}, nil
+	if !ok1 || !ok2 {
+		return mcp.NewToolResultText("缺少必要参数"), nil
 	}
 
 	depData := map[string]interface{}{
 		"upstreamTaskId":   upstreamTaskID,
 		"downstreamTaskId": downstreamTaskID,
 	}
-	if contract := request.Params.Arguments["contractSummary"]; contract != nil {
+	if contract, ok := getParamAny(request, "contractSummary"); ok {
 		depData["contractSummary"] = contract
 	}
 
 	jsonData, _ := json.Marshal(depData)
-	resp, err := http.Post(fmt.Sprintf("%s/dependencies", s.apiURL), "application/json", jsonData)
+	resp, err := http.Post(fmt.Sprintf("%s/dependencies", s.apiURL), "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
-func (s *MCPServer) handleGetTaskDependencies(ctx context.Context, request mcp.CallToolRequest) (*mcp.ToolResult, error) {
-	taskID := request.Params.Arguments["taskId"]
-	if taskID == nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "缺少 taskId 参数"}}}, nil
+func (s *MCPServer) handleGetTaskDependencies(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	taskID, ok := getParam(request, "taskId")
+	if !ok {
+		return mcp.NewToolResultText("缺少 taskId 参数"), nil
 	}
 
 	resp, err := http.Get(fmt.Sprintf("%s/dependencies?taskId=%s", s.apiURL, taskID))
 	if err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "请求失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
 	defer resp.Body.Close()
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: "解析失败：" + err.Error()}}}, nil
+		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
 	data, _ := json.MarshalIndent(result, "", "  ")
-	return &mcp.ToolResult{Content: []mcp.Content{mcp.TextContent{Text: string(data)}}}, nil
+	return mcp.NewToolResultText(string(data)), nil
 }
 
 // Run 运行 MCP 服务器
 func (s *MCPServer) Run() error {
 	log.Println("Starting AITDD MCP Server...")
-	return s.server.Start(context.Background())
+	return server.ServeStdio(s.server)
 }
 
 func main() {
-	server := NewMCPServer()
-	if err := server.Run(); err != nil {
+	s := NewMCPServer()
+	if err := s.Run(); err != nil {
 		log.Fatal(err)
 	}
 }

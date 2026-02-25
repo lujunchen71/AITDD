@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/aitdd/backend/internal/services"
 	"github.com/spf13/cobra"

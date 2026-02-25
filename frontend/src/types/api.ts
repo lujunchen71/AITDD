@@ -87,7 +87,8 @@ export interface Task extends BaseEntity, LockInfo {
   upstreamContractDetail: string;
   downstreamContractDetail: string;
   prompt: string;
-  tests: string; // JSON array
+  tests: string; // JSON array of TestItem objects
+  testResult: string; // JSON array of test evidence strings
   logs: string; // JSON array
   codePaths: string; // JSON array
   humanAssistance: string; // JSON object
@@ -130,6 +131,7 @@ export interface UpdateTaskRequest {
   upstreamContractDetail?: string;
   downstreamContractDetail?: string;
   tests?: string;
+  testResult?: string;
   logs?: string;
   codePaths?: string;
   humanAssistance?: string;
