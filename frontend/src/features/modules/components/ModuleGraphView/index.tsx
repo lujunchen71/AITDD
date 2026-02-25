@@ -175,18 +175,65 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
       levels.push(remaining);
     }
     
-    // 分配位置
-    const LAYER_HEIGHT = 400;
-    const NODE_WIDTH = 380;
+    // 分配位置 - 左右排列（层级在水平方向，同一层节点在垂直方向）
+    const LAYER_WIDTH = 500;   // 层与层之间的水平间距
+    const NODE_HEIGHT = 450;   // 同一层内节点之间的垂直间距
     
+    // 记录每个模块的层级
+    const moduleLevel: { [key: string]: number } = {};
     levels.forEach((level, levelIndex) => {
-      const levelWidth = level.length * NODE_WIDTH;
-      const startX = -levelWidth / 2;
+      level.forEach(moduleId => {
+        moduleLevel[moduleId] = levelIndex;
+      });
+    });
+    
+    // 迭代优化：检查同一层级的模块，如果有依赖关系则往后移动
+    let changed = true;
+    let iterations = 0;
+    const MAX_ITERATIONS = 30;
+    
+    while (changed && iterations < MAX_ITERATIONS) {
+      changed = false;
+      iterations++;
+      
+      // 遍历每一层
+      for (let levelIndex = 0; levelIndex < levels.length; levelIndex++) {
+        const currentLevel = [...levels[levelIndex]]; // 复制数组避免迭代时修改
+        
+        currentLevel.forEach(moduleId => {
+          const currentModuleLevel = moduleLevel[moduleId];
+          
+          // 检查这个模块的所有下游依赖
+          (dependents[moduleId] || []).forEach(downstreamId => {
+            const downstreamLevel = moduleLevel[downstreamId];
+            
+            // 如果下游模块的层级 <= 当前模块的层级，需要往后移
+            if (downstreamLevel <= currentModuleLevel) {
+              const newLevel = currentModuleLevel + 1;
+              // 从原层级移除
+              levels[downstreamLevel] = levels[downstreamLevel].filter(id => id !== downstreamId);
+              // 添加到新层级
+              if (!levels[newLevel]) {
+                levels[newLevel] = [];
+              }
+              levels[newLevel].push(downstreamId);
+              moduleLevel[downstreamId] = newLevel;
+              changed = true;
+            }
+          });
+        });
+      }
+    }
+    
+    // 重新计算每个层级的模块索引并分配最终位置
+    levels.forEach((level, levelIndex) => {
+      const levelHeight = level.length * NODE_HEIGHT;
+      const startY = -levelHeight / 2;
       
       level.forEach((moduleId, nodeIndex) => {
         newPositions[moduleId] = {
-          x: startX + nodeIndex * NODE_WIDTH,
-          y: levelIndex * LAYER_HEIGHT
+          x: levelIndex * LAYER_WIDTH,           // 层级在水平方向排列（从左到右）
+          y: startY + nodeIndex * NODE_HEIGHT    // 同一层节点在垂直方向排列
         };
       });
     });
