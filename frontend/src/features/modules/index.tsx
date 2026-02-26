@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Typography, Button, Empty, message, Spin } from 'antd';
 import { DeploymentUnitOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { ReactFlowProvider } from 'reactflow';
-import ModuleTree from './components/ModuleTree';
 import ProjectGroupedTree from './components/ProjectGroupedTree';
 import ModuleDetail from './components/ModuleDetail';
 import ModuleForm from './components/ModuleForm';
@@ -247,7 +246,7 @@ const ModulesPage: React.FC = () => {
     setTaskFormVisible(true);
   };
 
-  const handleEditTask = async (taskId: string, projectId?: string) => {
+  const handleEditTask = async (taskId: string) => {
     setTaskFormLoading(true);
     try {
       const response = await apiClient.get(`/tasks/${taskId}`);
@@ -547,7 +546,7 @@ const ModulesPage: React.FC = () => {
                 taskDependencies={taskDependencies}
                 moduleDependencies={moduleDependencies}
                 onModuleClick={handleSelectModule}
-                onTaskClick={(taskId: string) => handleEditTask(taskId, selectedModuleId || '')}
+                onTaskClick={(taskId: string) => handleEditTask(taskId)}
               />
             </div>
           </ReactFlowProvider>

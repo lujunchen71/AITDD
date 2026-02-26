@@ -157,81 +157,43 @@ export const useProjectStore = create<ProjectState>()(
         set({ isLoading: true, error: null });
         
         try {
-          // 先尝试获取项目
-          const response = await api.get<{ project: Project | null }>('/project');
-          const project = response.data?.project;
+          // 先尝试获取所有项目
+          const response = await api.get<{ projects: Project[], total: number }>('/projects');
+          const projects = response.data?.projects || [];
           
-          // 兼容后端返回的ID字段（可能是大写ID或小写id）
-          const projectId = project ? ((project as any).ID || (project as any).id) : null;
-          
-          if (projectId) {
-            // 项目已存在
+          if (projects.length > 0) {
+            // 项目已存在，使用第一个项目作为当前项目
+            const project = projects[0];
+            const projectId = (project as any).ID || (project as any).id || project.id;
+            
             set({
               projectId,
               project: project,
+              projects: projects,
               isLoading: false,
               isInitialized: true,
             });
             return;
           }
-        } catch (error: any) {
-          console.log('获取项目失败，尝试创建默认项目...');
-        }
-        
-        // 项目不存在，尝试创建默认项目
-        try {
-          const response = await api.put<{ project: Project }>('/project/constitution', {
-            constitution: '# AITDD 项目宪法\n\n这是自动创建的默认项目宪法。\n\n## 项目规则\n\n- 遵循TDD开发流程\n- 保持代码质量\n- 及时同步任务状态',
-            version: 0,
+          
+          // 没有项目，提示用户创建
+          console.log('没有找到任何项目，请使用数据导入脚本创建项目');
+          set({
+            projectId: null,
+            project: null,
+            projects: [],
+            isLoading: false,
+            isInitialized: true,
+            error: '没有找到任何项目，请使用数据导入脚本创建项目',
           });
-          
-          const project = response.data?.project;
-          
-          if (project) {
-            // 兼容后端返回的ID字段（可能是大写ID或小写id）
-            const projectId = (project as any).ID || (project as any).id || null;
-            set({
-              projectId,
-              project: project,
-              isLoading: false,
-              isInitialized: true,
-            });
-            return;
-          }
         } catch (error: any) {
-          // 如果是 409 版本冲突，说明项目可能已被其他请求创建，重新获取
-          if (error.response?.status === 409) {
-            console.log('版本冲突，项目可能已存在，重新获取...');
-            try {
-              const response = await api.get<{ project: Project | null }>('/project');
-              const project = response.data?.project;
-              
-              // 兼容后端返回的ID字段（可能是大写ID或小写id）
-              const projectId = project ? ((project as any).ID || (project as any).id) : null;
-              
-              if (projectId) {
-                set({
-                  projectId,
-                  project: project,
-                  isLoading: false,
-                  isInitialized: true,
-                });
-                return;
-              }
-            } catch (fetchError) {
-              console.error('重新获取项目失败:', fetchError);
-            }
-          }
-          
-          console.error('创建默认项目失败:', error);
+          console.error('获取项目失败:', error);
+          set({
+            isLoading: false,
+            isInitialized: true,
+            error: '获取项目失败，请检查后端服务是否正常运行',
+          });
         }
-        
-        // 所有尝试都失败
-        set({
-          isLoading: false,
-          isInitialized: true,
-          error: '项目初始化失败，请刷新页面重试',
-        });
       },
 
       // 设置项目

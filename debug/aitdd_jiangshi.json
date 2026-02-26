@@ -1,0 +1,1012 @@
+{
+  "project": {
+    "name": "Plants vs Zombies Web Game",
+    "description": "一款基于 HTML5 Canvas 和 JavaScript 实现的植物大战僵尸网页游戏，包含核心玩法、植物与僵尸交互、关卡系统等。"
+  },
+  "modules": [
+    {
+      "id": "mod-core",
+      "name": "核心引擎",
+      "description": "游戏循环、画布管理、网格系统等基础功能",
+      "status": "developing",
+      "file_path": "src/core/"
+    },
+    {
+      "id": "mod-plants",
+      "name": "植物模块",
+      "description": "所有植物类及其逻辑",
+      "status": "developing",
+      "file_path": "src/plants/"
+    },
+    {
+      "id": "mod-zombies",
+      "name": "僵尸模块",
+      "description": "所有僵尸类及其逻辑",
+      "status": "developing",
+      "file_path": "src/zombies/"
+    },
+    {
+      "id": "mod-sun",
+      "name": "阳光模块",
+      "description": "阳光对象、收集和计数",
+      "status": "developing",
+      "file_path": "src/sun/"
+    },
+    {
+      "id": "mod-collision",
+      "name": "碰撞检测模块",
+      "description": "管理豌豆与僵尸、僵尸与植物的碰撞",
+      "status": "developing",
+      "file_path": "src/collision/"
+    },
+    {
+      "id": "mod-levels",
+      "name": "关卡模块",
+      "description": "关卡数据、僵尸波次生成",
+      "status": "developing",
+      "file_path": "src/levels/"
+    },
+    {
+      "id": "mod-ui",
+      "name": "用户界面模块",
+      "description": "HUD、菜单等界面元素",
+      "status": "developing",
+      "file_path": "src/ui/"
+    },
+    {
+      "id": "mod-game-state",
+      "name": "游戏状态模块",
+      "description": "管理游戏进行中、胜利、失败状态",
+      "status": "developing",
+      "file_path": "src/state/"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-canvas",
+      "name": "创建游戏画布",
+      "description": "在 HTML 中创建 Canvas 元素，并提供获取上下文和尺寸的方法。",
+      "moduleId": "mod-core",
+      "status": "ready",
+      "prompt": "创建一个 CanvasManager 类，负责创建和管理 HTML5 Canvas。\n\n要求：\n1. 在指定的容器元素中创建 <canvas>，设置固定宽度 800px，高度 600px。\n2. 提供 getCanvas() 返回 canvas DOM 元素。\n3. 提供 getContext() 返回 2d 渲染上下文。\n4. 提供 getWidth() 和 getHeight() 返回画布宽高。\n5. 提供 clear() 方法清除画布。\n\n输出文件：src/core/canvas.js",
+      "upstreamContractDetail": {
+        "title": "无上游依赖",
+        "list": []
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "获取 canvas DOM 元素",
+            "contract_api": "getCanvas() -> HTMLCanvasElement",
+            "from": "task-canvas"
+          },
+          {
+            "label": "获取 2d 渲染上下文",
+            "contract_api": "getContext() -> CanvasRenderingContext2D",
+            "from": "task-canvas"
+          },
+          {
+            "label": "获取画布宽度",
+            "contract_api": "getWidth() -> number",
+            "from": "task-canvas"
+          },
+          {
+            "label": "获取画布高度",
+            "contract_api": "getHeight() -> number",
+            "from": "task-canvas"
+          },
+          {
+            "label": "清除画布",
+            "contract_api": "clear()",
+            "from": "task-canvas"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证画布是否正确创建并设置尺寸",
+          "api": "testCanvasCreation()"
+        },
+        {
+          "target": "验证 getContext 返回有效上下文",
+          "api": "testGetContext()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/core/canvas.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-game-loop",
+      "name": "游戏循环",
+      "description": "实现基于 requestAnimationFrame 的游戏循环，支持注册更新和渲染回调。",
+      "moduleId": "mod-core",
+      "status": "ready",
+      "prompt": "创建一个 GameLoop 类，管理游戏循环。\n\n要求：\n1. 使用 requestAnimationFrame 驱动循环。\n2. 提供 registerUpdate(callback) 注册更新函数，callback 接收 deltaTime 参数。\n3. 提供 registerRender(callback) 注册渲染函数。\n4. 提供 start() 和 stop() 方法控制循环。\n5. 在每一帧中，先调用所有更新回调，再调用所有渲染回调。\n\n输出文件：src/core/gameLoop.js",
+      "upstreamContractDetail": {
+        "title": "无上游依赖（画布由下游使用）",
+        "list": []
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "注册更新回调",
+            "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
+            "from": "task-game-loop"
+          },
+          {
+            "label": "注册渲染回调",
+            "contract_api": "registerRender(callback: () => void)",
+            "from": "task-game-loop"
+          },
+          {
+            "label": "开始游戏循环",
+            "contract_api": "start()",
+            "from": "task-game-loop"
+          },
+          {
+            "label": "停止游戏循环",
+            "contract_api": "stop()",
+            "from": "task-game-loop"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证注册的更新回调被调用",
+          "api": "testUpdateCallback()"
+        },
+        {
+          "target": "验证注册的渲染回调被调用",
+          "api": "testRenderCallback()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/core/gameLoop.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-grid",
+      "name": "网格系统",
+      "description": "将画布划分为网格，提供行列转换和单元格位置计算。",
+      "moduleId": "mod-core",
+      "status": "ready",
+      "prompt": "创建一个 Grid 类，管理游戏网格。\n\n要求：\n1. 构造函数接收行数、列数、画布宽度和高度。\n2. 默认行数 5，列数 9。\n3. 提供 getCellAt(x, y) 返回点击坐标对应的行列，若无则返回 null。\n4. 提供 getCellBounds(row, col) 返回单元格的 {x, y, width, height}。\n5. 提供 getRows() 和 getCols()。\n6. 提供 getCellCenter(row, col) 返回中心点坐标。\n\n输出文件：src/core/grid.js",
+      "upstreamContractDetail": {
+        "title": "依赖上游任务提供",
+        "list": [
+          {
+            "label": "获取画布宽度",
+            "contract_api": "getWidth() -> number",
+            "from": "task-canvas"
+          },
+          {
+            "label": "获取画布高度",
+            "contract_api": "getHeight() -> number",
+            "from": "task-canvas"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "根据坐标获取单元格行列",
+            "contract_api": "getCellAt(x: number, y: number) -> {row: number, col: number} | null",
+            "from": "task-grid"
+          },
+          {
+            "label": "获取单元格边界",
+            "contract_api": "getCellBounds(row: number, col: number) -> {x: number, y: number, width: number, height: number}",
+            "from": "task-grid"
+          },
+          {
+            "label": "获取总行数",
+            "contract_api": "getRows() -> number",
+            "from": "task-grid"
+          },
+          {
+            "label": "获取总列数",
+            "contract_api": "getCols() -> number",
+            "from": "task-grid"
+          },
+          {
+            "label": "获取单元格中心点",
+            "contract_api": "getCellCenter(row: number, col: number) -> {x: number, y: number}",
+            "from": "task-grid"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证坐标到行列的转换正确",
+          "api": "testGetCellAt()"
+        },
+        {
+          "target": "验证单元格边界计算正确",
+          "api": "testGetCellBounds()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/core/grid.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-plant-base",
+      "name": "植物基类",
+      "description": "定义所有植物的基类，包含通用属性和方法。",
+      "moduleId": "mod-plants",
+      "status": "ready",
+      "prompt": "创建一个 PlantBase 类，作为所有植物的基类。\n\n要求：\n1. 构造函数接收参数：row, col, hp, attack, attackSpeed 等。\n2. 属性：row, col, hp, maxHp, attack, attackSpeed, lastAttackTime。\n3. 方法：takeDamage(amount) 减少 hp，返回是否死亡。\n4. 方法：update(deltaTime) 供子类重写。\n5. 方法：render(ctx) 供子类重写。\n6. 提供 getRow()/getCol() 等 getter。\n\n输出文件：src/plants/plantBase.js",
+      "upstreamContractDetail": {
+        "title": "无上游依赖",
+        "list": []
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "植物基类构造函数",
+            "contract_api": "constructor(row: number, col: number, hp: number, attack: number, attackSpeed: number)",
+            "from": "task-plant-base"
+          },
+          {
+            "label": "植物受伤方法",
+            "contract_api": "takeDamage(amount: number) -> boolean",
+            "from": "task-plant-base"
+          },
+          {
+            "label": "更新方法",
+            "contract_api": "update(deltaTime: number)",
+            "from": "task-plant-base"
+          },
+          {
+            "label": "渲染方法",
+            "contract_api": "render(ctx: CanvasRenderingContext2D)",
+            "from": "task-plant-base"
+          },
+          {
+            "label": "获取行列",
+            "contract_api": "getRow() -> number, getCol() -> number",
+            "from": "task-plant-base"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证植物初始化属性正确",
+          "api": "testPlantInitialization()"
+        },
+        {
+          "target": "验证受伤和死亡逻辑",
+          "api": "testTakeDamage()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/plants/plantBase.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-zombie-base",
+      "name": "僵尸基类",
+      "description": "定义所有僵尸的基类，包含通用属性和方法。",
+      "moduleId": "mod-zombies",
+      "status": "ready",
+      "prompt": "创建一个 ZombieBase 类，作为所有僵尸的基类。\n\n要求：\n1. 构造函数接收参数：row, hp, attack, speed 等。\n2. 属性：row, col（列随时间移动），hp, maxHp, attack, speed, targetPlant 等。\n3. 方法：takeDamage(amount) 减少 hp，返回是否死亡。\n4. 方法：update(deltaTime, plants) 更新位置，攻击植物。\n5. 方法：render(ctx)。\n6. 提供 getRow()/getCol() 等。\n7. 列坐标以像素为单位，但知道所在行。\n\n输出文件：src/zombies/zombieBase.js",
+      "upstreamContractDetail": {
+        "title": "无上游依赖",
+        "list": []
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "僵尸基类构造函数",
+            "contract_api": "constructor(row: number, hp: number, attack: number, speed: number)",
+            "from": "task-zombie-base"
+          },
+          {
+            "label": "受伤方法",
+            "contract_api": "takeDamage(amount: number) -> boolean",
+            "from": "task-zombie-base"
+          },
+          {
+            "label": "更新方法",
+            "contract_api": "update(deltaTime: number, plants: PlantBase[])",
+            "from": "task-zombie-base"
+          },
+          {
+            "label": "渲染方法",
+            "contract_api": "render(ctx: CanvasRenderingContext2D)",
+            "from": "task-zombie-base"
+          },
+          {
+            "label": "获取行",
+            "contract_api": "getRow() -> number",
+            "from": "task-zombie-base"
+          },
+          {
+            "label": "获取列位置（像素）",
+            "contract_api": "getCol() -> number",
+            "from": "task-zombie-base"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证僵尸初始化",
+          "api": "testZombieInitialization()"
+        },
+        {
+          "target": "验证受伤和死亡",
+          "api": "testZombieTakeDamage()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/zombies/zombieBase.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-sun",
+      "name": "阳光系统",
+      "description": "实现阳光对象、阳光生成和收集逻辑。",
+      "moduleId": "mod-sun",
+      "status": "ready",
+      "prompt": "实现阳光系统。\n\n要求：\n1. 创建 Sun 类，表示一个阳光，包含 x, y, 价值（默认 25）。\n2. 创建 SunManager 类，管理所有阳光，提供 addSun(sun)、removeSun(sun)、getSuns()。\n3. 提供 collectSunAt(x, y) 检测点击是否收集阳光，返回收集的阳光价值并移除阳光。\n4. 提供 update(deltaTime) 和 render(ctx) 方法，用于更新阳光动画（如飘落）和绘制。\n5. 阳光计数全局变量，提供 addSunCount(amount) 和 getSunCount()。\n\n输出文件：src/sun/sun.js",
+      "upstreamContractDetail": {
+        "title": "依赖上游任务提供",
+        "list": [
+          {
+            "label": "注册更新回调",
+            "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
+            "from": "task-game-loop"
+          },
+          {
+            "label": "注册渲染回调",
+            "contract_api": "registerRender(callback: () => void)",
+            "from": "task-game-loop"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "添加阳光到管理器",
+            "contract_api": "addSun(sun: Sun)",
+            "from": "task-sun"
+          },
+          {
+            "label": "尝试收集阳光",
+            "contract_api": "tryCollectSun(x: number, y: number) -> number | null",
+            "from": "task-sun"
+          },
+          {
+            "label": "获取当前阳光数量",
+            "contract_api": "getSunCount() -> number",
+            "from": "task-sun"
+          },
+          {
+            "label": "增加阳光数量",
+            "contract_api": "addSunCount(amount: number)",
+            "from": "task-sun"
+          },
+          {
+            "label": "消耗阳光（减少）",
+            "contract_api": "spendSun(amount: number) -> boolean",
+            "from": "task-sun"
+          },
+          {
+            "label": "阳光管理器更新",
+            "contract_api": "update(deltaTime: number)",
+            "from": "task-sun"
+          },
+          {
+            "label": "阳光管理器渲染",
+            "contract_api": "render(ctx: CanvasRenderingContext2D)",
+            "from": "task-sun"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证阳光添加和收集",
+          "api": "testSunCollection()"
+        },
+        {
+          "target": "验证阳光计数增减",
+          "api": "testSunCount()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/sun/sun.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-sunflower",
+      "name": "向日葵植物",
+      "description": "实现向日葵植物，定期产生阳光。",
+      "moduleId": "mod-plants",
+      "status": "ready",
+      "prompt": "创建 Sunflower 类，继承自 PlantBase。\n\n要求：\n1. 构造函数(row, col) 设置 hp=100, attack=0, attackSpeed=0。\n2. 重写 update 方法，每 5 秒生成一个阳光（使用 SunManager.addSun）。阳光出现在植物上方。\n3. 重写 render 方法，绘制向日葵图像（可用圆形或简单图形代替）。\n4. 需要访问 SunManager，通过全局或单例。\n\n输出文件：src/plants/sunflower.js",
+      "upstreamContractDetail": {
+        "title": "依赖上游任务提供",
+        "list": [
+          {
+            "label": "植物基类构造函数",
+            "contract_api": "constructor(row: number, col: number, hp: number, attack: number, attackSpeed: number)",
+            "from": "task-plant-base"
+          },
+          {
+            "label": "添加阳光到管理器",
+            "contract_api": "addSun(sun: Sun)",
+            "from": "task-sun"
+          },
+          {
+            "label": "注册更新回调",
+            "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
+            "from": "task-game-loop"
+          },
+          {
+            "label": "注册渲染回调",
+            "contract_api": "registerRender(callback: () => void)",
+            "from": "task-game-loop"
+          },
+          {
+            "label": "获取单元格中心点",
+            "contract_api": "getCellCenter(row: number, col: number) -> {x: number, y: number}",
+            "from": "task-grid"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "向日葵构造函数",
+            "contract_api": "constructor(row: number, col: number)",
+            "from": "task-sunflower"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证向日葵每5秒产生阳光",
+          "api": "testSunflowerProducesSun()"
+        },
+        {
+          "target": "验证向日葵受伤和死亡",
+          "api": "testSunflowerTakeDamage()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/plants/sunflower.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-peashooter",
+      "name": "豌豆射手植物",
+      "description": "实现豌豆射手，定期发射豌豆攻击僵尸。",
+      "moduleId": "mod-plants",
+      "status": "ready",
+      "prompt": "创建 Peashooter 类，继承自 PlantBase。\n\n要求：\n1. 构造函数(row, col) 设置 hp=100, attack=20, attackSpeed=1.5（每秒攻击1.5次）。\n2. 重写 update 方法，根据攻击速度发射豌豆。豌豆需添加到碰撞检测模块。\n3. 需要访问 CollisionManager，提供 addPea(pea) 方法。\n4. 豌豆类简单定义：包含 x, y, row, damage, speed。\n5. 重写 render 方法绘制豌豆射手。\n\n输出文件：src/plants/peashooter.js",
+      "upstreamContractDetail": {
+        "title": "依赖上游任务提供",
+        "list": [
+          {
+            "label": "植物基类构造函数",
+            "contract_api": "constructor(row: number, col: number, hp: number, attack: number, attackSpeed: number)",
+            "from": "task-plant-base"
+          },
+          {
+            "label": "添加豌豆到碰撞检测",
+            "contract_api": "addPea(pea: Pea)",
+            "from": "task-collision"
+          },
+          {
+            "label": "注册更新回调",
+            "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
+            "from": "task-game-loop"
+          },
+          {
+            "label": "注册渲染回调",
+            "contract_api": "registerRender(callback: () => void)",
+            "from": "task-game-loop"
+          },
+          {
+            "label": "获取单元格中心点",
+            "contract_api": "getCellCenter(row: number, col: number) -> {x: number, y: number}",
+            "from": "task-grid"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "豌豆射手构造函数",
+            "contract_api": "constructor(row: number, col: number)",
+            "from": "task-peashooter"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证豌豆射手按攻击速度发射豌豆",
+          "api": "testPeashooterShoots()"
+        },
+        {
+          "target": "验证豌豆射手受伤和死亡",
+          "api": "testPeashooterTakeDamage()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/plants/peashooter.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-normal-zombie",
+      "name": "普通僵尸",
+      "description": "实现普通僵尸，继承 ZombieBase。",
+      "moduleId": "mod-zombies",
+      "status": "ready",
+      "prompt": "创建 NormalZombie 类，继承自 ZombieBase。\n\n要求：\n1. 构造函数(row) 设置 hp=150, attack=10, speed=20 像素/秒。\n2. 重写 update 方法，实现移动逻辑，检测与植物的碰撞并攻击。\n3. 需要访问植物列表（由碰撞检测模块或外部传入）。\n4. 重写 render 方法绘制僵尸（简单矩形或圆形）。\n\n输出文件：src/zombies/normalZombie.js",
+      "upstreamContractDetail": {
+        "title": "依赖上游任务提供",
+        "list": [
+          {
+            "label": "僵尸基类构造函数",
+            "contract_api": "constructor(row: number, hp: number, attack: number, speed: number)",
+            "from": "task-zombie-base"
+          },
+          {
+            "label": "注册更新回调",
+            "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
+            "from": "task-game-loop"
+          },
+          {
+            "label": "注册渲染回调",
+            "contract_api": "registerRender(callback: () => void)",
+            "from": "task-game-loop"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "普通僵尸构造函数",
+            "contract_api": "constructor(row: number)",
+            "from": "task-normal-zombie"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证僵尸移动和攻击",
+          "api": "testZombieMovement()"
+        },
+        {
+          "target": "验证僵尸受伤死亡",
+          "api": "testZombieDeath()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/zombies/normalZombie.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-collision",
+      "name": "碰撞检测管理",
+      "description": "管理所有碰撞检测，包括豌豆与僵尸、僵尸与植物。",
+      "moduleId": "mod-collision",
+      "status": "ready",
+      "prompt": "创建 CollisionManager 类，管理豌豆、僵尸、植物的碰撞。\n\n要求：\n1. 维护豌豆列表、僵尸列表、植物列表。\n2. 提供 addPea(pea)、removePea(pea)、addZombie(zombie)、removeZombie(zombie)、addPlant(plant)、removePlant(plant) 等方法。\n3. 提供 update(deltaTime) 方法，在每帧中：\n   a. 更新豌豆位置，检测豌豆与僵尸碰撞，造成伤害并移除豌豆。\n   b. 检测僵尸与植物碰撞，僵尸攻击植物，植物受伤。\n4. 豌豆类定义：包含 x, y, row, damage, speed。\n5. 碰撞检测使用矩形或圆形。\n\n输出文件：src/collision/collisionManager.js",
+      "upstreamContractDetail": {
+        "title": "依赖上游任务提供",
+        "list": [
+          {
+            "label": "注册更新回调",
+            "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
+            "from": "task-game-loop"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "添加豌豆",
+            "contract_api": "addPea(pea: Pea)",
+            "from": "task-collision"
+          },
+          {
+            "label": "添加僵尸",
+            "contract_api": "addZombie(zombie: ZombieBase)",
+            "from": "task-collision"
+          },
+          {
+            "label": "添加植物",
+            "contract_api": "addPlant(plant: PlantBase)",
+            "from": "task-collision"
+          },
+          {
+            "label": "移除植物",
+            "contract_api": "removePlant(plant: PlantBase)",
+            "from": "task-collision"
+          },
+          {
+            "label": "获取所有僵尸",
+            "contract_api": "getZombies() -> ZombieBase[]",
+            "from": "task-collision"
+          },
+          {
+            "label": "获取所有植物",
+            "contract_api": "getPlants() -> PlantBase[]",
+            "from": "task-collision"
+          },
+          {
+            "label": "更新碰撞",
+            "contract_api": "update(deltaTime: number)",
+            "from": "task-collision"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证豌豆与僵尸碰撞造成伤害",
+          "api": "testPeaZombieCollision()"
+        },
+        {
+          "target": "验证僵尸与植物碰撞攻击",
+          "api": "testZombiePlantCollision()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/collision/collisionManager.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-planting",
+      "name": "种植逻辑",
+      "description": "处理玩家点击网格种植植物的逻辑。",
+      "moduleId": "mod-plants",
+      "status": "ready",
+      "prompt": "实现种植管理器 PlantingManager，处理种植。\n\n要求：\n1. 监听画布点击事件，通过 Grid 获取点击的单元格。\n2. 检查该单元格是否已有植物，无则允许种植。\n3. 检查当前阳光是否足够（例如向日葵 50，豌豆射手 100）。\n4. 扣除阳光，创建植物实例，并添加到 CollisionManager。\n5. 提供 registerPlantType(name, cost, plantClass) 注册可种植植物类型。\n\n输出文件：src/plants/planting.js",
+      "upstreamContractDetail": {
+        "title": "依赖上游任务提供",
+        "list": [
+          {
+            "label": "根据坐标获取单元格",
+            "contract_api": "getCellAt(x: number, y: number) -> {row: number, col: number} | null",
+            "from": "task-grid"
+          },
+          {
+            "label": "获取当前阳光数量",
+            "contract_api": "getSunCount() -> number",
+            "from": "task-sun"
+          },
+          {
+            "label": "消耗阳光",
+            "contract_api": "spendSun(amount: number) -> boolean",
+            "from": "task-sun"
+          },
+          {
+            "label": "添加植物到碰撞检测",
+            "contract_api": "addPlant(plant: PlantBase)",
+            "from": "task-collision"
+          },
+          {
+            "label": "获取 canvas 元素以添加事件监听",
+            "contract_api": "getCanvas() -> HTMLCanvasElement",
+            "from": "task-canvas"
+          },
+          {
+            "label": "向日葵构造函数",
+            "contract_api": "constructor(row: number, col: number)",
+            "from": "task-sunflower"
+          },
+          {
+            "label": "豌豆射手构造函数",
+            "contract_api": "constructor(row: number, col: number)",
+            "from": "task-peashooter"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "注册可种植植物类型",
+            "contract_api": "registerPlantType(name: string, cost: number, plantClass: Function)",
+            "from": "task-planting"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证点击空单元格且阳光足够时成功种植",
+          "api": "testPlantingSuccess()"
+        },
+        {
+          "target": "验证阳光不足时种植失败",
+          "api": "testPlantingInsufficientSun()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/plants/planting.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-sun-collection",
+      "name": "阳光收集",
+      "description": "处理玩家点击阳光收集的逻辑。",
+      "moduleId": "mod-sun",
+      "status": "ready",
+      "prompt": "在 SunManager 基础上增加点击收集功能。\n\n要求：\n1. 监听画布点击事件，调用 SunManager.tryCollectSun(x, y)。\n2. 如果收集到阳光，增加阳光计数。\n3. 需要从 task-canvas 获取画布添加事件监听。\n\n输出文件：src/sun/sunCollection.js",
+      "upstreamContractDetail": {
+        "title": "依赖上游任务提供",
+        "list": [
+          {
+            "label": "尝试收集阳光",
+            "contract_api": "tryCollectSun(x: number, y: number) -> number | null",
+            "from": "task-sun"
+          },
+          {
+            "label": "获取 canvas 元素以添加事件监听",
+            "contract_api": "getCanvas() -> HTMLCanvasElement",
+            "from": "task-canvas"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": []
+      },
+      "tests": [
+        {
+          "target": "验证点击阳光时收集并增加计数",
+          "api": "testSunCollectionClick()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/sun/sunCollection.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-level-manager",
+      "name": "关卡管理器",
+      "description": "管理关卡数据，控制僵尸波次生成。",
+      "moduleId": "mod-levels",
+      "status": "ready",
+      "prompt": "创建 LevelManager 类。\n\n要求：\n1. 定义关卡数据，如每波僵尸类型、数量、间隔。\n2. 提供 startLevel(level) 方法开始指定关卡。\n3. 在 update 中根据时间生成僵尸，添加到 CollisionManager。\n4. 检测是否所有波次完成且场上无僵尸，触发胜利。\n5. 需要与游戏状态模块交互。\n\n输出文件：src/levels/levelManager.js",
+      "upstreamContractDetail": {
+        "title": "依赖上游任务提供",
+        "list": [
+          {
+            "label": "注册更新回调",
+            "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
+            "from": "task-game-loop"
+          },
+          {
+            "label": "添加僵尸到碰撞检测",
+            "contract_api": "addZombie(zombie: ZombieBase)",
+            "from": "task-collision"
+          },
+          {
+            "label": "普通僵尸构造函数",
+            "contract_api": "constructor(row: number)",
+            "from": "task-normal-zombie"
+          },
+          {
+            "label": "设置游戏状态",
+            "contract_api": "setState(state: string)",
+            "from": "task-game-state"
+          },
+          {
+            "label": "获取总行数",
+            "contract_api": "getRows() -> number",
+            "from": "task-grid"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "开始关卡",
+            "contract_api": "startLevel(level: number)",
+            "from": "task-level-manager"
+          },
+          {
+            "label": "获取当前波次信息",
+            "contract_api": "getWaveInfo() -> object",
+            "from": "task-level-manager"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证关卡开始时生成僵尸",
+          "api": "testLevelStart()"
+        },
+        {
+          "target": "验证所有僵尸死亡后触发胜利",
+          "api": "testLevelWinCondition()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/levels/levelManager.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-hud",
+      "name": "HUD界面",
+      "description": "显示阳光数量、当前波次、游戏状态等。",
+      "moduleId": "mod-ui",
+      "status": "ready",
+      "prompt": "创建 HUD 类，负责在画布上绘制游戏信息。\n\n要求：\n1. 绘制阳光图标和当前阳光数量（从 SunManager 获取）。\n2. 绘制当前波次/剩余僵尸数量（从 LevelManager 获取）。\n3. 提供 render(ctx) 方法，在游戏循环中调用。\n4. 可能需要显示游戏状态（进行中、胜利、失败）。\n\n输出文件：src/ui/hud.js",
+      "upstreamContractDetail": {
+        "title": "依赖上游任务提供",
+        "list": [
+          {
+            "label": "注册渲染回调",
+            "contract_api": "registerRender(callback: () => void)",
+            "from": "task-game-loop"
+          },
+          {
+            "label": "获取当前阳光数量",
+            "contract_api": "getSunCount() -> number",
+            "from": "task-sun"
+          },
+          {
+            "label": "获取当前波次信息",
+            "contract_api": "getWaveInfo() -> object",
+            "from": "task-level-manager"
+          },
+          {
+            "label": "获取游戏状态",
+            "contract_api": "getState() -> string",
+            "from": "task-game-state"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "HUD 渲染方法",
+            "contract_api": "render(ctx: CanvasRenderingContext2D)",
+            "from": "task-hud"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证 HUD 正确显示阳光数量",
+          "api": "testHUDSunDisplay()"
+        },
+        {
+          "target": "验证 HUD 正确显示波次",
+          "api": "testHUDWaveDisplay()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/ui/hud.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-game-state",
+      "name": "游戏状态管理",
+      "description": "管理游戏整体状态（进行中、胜利、失败）。",
+      "moduleId": "mod-game-state",
+      "status": "ready",
+      "prompt": "创建 GameStateManager 类。\n\n要求：\n1. 维护状态：'playing', 'win', 'lose'。\n2. 提供 setState(state) 和 getState()。\n3. 当状态变为 win 或 lose 时，停止游戏循环，显示相应消息。\n4. 与关卡管理器交互检测失败条件（僵尸到达房子左侧）。\n\n输出文件：src/state/gameState.js",
+      "upstreamContractDetail": {
+        "title": "依赖上游任务提供",
+        "list": [
+          {
+            "label": "停止游戏循环",
+            "contract_api": "stop()",
+            "from": "task-game-loop"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "设置游戏状态",
+            "contract_api": "setState(state: string)",
+            "from": "task-game-state"
+          },
+          {
+            "label": "获取游戏状态",
+            "contract_api": "getState() -> string",
+            "from": "task-game-state"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证状态切换",
+          "api": "testStateTransition()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/state/gameState.js\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    }
+  ],
+  "taskDependencies": [
+    { "id": "dep-001", "upstreamTaskId": "task-canvas", "downstreamTaskId": "task-grid", "interfaceContract": "getWidth() -> number" },
+    { "id": "dep-002", "upstreamTaskId": "task-canvas", "downstreamTaskId": "task-grid", "interfaceContract": "getHeight() -> number" },
+    { "id": "dep-003", "upstreamTaskId": "task-game-loop", "downstreamTaskId": "task-sun", "interfaceContract": "registerUpdate(callback: (deltaTime: number) => void)" },
+    { "id": "dep-004", "upstreamTaskId": "task-game-loop", "downstreamTaskId": "task-sun", "interfaceContract": "registerRender(callback: () => void)" },
+    { "id": "dep-005", "upstreamTaskId": "task-plant-base", "downstreamTaskId": "task-sunflower", "interfaceContract": "constructor(row: number, col: number, hp: number, attack: number, attackSpeed: number)" },
+    { "id": "dep-006", "upstreamTaskId": "task-sun", "downstreamTaskId": "task-sunflower", "interfaceContract": "addSun(sun: Sun)" },
+    { "id": "dep-007", "upstreamTaskId": "task-game-loop", "downstreamTaskId": "task-sunflower", "interfaceContract": "registerUpdate(callback: (deltaTime: number) => void)" },
+    { "id": "dep-008", "upstreamTaskId": "task-game-loop", "downstreamTaskId": "task-sunflower", "interfaceContract": "registerRender(callback: () => void)" },
+    { "id": "dep-009", "upstreamTaskId": "task-grid", "downstreamTaskId": "task-sunflower", "interfaceContract": "getCellCenter(row: number, col: number) -> {x: number, y: number}" },
+    { "id": "dep-010", "upstreamTaskId": "task-plant-base", "downstreamTaskId": "task-peashooter", "interfaceContract": "constructor(row: number, col: number, hp: number, attack: number, attackSpeed: number)" },
+    { "id": "dep-011", "upstreamTaskId": "task-collision", "downstreamTaskId": "task-peashooter", "interfaceContract": "addPea(pea: Pea)" },
+    { "id": "dep-012", "upstreamTaskId": "task-game-loop", "downstreamTaskId": "task-peashooter", "interfaceContract": "registerUpdate(callback: (deltaTime: number) => void)" },
+    { "id": "dep-013", "upstreamTaskId": "task-game-loop", "downstreamTaskId": "task-peashooter", "interfaceContract": "registerRender(callback: () => void)" },
+    { "id": "dep-014", "upstreamTaskId": "task-grid", "downstreamTaskId": "task-peashooter", "interfaceContract": "getCellCenter(row: number, col: number) -> {x: number, y: number}" },
+    { "id": "dep-015", "upstreamTaskId": "task-zombie-base", "downstreamTaskId": "task-normal-zombie", "interfaceContract": "constructor(row: number, hp: number, attack: number, speed: number)" },
+    { "id": "dep-016", "upstreamTaskId": "task-game-loop", "downstreamTaskId": "task-normal-zombie", "interfaceContract": "registerUpdate(callback: (deltaTime: number) => void)" },
+    { "id": "dep-017", "upstreamTaskId": "task-game-loop", "downstreamTaskId": "task-normal-zombie", "interfaceContract": "registerRender(callback: () => void)" },
+    { "id": "dep-018", "upstreamTaskId": "task-game-loop", "downstreamTaskId": "task-collision", "interfaceContract": "registerUpdate(callback: (deltaTime: number) => void)" },
+    { "id": "dep-019", "upstreamTaskId": "task-grid", "downstreamTaskId": "task-planting", "interfaceContract": "getCellAt(x: number, y: number) -> {row: number, col: number} | null" },
+    { "id": "dep-020", "upstreamTaskId": "task-sun", "downstreamTaskId": "task-planting", "interfaceContract": "getSunCount() -> number" },
+    { "id": "dep-021", "upstreamTaskId": "task-sun", "downstreamTaskId": "task-planting", "interfaceContract": "spendSun(amount: number) -> boolean" },
+    { "id": "dep-022", "upstreamTaskId": "task-collision", "downstreamTaskId": "task-planting", "interfaceContract": "addPlant(plant: PlantBase)" },
+    { "id": "dep-023", "upstreamTaskId": "task-canvas", "downstreamTaskId": "task-planting", "interfaceContract": "getCanvas() -> HTMLCanvasElement" },
+    { "id": "dep-024", "upstreamTaskId": "task-sunflower", "downstreamTaskId": "task-planting", "interfaceContract": "constructor(row: number, col: number)" },
+    { "id": "dep-025", "upstreamTaskId": "task-peashooter", "downstreamTaskId": "task-planting", "interfaceContract": "constructor(row: number, col: number)" },
+    { "id": "dep-026", "upstreamTaskId": "task-sun", "downstreamTaskId": "task-sun-collection", "interfaceContract": "tryCollectSun(x: number, y: number) -> number | null" },
+    { "id": "dep-027", "upstreamTaskId": "task-canvas", "downstreamTaskId": "task-sun-collection", "interfaceContract": "getCanvas() -> HTMLCanvasElement" },
+    { "id": "dep-028", "upstreamTaskId": "task-game-loop", "downstreamTaskId": "task-level-manager", "interfaceContract": "registerUpdate(callback: (deltaTime: number) => void)" },
+    { "id": "dep-029", "upstreamTaskId": "task-collision", "downstreamTaskId": "task-level-manager", "interfaceContract": "addZombie(zombie: ZombieBase)" },
+    { "id": "dep-030", "upstreamTaskId": "task-normal-zombie", "downstreamTaskId": "task-level-manager", "interfaceContract": "constructor(row: number)" },
+    { "id": "dep-031", "upstreamTaskId": "task-game-state", "downstreamTaskId": "task-level-manager", "interfaceContract": "setState(state: string)" },
+    { "id": "dep-032", "upstreamTaskId": "task-grid", "downstreamTaskId": "task-level-manager", "interfaceContract": "getRows() -> number" },
+    { "id": "dep-033", "upstreamTaskId": "task-game-loop", "downstreamTaskId": "task-hud", "interfaceContract": "registerRender(callback: () => void)" },
+    { "id": "dep-034", "upstreamTaskId": "task-sun", "downstreamTaskId": "task-hud", "interfaceContract": "getSunCount() -> number" },
+    { "id": "dep-035", "upstreamTaskId": "task-level-manager", "downstreamTaskId": "task-hud", "interfaceContract": "getWaveInfo() -> object" },
+    { "id": "dep-036", "upstreamTaskId": "task-game-state", "downstreamTaskId": "task-hud", "interfaceContract": "getState() -> string" },
+    { "id": "dep-037", "upstreamTaskId": "task-game-loop", "downstreamTaskId": "task-game-state", "interfaceContract": "stop()" }
+  ]
+}

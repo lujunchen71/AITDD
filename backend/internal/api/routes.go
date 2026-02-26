@@ -31,6 +31,7 @@ func SetupRouter() *gin.Engine {
 		{
 			projects.GET("", handlers.GetProjects)
 			projects.POST("", handlers.CreateProject)
+			projects.DELETE("/:id", handlers.DeleteProject)
 		}
 
 		// 模块相关

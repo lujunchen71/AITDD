@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Button, Badge, Tooltip, Dropdown, Avatar, Space, Checkbox, Spin, Tag } from 'antd';
+import { Layout, Button, Badge, Tooltip, Dropdown, Avatar, Space, Checkbox } from 'antd';
 import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -157,25 +157,25 @@ const Header: React.FC = () => {
           className="header-trigger"
         />
         <span className="header-title">AITDD - 可视化任务治理系统</span>
+        
+        {/* 项目选择器 - 移到左侧 */}
+        <Dropdown
+          dropdownRender={() => projectDropdownContent}
+          trigger={['click']}
+          open={dropdownVisible}
+          onOpenChange={setDropdownVisible}
+          placement="bottomLeft"
+        >
+          <Button className="project-selector-btn">
+            <FolderOutlined />
+            <span className="project-selector-text">{getSelectedProjectsText()}</span>
+            <DownOutlined style={{ fontSize: 10, marginLeft: 4 }} />
+          </Button>
+        </Dropdown>
       </div>
 
       <div className="header-right">
         <Space size="middle">
-          {/* 项目选择器 */}
-          <Dropdown
-            dropdownRender={() => projectDropdownContent}
-            trigger={['click']}
-            open={dropdownVisible}
-            onOpenChange={setDropdownVisible}
-            placement="bottomRight"
-          >
-            <Button className="project-selector-btn">
-              <FolderOutlined />
-              <span className="project-selector-text">{getSelectedProjectsText()}</span>
-              <DownOutlined style={{ fontSize: 10, marginLeft: 4 }} />
-            </Button>
-          </Dropdown>
-
           {/* 通知按钮 */}
           <Tooltip title="通知">
             <Badge count={0} size="small">

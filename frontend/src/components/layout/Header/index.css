@@ -61,28 +61,33 @@
 .project-selector-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  height: 32px;
-  background: rgba(255, 255, 255, 0.1) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.87) !important;
-  transition: all 0.3s;
+  gap: 8px;
+  padding: 6px 16px;
+  height: 36px;
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.15) 0%, rgba(233, 69, 96, 0.05) 100%) !important;
+  border: 1px solid rgba(233, 69, 96, 0.3) !important;
+  border-radius: 8px;
+  color: #fff !important;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .project-selector-btn:hover {
-  background: rgba(255, 255, 255, 0.15) !important;
+  background: linear-gradient(135deg, rgba(233, 69, 96, 0.25) 0%, rgba(233, 69, 96, 0.1) 100%) !important;
   border-color: #e94560 !important;
   color: #fff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(233, 69, 96, 0.2);
 }
 
 .project-selector-text {
-  max-width: 150px;
+  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 14px;
+  letter-spacing: 0.3px;
 }
 
 /* 项目下拉菜单样式 */

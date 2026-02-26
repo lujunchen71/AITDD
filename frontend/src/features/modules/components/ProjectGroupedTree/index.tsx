@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tree, Button, Empty, Spin, Dropdown, Collapse } from 'antd';
+import { Tree, Button, Empty, Spin, Dropdown } from 'antd';
 import { 
   PlusOutlined, 
   FolderOutlined, 
@@ -15,7 +15,7 @@ import {
   RightOutlined,
 } from '@ant-design/icons';
 import type { TreeDataNode, TreeProps, MenuProps } from 'antd';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../../../services/api';
 import { localStorageService } from '../../../../services/localStorageService';
 import { Project } from '../../../../stores/useProjectStore';
@@ -61,11 +61,11 @@ const ModuleTreeByProject: React.FC<ModuleTreeByProjectProps> = ({
   onCheckTask,
   onRefactorTask,
 }) => {
-  const queryClient = useQueryClient();
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [selectedModuleForMenu, setSelectedModuleForMenu] = useState<{ id: string; name: string } | null>(null);
   const [taskMenuOpen, setTaskMenuOpen] = useState(false);
   const [selectedTaskForMenu, setSelectedTaskForMenu] = useState<{ id: string; name: string } | null>(null);
+  const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
 
   const { data: modules, isLoading, error } = useQuery({
     queryKey: ['modules', projectId],
@@ -372,7 +372,7 @@ const ModuleTreeByProject: React.FC<ModuleTreeByProjectProps> = ({
     return rootNodes;
   };
 
-  const handleSelect: TreeProps['onSelect'] = (selectedKeys, info) => {
+  const handleSelect: TreeProps['onSelect'] = (selectedKeys, _info) => {
     if (selectedKeys.length > 0) {
       const key = selectedKeys[0] as string;
       if (!key.startsWith('task-')) {
@@ -407,10 +407,24 @@ const ModuleTreeByProject: React.FC<ModuleTreeByProjectProps> = ({
     );
   }
 
+  const handleExpand: TreeProps['onExpand'] = (expandedKeys, info) => {
+    // 只有通过 switcher（三角图标）触发的展开才允许
+    // 通过点击节点标题触发的展开会被忽略
+    if (info.nativeEvent) {
+      const target = info.nativeEvent.target as HTMLElement;
+      // 检查点击是否来自 switcher
+      if (target.closest('.ant-tree-switcher')) {
+        setExpandedKeys(expandedKeys);
+      }
+    }
+  };
+
   return (
     <Tree
       showIcon
       blockNode
+      expandedKeys={expandedKeys}
+      onExpand={handleExpand}
       selectedKeys={selectedModuleId ? [selectedModuleId] : []}
       treeData={treeData}
       onSelect={handleSelect}
@@ -490,15 +504,15 @@ const ProjectGroupedTree: React.FC<ProjectGroupedTreeProps> = ({
     <div className="project-grouped-tree">
       {selectedProjects.map((project) => {
         const isExpanded = expandedProjects.includes(project.id);
-        const moduleCount = '(加载中...)';
         
         return (
           <div key={project.id} className="project-tree-group">
-            <div 
-              className="project-tree-header"
-              onClick={() => toggleProjectExpand(project.id)}
-            >
-              <div className="project-tree-header-left">
+            <div className="project-tree-header">
+              <div
+                className="project-tree-header-left"
+                onClick={() => toggleProjectExpand(project.id)}
+                style={{ cursor: 'pointer' }}
+              >
                 {isExpanded ? (
                   <DownOutlined style={{ fontSize: 12, color: '#ec4899' }} />
                 ) : (

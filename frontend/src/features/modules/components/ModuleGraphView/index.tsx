@@ -533,13 +533,73 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [calculateAutoLayout, setNodes, savePositions]);
 
+  // 记录拖拽开始时的位置，用于计算偏移量
+  const dragStartPos = useRef<{ [key: string]: { x: number; y: number } }>({});
+  
+  // 节点拖拽开始时记录初始位置
+  const onNodeDragStart = useCallback(
+    (_: React.MouseEvent, _node: Node) => {
+      // 记录所有选中节点的初始位置
+      dragStartPos.current = {};
+      nodes.forEach(n => {
+        if (selectedModuleIds.has(n.id.replace('module-', ''))) {
+          dragStartPos.current[n.id] = { ...n.position };
+        }
+      });
+    },
+    [nodes, selectedModuleIds]
+  );
+
+  // 节点拖拽过程中，同步移动其他选中的节点
+  const onNodeDrag = useCallback(
+    (_: React.MouseEvent, draggedNode: Node) => {
+      const draggedModuleId = draggedNode.id.replace('module-', '');
+      
+      // 只有拖拽的节点是选中状态时，才同步移动其他选中节点
+      if (!selectedModuleIds.has(draggedModuleId) || selectedModuleIds.size <= 1) {
+        return;
+      }
+      
+      const startPos = dragStartPos.current[draggedNode.id];
+      if (!startPos) return;
+      
+      // 计算偏移量
+      const deltaX = draggedNode.position.x - startPos.x;
+      const deltaY = draggedNode.position.y - startPos.y;
+      
+      // 更新所有其他选中节点的位置
+      setNodes(prevNodes => prevNodes.map(node => {
+        if (node.id === draggedNode.id) return node;
+        
+        const moduleId = node.id.replace('module-', '');
+        if (selectedModuleIds.has(moduleId) && dragStartPos.current[node.id]) {
+          return {
+            ...node,
+            position: {
+              x: dragStartPos.current[node.id].x + deltaX,
+              y: dragStartPos.current[node.id].y + deltaY,
+            }
+          };
+        }
+        return node;
+      }));
+    },
+    [selectedModuleIds, setNodes]
+  );
+
   // 节点拖拽结束时的处理
   const onNodeDragStop = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      // 保存位置到后端（防抖）
-      debouncedSavePosition(node.id, node.position.x, node.position.y);
+    (_: React.MouseEvent, _node: Node) => {
+      // 保存所有选中节点的位置到后端
+      selectedModuleIds.forEach(moduleId => {
+        const nodeId = `module-${moduleId}`;
+        const nodeEl = nodes.find(n => n.id === nodeId);
+        if (nodeEl) {
+          debouncedSavePosition(nodeId, nodeEl.position.x, nodeEl.position.y);
+        }
+      });
     },
-    [debouncedSavePosition]
+    [debouncedSavePosition, selectedModuleIds, nodes]
   );
 
   const onNodeClick = useCallback(
@@ -588,14 +648,31 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
   const onSelectionChange = useCallback(
     (params: OnSelectionChangeParams) => {
       const selectedNodes = params.nodes.filter(n => n.id.startsWith('module-'));
-      if (selectedNodes.length > 0) {
-        const selectedIds = selectedNodes.map(n => n.id.replace('module-', ''));
-        console.log('[ModuleGraphView] 框选完成，选中模块:', selectedIds);
-        setSelectedModuleIds(new Set(selectedIds));
-      }
+      const selectedIds = selectedNodes.map(n => n.id.replace('module-', ''));
+      
+      // 只有当选中节点真正变化时才更新状态
+      setSelectedModuleIds(prev => {
+        const prevIds = Array.from(prev);
+        // 比较新旧选中ID是否相同
+        if (prevIds.length === selectedIds.length &&
+            prevIds.every(id => selectedIds.includes(id))) {
+          return prev; // 没有变化，返回旧状态
+        }
+        // 有变化才更新
+        if (selectedIds.length > 0) {
+          console.log('[ModuleGraphView] 框选完成，选中模块:', selectedIds);
+          return new Set(selectedIds);
+        }
+        return prev;
+      });
     },
     []
   );
+
+  // 点击空白处清除选中
+  const onPaneClick = useCallback(() => {
+    setSelectedModuleIds(new Set());
+  }, []);
 
   // 自定义节点类型
   const nodeTypes = useMemo(() => ({
@@ -745,9 +822,12 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onMoveEnd={onMoveEnd}
         onSelectionChange={onSelectionChange}
+        onPaneClick={onPaneClick}
         attributionPosition="bottom-left"
         style={{ background: '#0f0f23' }}
         nodeTypes={nodeTypes}
@@ -760,6 +840,7 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
         selectionMode={SelectionMode.Partial}
         selectionOnDrag={true}
         panOnDrag={[1]}
+        selectNodesOnDrag={false}
         zoomOnScroll={true}
         panOnScroll={false}
         preventScrolling={true}
@@ -920,11 +1001,10 @@ const ModuleNodeComponent: React.FC<{ data: ModuleNodeData }> = ({ data }) => {
       >
       {/* 模块头部 */}
       <div
-        onClick={onToggle}
         style={{
           padding: '10px 14px',
           borderBottom: collapsed ? 'none' : '1px solid rgba(255,255,255,0.1)',
-          cursor: 'pointer',
+          cursor: 'default',
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
@@ -942,7 +1022,18 @@ const ModuleNodeComponent: React.FC<{ data: ModuleNodeData }> = ({ data }) => {
         }}>
           {status}
         </span>
-        <span style={{ fontSize: '10px', color: '#a0a0a0' }}>
+        <span
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+          style={{
+            fontSize: '10px',
+            color: '#a0a0a0',
+            cursor: 'pointer',
+            padding: '2px 4px',
+          }}
+        >
           {collapsed ? '▶' : '▼'}
         </span>
       </div>
