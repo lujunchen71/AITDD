@@ -1,5 +1,5 @@
 import React from 'react';
-import { Row, Col, Card, Statistic, Typography, Progress, List, Tag, Space } from 'antd';
+import { Row, Col, Card, Statistic, Typography, Progress, List, Tag, Space, Empty } from 'antd';
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -8,36 +8,63 @@ import {
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../services/api';
-import { useProjectId } from '../../stores/useProjectStore';
+import { useSelectedProjectIds } from '../../stores/useProjectStore';
 
 const { Title, Text } = Typography;
 
 const DashboardPage: React.FC = () => {
-  const projectId = useProjectId();
+  const selectedProjectIds = useSelectedProjectIds();
   
-  const { data: modulesData } = useQuery({
-    queryKey: ['modules', projectId],
+  // [DEBUG] Dashboard 渲染调试
+  console.log('[Dashboard] Rendered, selectedProjectIds:', selectedProjectIds);
+  console.log('[Dashboard] selectedProjectIds type:', typeof selectedProjectIds, Array.isArray(selectedProjectIds));
+  
+  // 当没有选中项目时，显示空状态
+  const hasSelectedProjects = selectedProjectIds.length > 0;
+  console.log('[Dashboard] hasSelectedProjects:', hasSelectedProjects);
+  
+  const { data: modulesData, isLoading: modulesLoading, error: modulesError } = useQuery({
+    queryKey: ['dashboard-modules', selectedProjectIds],
     queryFn: async () => {
+      console.log('[Dashboard] Fetching modules for projectIds:', selectedProjectIds);
+      // 使用 selectedProjectIds 获取多个项目的模块
+      const projectIdsParam = selectedProjectIds.join(',');
       const response = await api.get<{ modules: any[] }>('/modules', {
-        params: { projectId: projectId || undefined },
+        params: { projectIds: projectIdsParam },
       });
+      console.log('[Dashboard] Modules fetched:', response.data?.modules?.length);
       return response;
     },
-    enabled: !!projectId,
+    enabled: hasSelectedProjects,
   });
 
-  const { data: tasksData } = useQuery({
-    queryKey: ['tasks'],
+  const { data: tasksData, isLoading: tasksLoading, error: tasksError } = useQuery({
+    queryKey: ['dashboard-tasks', selectedProjectIds],
     queryFn: async () => {
+      console.log('[Dashboard] Fetching tasks for projectIds:', selectedProjectIds);
+      // 使用 selectedProjectIds 获取多个项目的任务
+      const projectIdsParam = selectedProjectIds.join(',');
       const response = await api.get<{ tasks: any[] }>('/tasks', {
-        params: { pageSize: 100 },
+        params: { projectIds: projectIdsParam, pageSize: 100 },
       });
+      console.log('[Dashboard] Tasks fetched:', response.data?.tasks?.length);
       return response;
     },
+    enabled: hasSelectedProjects,
   });
 
   const modules = modulesData?.data?.modules || [];
   const tasks = tasksData?.data?.tasks || [];
+  
+  // [DEBUG] 数据状态日志
+  console.log('[Dashboard] Data state:', {
+    modulesLoading,
+    tasksLoading,
+    modulesError,
+    tasksError,
+    modulesCount: modules.length,
+    tasksCount: tasks.length,
+  });
 
   // 统计任务状态
   const taskStats = {
@@ -82,12 +109,41 @@ const DashboardPage: React.FC = () => {
     }
   };
 
-  return (
-    <div style={{ padding: 24 }}>
-      <Title level={4} style={{ marginBottom: 24 }}>
-        仪表盘
-      </Title>
+  // 如果没有选中项目，显示空状态
+  if (!hasSelectedProjects) {
+    return (
+      <div style={{ padding: 24 }}>
+        <Title level={4} style={{ marginBottom: 24 }}>
+          仪表盘
+        </Title>
+        <Empty
+          description="请选择至少一个项目查看统计数据"
+          style={{ padding: '40px 0' }}
+        />
+      </div>
+    );
+  }
 
+  return (
+    <div style={{
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+    }}>
+      {/* 固定标题 */}
+      <div style={{
+        padding: '16px 24px',
+        flexShrink: 0,
+        borderBottom: '1px solid #2d2d44',
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+      }}>
+        <Title level={4} style={{ margin: 0 }}>
+          仪表盘
+        </Title>
+      </div>
+      {/* 可滚动内容 */}
+      <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
       {/* 统计卡片 */}
       <Row gutter={[16, 16]}>
         <Col xs={24} sm={12} lg={6}>
@@ -173,6 +229,7 @@ const DashboardPage: React.FC = () => {
           locale={{ emptyText: '暂无任务' }}
         />
       </Card>
+      </div>
     </div>
   );
 };

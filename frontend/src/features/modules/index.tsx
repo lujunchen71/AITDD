@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Typography, Button, Empty, message, Spin } from 'antd';
 import { DeploymentUnitOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { ReactFlowProvider } from 'reactflow';
 import ModuleTree from './components/ModuleTree';
+import ProjectGroupedTree from './components/ProjectGroupedTree';
 import ModuleDetail from './components/ModuleDetail';
 import ModuleForm from './components/ModuleForm';
 import TaskForm from '../tasks/components/TaskForm';
 import ViewSwitcher from './components/ViewSwitcher';
 import ModuleGraphView from './components/ModuleGraphView';
 import { apiClient } from '../../services/api';
-import { useProjectId, useProjectStore } from '../../stores/useProjectStore';
+import { useProjectId, useProjectStore, useProjects, useSelectedProjectIds } from '../../stores/useProjectStore';
 import { Module, ModuleDependency, Task, TaskDependency, ViewMode } from '../../types';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -18,6 +20,11 @@ const ModulesPage: React.FC = () => {
   const queryClient = useQueryClient();
   const projectId = useProjectId();
   const { isInitialized, isLoading } = useProjectStore();
+  const projects = useProjects();
+  const selectedProjectIds = useSelectedProjectIds();
+  
+  // 当前选中的项目ID（用于模块详情等单项目操作）
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [moduleFormVisible, setModuleFormVisible] = useState(false);
@@ -59,10 +66,10 @@ const ModulesPage: React.FC = () => {
 
   // 加载项目图表数据（图形视图模式）
   useEffect(() => {
-    if (projectId && viewMode === 'graph') {
+    if (viewMode === 'graph') {
       loadProjectGraph();
     }
-  }, [projectId, viewMode]);
+  }, [selectedProjectIds, viewMode]);
 
   const loadModules = async () => {
     try {
@@ -102,7 +109,21 @@ const ModulesPage: React.FC = () => {
 
   const loadProjectGraph = async () => {
     try {
-      const response = await apiClient.get(`/graph/project?projectId=${projectId}`);
+      // 如果没有选中的项目，清空所有图形数据
+      // 注意：不再回退使用 projectId，保持与列表模式一致的行为
+      if (selectedProjectIds.length === 0) {
+        setModules([]);
+        setTasks([]);
+        setTaskDependencies([]);
+        setModuleDependencies([]);
+        return;
+      }
+      
+      // 使用 selectedProjectIds 加载数据
+      const projectIds = selectedProjectIds;
+      
+      // 修改API调用，支持多个项目ID
+      const response = await apiClient.get(`/graph/project?projectIds=${projectIds.join(',')}`);
       // apiClient 响应拦截器已经解包了 axios 响应，所以 response = {success: true, data: {...}}
       // response.data 就是 {modules: [], tasks: [], ...}
       const graphData = response.data;
@@ -118,15 +139,19 @@ const ModulesPage: React.FC = () => {
     }
   };
 
-  const handleSelectModule = (moduleId: string) => {
+  const handleSelectModule = (moduleId: string, projectId?: string) => {
     setSelectedModuleId(moduleId);
+    if (projectId) {
+      setCurrentProjectId(projectId);
+    }
   };
 
-  const handleAddModule = (parentId?: string) => {
+  const handleAddModule = (projectId: string, parentId?: string) => {
     if (!projectId) {
-      message.warning('项目尚未初始化，请稍候再试');
+      message.warning('请先选择一个项目');
       return;
     }
+    setCurrentProjectId(projectId);
     setEditingModuleId(undefined);
     setEditingModule(null);
     setParentIdForNew(parentId);
@@ -148,7 +173,7 @@ const ModulesPage: React.FC = () => {
     }
   };
 
-  const handleDeleteModule = async (moduleId: string) => {
+  const handleDeleteModule = async (moduleId: string, projectId?: string) => {
     try {
       await apiClient.delete(`/modules/${moduleId}`);
       message.success('模块删除成功');
@@ -156,6 +181,10 @@ const ModulesPage: React.FC = () => {
         setSelectedModuleId(null);
       }
       setRefreshKey((prev) => prev + 1);
+      // 刷新对应项目的模块缓存
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['modules', projectId] });
+      }
     } catch (error: any) {
       const errorMsg = error?.response?.data?.error?.message || '删除模块失败';
       message.error(errorMsg);
@@ -170,7 +199,9 @@ const ModulesPage: React.FC = () => {
   };
 
   const handleModuleFormSubmit = async (values: any) => {
-    if (!projectId) {
+    // 使用当前选中的项目ID或currentProjectId
+    const targetProjectId = currentProjectId || projectId;
+    if (!targetProjectId) {
       message.error('项目 ID 不存在，无法创建模块');
       return;
     }
@@ -183,7 +214,7 @@ const ModulesPage: React.FC = () => {
       } else {
         await apiClient.post('/modules', {
           ...values,
-          projectId: projectId,
+          projectId: targetProjectId,
         });
         message.success('模块创建成功');
       }
@@ -192,6 +223,8 @@ const ModulesPage: React.FC = () => {
       setEditingModule(null);
       setParentIdForNew(undefined);
       setRefreshKey((prev) => prev + 1);
+      // 刷新对应项目的模块缓存
+      queryClient.invalidateQueries({ queryKey: ['modules', targetProjectId] });
     } catch (error: any) {
       const errorMsg = error?.response?.data?.error?.message || '操作失败';
       message.error(errorMsg);
@@ -200,18 +233,21 @@ const ModulesPage: React.FC = () => {
     }
   };
 
-  const handleAddTask = (moduleId: string) => {
-    if (!projectId) {
-      message.warning('项目尚未初始化，请稍候再试');
+  const handleAddTask = (moduleId: string, projectId?: string) => {
+    if (!projectId && !currentProjectId) {
+      message.warning('请先选择一个项目');
       return;
     }
     setEditingTaskId(undefined);
     setEditingTask(null);
     setSelectedModuleId(moduleId);
+    if (projectId) {
+      setCurrentProjectId(projectId);
+    }
     setTaskFormVisible(true);
   };
 
-  const handleEditTask = async (taskId: string, _moduleId: string) => {
+  const handleEditTask = async (taskId: string, projectId?: string) => {
     setTaskFormLoading(true);
     try {
       const response = await apiClient.get(`/tasks/${taskId}`);
@@ -271,6 +307,78 @@ const ModulesPage: React.FC = () => {
     }
   };
 
+  // 删除任务（从树节点调用）
+  const handleDeleteTaskFromTree = async (taskId: string, projectId?: string) => {
+    try {
+      await apiClient.delete(`/tasks/${taskId}`);
+      message.success('任务删除成功');
+      await loadModules();
+      // 刷新对应项目的模块缓存
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['modules', projectId] });
+      }
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error?.message || '删除失败';
+      message.error(errorMsg);
+    }
+  };
+
+  // 编辑任务（从树节点调用）
+  const handleEditTaskFromTree = async (taskId: string, projectId?: string) => {
+    setTaskFormLoading(true);
+    try {
+      const response = await apiClient.get(`/tasks/${taskId}`);
+      const task = response.data?.task;
+      setEditingTask(task);
+      setEditingTaskId(taskId);
+      // 设置所属模块ID
+      if (task?.moduleId) {
+        setSelectedModuleId(task.moduleId);
+      }
+      // 设置当前项目ID
+      if (projectId) {
+        setCurrentProjectId(projectId);
+      }
+      setTaskFormVisible(true);
+    } catch (error) {
+      message.error('获取任务详情失败');
+    } finally {
+      setTaskFormLoading(false);
+    }
+  };
+
+  // 检查任务
+  const handleCheckTask = async (taskId: string, projectId?: string) => {
+    try {
+      await apiClient.post(`/tasks/${taskId}/check`);
+      message.success('任务检查完成');
+      await loadModules();
+      // 刷新对应项目的模块缓存
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['modules', projectId] });
+      }
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error?.message || '检查失败';
+      message.error(errorMsg);
+    }
+  };
+
+  // 重构任务
+  const handleRefactorTask = async (taskId: string, projectId?: string) => {
+    try {
+      await apiClient.post(`/tasks/${taskId}/refactor`);
+      message.success('任务重构完成');
+      await loadModules();
+      // 刷新对应项目的模块缓存
+      if (projectId) {
+        queryClient.invalidateQueries({ queryKey: ['modules', projectId] });
+      }
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error?.message || '重构失败';
+      message.error(errorMsg);
+    }
+  };
+
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
   };
@@ -302,12 +410,13 @@ const ModulesPage: React.FC = () => {
 
   return (
     <div style={{
-      height: 'calc(100vh - 64px)',
+      height: '100%',
       display: 'flex',
       flexDirection: 'column',
       background: '#0f0f23',
+      overflow: 'hidden',
     }}>
-      {/* 顶部工具栏 */}
+      {/* 顶部工具栏 - 固定在顶部 */}
       <div style={{
         padding: '12px 24px',
         display: 'flex',
@@ -316,6 +425,7 @@ const ModulesPage: React.FC = () => {
         background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
         borderBottom: '1px solid #2d2d44',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+        flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <DeploymentUnitOutlined style={{ fontSize: 20, color: '#e94560' }} />
@@ -361,15 +471,20 @@ const ModulesPage: React.FC = () => {
                 <AppstoreOutlined />
                 模块结构
               </div>
-              <div style={{ flex: 1, overflow: 'auto', padding: '8px' }}>
-                <ModuleTree
+              <div style={{ flex: 1, overflow: 'auto', padding: '4px' }}>
+                <ProjectGroupedTree
                   key={refreshKey}
-                  projectId={projectId ?? ''}
+                  selectedProjectIds={selectedProjectIds}
+                  projects={projects}
                   onSelectModule={handleSelectModule}
                   selectedModuleId={selectedModuleId}
                   onAddModule={handleAddModule}
                   onAddTask={handleAddTask}
                   onDeleteModule={handleDeleteModule}
+                  onEditTask={handleEditTaskFromTree}
+                  onDeleteTask={handleDeleteTaskFromTree}
+                  onCheckTask={handleCheckTask}
+                  onRefactorTask={handleRefactorTask}
                 />
               </div>
             </div>
@@ -424,16 +539,18 @@ const ModulesPage: React.FC = () => {
           </>
         ) : (
           // 图形视图模式
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <ModuleGraphView
-              modules={modules}
-              tasks={tasks}
-              taskDependencies={taskDependencies}
-              moduleDependencies={moduleDependencies}
-              onModuleClick={handleSelectModule}
-              onTaskClick={(taskId: string) => handleEditTask(taskId, selectedModuleId || '')}
-            />
-          </div>
+          <ReactFlowProvider>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <ModuleGraphView
+                modules={modules}
+                tasks={tasks}
+                taskDependencies={taskDependencies}
+                moduleDependencies={moduleDependencies}
+                onModuleClick={handleSelectModule}
+                onTaskClick={(taskId: string) => handleEditTask(taskId, selectedModuleId || '')}
+              />
+            </div>
+          </ReactFlowProvider>
         )}
       </div>
 

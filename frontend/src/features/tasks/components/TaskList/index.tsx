@@ -1,8 +1,9 @@
 import React from 'react';
-import { Table, Tag, Button, Space, Empty, Spin, Input, Select } from 'antd';
-import { EditOutlined, DeleteOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { Table, Tag, Button, Space, Empty, Spin, Input, Select, Dropdown } from 'antd';
+import { EditOutlined, DeleteOutlined, PlusOutlined, SearchOutlined, MoreOutlined, CheckCircleOutlined, ReloadOutlined, CopyOutlined, LockOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import type { ColumnsType } from 'antd/es/table';
+import type { MenuProps } from 'antd';
 import { apiClient } from '../../../../services/api';
 
 interface TaskListProps {
@@ -10,6 +11,10 @@ interface TaskListProps {
   onEdit?: (taskId: string) => void;
   onDelete?: (taskId: string) => void;
   onAdd?: () => void;
+  onCheck?: (taskId: string) => void;
+  onRefactor?: (taskId: string) => void;
+  onDuplicate?: (taskId: string) => void;
+  onLock?: (taskId: string) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -31,6 +36,10 @@ const TaskList: React.FC<TaskListProps> = ({
   onEdit,
   onDelete,
   onAdd,
+  onCheck,
+  onRefactor,
+  onDuplicate,
+  onLock,
 }) => {
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(10);
@@ -95,24 +104,58 @@ const TaskList: React.FC<TaskListProps> = ({
     {
       title: '操作',
       key: 'action',
-      width: 80,
+      width: 60,
       fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="text"
-            size="small"
-            icon={<EditOutlined style={{ color: '#00d9ff' }} />}
-            onClick={() => onEdit?.(record.id)}
-          />
-          <Button
-            type="text"
-            size="small"
-            icon={<DeleteOutlined style={{ color: '#ff4d4f' }} />}
-            onClick={() => onDelete?.(record.id)}
-          />
-        </Space>
-      ),
+      render: (_, record) => {
+        const menuItems: MenuProps['items'] = [
+          {
+            key: 'edit',
+            label: '编辑',
+            icon: <EditOutlined />,
+            onClick: () => onEdit?.(record.id),
+          },
+          {
+            key: 'check',
+            label: '检查',
+            icon: <CheckCircleOutlined />,
+            onClick: () => onCheck?.(record.id),
+          },
+          {
+            key: 'refactor',
+            label: '重构',
+            icon: <ReloadOutlined />,
+            onClick: () => onRefactor?.(record.id),
+          },
+          {
+            key: 'duplicate',
+            label: '复制',
+            icon: <CopyOutlined />,
+            onClick: () => onDuplicate?.(record.id),
+          },
+          {
+            key: 'lock',
+            label: record.locked ? '解锁' : '锁定',
+            icon: <LockOutlined />,
+            onClick: () => onLock?.(record.id),
+          },
+          {
+            type: 'divider',
+          },
+          {
+            key: 'delete',
+            label: '删除',
+            icon: <DeleteOutlined />,
+            danger: true,
+            onClick: () => onDelete?.(record.id),
+          },
+        ];
+
+        return (
+          <Dropdown menu={{ items: menuItems }} trigger={['click']}>
+            <Button type="text" size="small" icon={<MoreOutlined style={{ color: '#a0a0a0' }} />} />
+          </Dropdown>
+        );
+      },
     },
   ];
 

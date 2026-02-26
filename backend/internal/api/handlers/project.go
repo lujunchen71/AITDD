@@ -9,6 +9,61 @@ import (
 	"github.com/google/uuid"
 )
 
+// GetProjects 获取所有项目列表
+func GetProjects(c *gin.Context) {
+	var projects []models.Project
+
+	result := database.DB.Order("created_at DESC").Find(&projects)
+	if result.Error != nil {
+		InternalError(c, "获取项目列表失败")
+		return
+	}
+
+	// 如果没有项目，返回空数组
+	if projects == nil {
+		projects = []models.Project{}
+	}
+
+	Success(c, gin.H{
+		"projects": projects,
+		"total":    len(projects),
+	})
+}
+
+// CreateProject 创建新项目
+func CreateProject(c *gin.Context) {
+	var req struct {
+		Name        string `json:"name" binding:"required"`
+		Description string `json:"description"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ValidationError(c, "无效的请求数据", nil)
+		return
+	}
+
+	// 创建新项目
+	project := models.Project{
+		ID:           uuid.New().String(),
+		Name:         req.Name,
+		Constitution: req.Description,
+		CreatedAt:    time.Now().UnixMilli(),
+		UpdatedAt:    time.Now().UnixMilli(),
+		Version:      1,
+		SyncStatus:   models.SyncStatusSynced,
+	}
+
+	result := database.DB.Create(&project)
+	if result.Error != nil {
+		InternalError(c, "创建项目失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"project": project,
+	})
+}
+
 // GetProject 获取项目信息
 func GetProject(c *gin.Context) {
 	var project models.Project

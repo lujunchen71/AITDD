@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { api } from '../services/api';
+import { localStorageService } from '../services/localStorageService';
 
 // 项目接口
 export interface Project {
@@ -19,6 +20,12 @@ interface ProjectState {
   project: Project | null;
   projectId: string | null;
   
+  // 所有项目列表
+  projects: Project[];
+  
+  // 选中的项目ID列表（用于多选）
+  selectedProjectIds: string[];
+  
   // 加载状态
   isLoading: boolean;
   error: string | null;
@@ -28,11 +35,23 @@ interface ProjectState {
   
   // 操作方法
   fetchProject: () => Promise<void>;
+  fetchProjects: () => Promise<void>;
   ensureProject: () => Promise<void>;
   setProject: (project: Project | null) => void;
   clearError: () => void;
   reset: () => void;
+  
+  // 多选相关方法
+  toggleProjectSelection: (projectId: string) => void;
+  selectAllProjects: () => void;
+  deselectAllProjects: () => void;
+  setSelectedProjectIds: (ids: string[]) => void;
 }
+
+// 从本地存储加载初始选中的项目ID
+const loadInitialSelectedProjectIds = (): string[] => {
+  return localStorageService.getSelectedProjectIds();
+};
 
 // 创建Store - 移除 persist 中间件，每次都从服务器获取项目状态
 export const useProjectStore = create<ProjectState>()(
@@ -41,9 +60,56 @@ export const useProjectStore = create<ProjectState>()(
       // 初始状态
       project: null,
       projectId: null,
+      projects: [],
+      selectedProjectIds: loadInitialSelectedProjectIds(),
       isLoading: false,
       error: null,
       isInitialized: false,
+
+      // 获取所有项目列表
+      fetchProjects: async () => {
+        try {
+          console.log('[ProjectStore] fetchProjects 开始...');
+          const response = await api.get<{ projects: Project[], total: number }>('/projects');
+          console.log('[ProjectStore] API 响应:', response);
+          const projects = response.data?.projects || [];
+          console.log('[ProjectStore] 解析出的 projects:', projects);
+          
+          // 兼容后端返回的ID字段（可能是大写ID或小写id）
+          const normalizedProjects = projects.map((p: any) => ({
+            ...p,
+            id: p.ID || p.id,
+          }));
+          
+          console.log('[ProjectStore] 标准化后的 projects:', normalizedProjects);
+          
+          // 获取有效项目ID列表
+          const validProjectIds = normalizedProjects.map((p: Project) => p.id);
+          
+          // 清理无效的项目ID并获取有效的选中项目
+          const cleanedSelectedIds = localStorageService.cleanupInvalidProjectIds(validProjectIds);
+          
+          console.log('[ProjectStore] 当前 selectedProjectIds:', get().selectedProjectIds);
+          console.log('[ProjectStore] 清理后的 selectedProjectIds:', cleanedSelectedIds);
+          
+          set({ projects: normalizedProjects });
+          
+          // 如果没有选中的项目，默认选中所有项目
+          if (cleanedSelectedIds.length === 0 && normalizedProjects.length > 0) {
+            const allProjectIds = normalizedProjects.map((p: Project) => p.id);
+            console.log('[ProjectStore] 自动选中所有项目:', allProjectIds);
+            localStorageService.setSelectedProjectIds(allProjectIds);
+            set({ selectedProjectIds: allProjectIds });
+          } else {
+            // 使用清理后的选中项目ID
+            set({ selectedProjectIds: cleanedSelectedIds });
+            console.log('[ProjectStore] 使用清理后的选中项目:', cleanedSelectedIds);
+          }
+        } catch (error: any) {
+          console.error('[ProjectStore] fetchProjects 失败:', error);
+          set({ projects: [] });
+        }
+      },
 
       // 获取项目信息
       fetchProject: async () => {
@@ -186,10 +252,46 @@ export const useProjectStore = create<ProjectState>()(
         set({
           project: null,
           projectId: null,
+          projects: [],
+          selectedProjectIds: [],
           isLoading: false,
           error: null,
           isInitialized: false,
         });
+      },
+
+      // 切换项目选择状态
+      toggleProjectSelection: (projectId: string) => {
+        const { selectedProjectIds } = get();
+        const newSelectedIds = selectedProjectIds.includes(projectId)
+          ? selectedProjectIds.filter(id => id !== projectId)
+          : [...selectedProjectIds, projectId];
+        // 保存到本地存储
+        localStorageService.setSelectedProjectIds(newSelectedIds);
+        set({ selectedProjectIds: newSelectedIds });
+      },
+
+      // 选择所有项目
+      selectAllProjects: () => {
+        const { projects } = get();
+        const allIds = projects.map(p => p.id);
+        // 保存到本地存储
+        localStorageService.setSelectedProjectIds(allIds);
+        set({ selectedProjectIds: allIds });
+      },
+
+      // 取消选择所有项目
+      deselectAllProjects: () => {
+        // 保存到本地存储
+        localStorageService.setSelectedProjectIds([]);
+        set({ selectedProjectIds: [] });
+      },
+
+      // 设置选中的项目ID列表
+      setSelectedProjectIds: (ids: string[]) => {
+        // 保存到本地存储
+        localStorageService.setSelectedProjectIds(ids);
+        set({ selectedProjectIds: ids });
       },
     }),
     { name: 'ProjectStore' }
@@ -199,5 +301,7 @@ export const useProjectStore = create<ProjectState>()(
 // 导出便捷 hook
 export const useProjectId = () => useProjectStore((state) => state.projectId);
 export const useProject = () => useProjectStore((state) => state.project);
+export const useProjects = () => useProjectStore((state) => state.projects);
+export const useSelectedProjectIds = () => useProjectStore((state) => state.selectedProjectIds);
 
 export default useProjectStore;

@@ -1,24 +1,55 @@
-import React, { useState } from 'react';
-import { Tree, Button, Empty, Spin, Dropdown } from 'antd';
-import { PlusOutlined, FolderOutlined, FolderOpenOutlined, MoreOutlined, FileTextOutlined, FileOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Tree, Button, Empty, Spin, Dropdown, Collapse } from 'antd';
+import { 
+  PlusOutlined, 
+  FolderOutlined, 
+  FolderOpenOutlined, 
+  MoreOutlined, 
+  FileTextOutlined, 
+  EditOutlined, 
+  DeleteOutlined, 
+  CheckCircleOutlined, 
+  ReloadOutlined,
+  ProjectOutlined,
+  DownOutlined,
+  RightOutlined,
+} from '@ant-design/icons';
 import type { TreeDataNode, TreeProps, MenuProps } from 'antd';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../../services/api';
+import { localStorageService } from '../../../../services/localStorageService';
+import { Project } from '../../../../stores/useProjectStore';
+import './index.css';
 
-interface ModuleTreeProps {
-  projectId: string;
-  onSelectModule: (moduleId: string) => void;
+interface ProjectGroupedTreeProps {
+  selectedProjectIds: string[];
+  projects: Project[];
+  onSelectModule: (moduleId: string, projectId: string) => void;
   selectedModuleId?: string | null;
-  onAddModule?: (parentId?: string) => void;
-  onAddTask?: (moduleId: string) => void;
-  onDeleteModule?: (moduleId: string) => void;
-  onEditTask?: (taskId: string) => void;
-  onDeleteTask?: (taskId: string) => void;
-  onCheckTask?: (taskId: string) => void;
-  onRefactorTask?: (taskId: string) => void;
+  onAddModule?: (projectId: string, parentId?: string) => void;
+  onAddTask?: (moduleId: string, projectId: string) => void;
+  onDeleteModule?: (moduleId: string, projectId: string) => void;
+  onEditTask?: (taskId: string, projectId: string) => void;
+  onDeleteTask?: (taskId: string, projectId: string) => void;
+  onCheckTask?: (taskId: string, projectId: string) => void;
+  onRefactorTask?: (taskId: string, projectId: string) => void;
 }
 
-const ModuleTree: React.FC<ModuleTreeProps> = ({
+interface ModuleTreeByProjectProps {
+  projectId: string;
+  onSelectModule: (moduleId: string, projectId: string) => void;
+  selectedModuleId?: string | null;
+  onAddModule?: (projectId: string, parentId?: string) => void;
+  onAddTask?: (moduleId: string, projectId: string) => void;
+  onDeleteModule?: (moduleId: string, projectId: string) => void;
+  onEditTask?: (taskId: string, projectId: string) => void;
+  onDeleteTask?: (taskId: string, projectId: string) => void;
+  onCheckTask?: (taskId: string, projectId: string) => void;
+  onRefactorTask?: (taskId: string, projectId: string) => void;
+}
+
+// 单个项目的模块树组件
+const ModuleTreeByProject: React.FC<ModuleTreeByProjectProps> = ({
   projectId,
   onSelectModule,
   selectedModuleId,
@@ -42,8 +73,6 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
       const response = await apiClient.get('/modules', {
         params: { projectId },
       });
-      console.log('ModuleTree API response:', response);
-      // API 响应格式：{success: true, data: {modules: [], total: 0}}
       const modulesList = response.data?.data?.modules || response.data?.modules || [];
       
       // 为每个模块获取其任务
@@ -62,9 +91,15 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
       
       return modulesWithTasks;
     },
+    enabled: !!projectId,
   });
 
   const convertToTreeData = (modulesData: any[]): TreeDataNode[] => {
+    // 防御性检查：确保 modulesData 是有效的数组
+    if (!modulesData || !Array.isArray(modulesData)) {
+      return [];
+    }
+
     const moduleMap = new Map<string, TreeDataNode>();
     const rootNodes: TreeDataNode[] = [];
 
@@ -83,7 +118,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
           icon: <FileTextOutlined style={{ color: '#e94560' }} />,
           onClick: (e) => {
             e?.domEvent?.stopPropagation();
-            onAddTask?.(module.id);
+            onAddTask?.(module.id, projectId);
           },
         },
         {
@@ -92,7 +127,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
           icon: <PlusOutlined style={{ color: '#e94560' }} />,
           onClick: (e) => {
             e?.domEvent?.stopPropagation();
-            onAddModule?.(module.id);
+            onAddModule?.(projectId, module.id);
           },
         },
         {
@@ -106,7 +141,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
           onClick: (e) => {
             e?.domEvent?.stopPropagation();
             if (window.confirm(`确定要删除模块 "${module.name}" 吗？`)) {
-              onDeleteModule?.(module.id);
+              onDeleteModule?.(module.id, projectId);
             }
           },
         },
@@ -128,8 +163,8 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
             <span style={{
               flex: 1,
               fontSize: '14px',
-              color: '#e8e8e8',
-              fontWeight: 600,
+              color: '#f87171',
+              fontWeight: 700,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -137,6 +172,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
             <Dropdown
               menu={{ items: menuItems }}
               trigger={['click']}
+              placement="bottomRight"
               open={contextMenuOpen && selectedModuleForMenu?.id === module.id}
               onOpenChange={(open) => {
                 setContextMenuOpen(open);
@@ -146,7 +182,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
                   setSelectedModuleForMenu(null);
                 }
               }}
-              getPopupContainer={(trigger) => trigger.parentNode as HTMLElement}
+              destroyPopupOnHide
             >
               <Button
                 type="text"
@@ -165,9 +201,9 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
                 }}
                 className="module-tree-action"
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#fbbf24';
-                  e.currentTarget.style.background = 'rgba(251, 191, 36, 0.1)';
-                  e.currentTarget.style.borderColor = 'rgba(251, 191, 36, 0.3)';
+                  e.currentTarget.style.color = '#f87171';
+                  e.currentTarget.style.background = 'rgba(248, 113, 113, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(248, 113, 113, 0.3)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.color = '#a0a0a0';
@@ -179,21 +215,14 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
           </div>
         ),
         icon: ({ expanded }) => expanded ?
-          <FolderOpenOutlined style={{ color: '#fbbf24', fontSize: '14px' }} /> :
-          <FolderOutlined style={{ color: '#f59e0b', fontSize: '14px' }} />,
+          <FolderOpenOutlined style={{ color: '#f87171', fontSize: '14px' }} /> :
+          <FolderOutlined style={{ color: '#f87171', fontSize: '14px' }} />,
         children: [],
-        isLeaf: false, // 始终允许展开，因为可能有子模块或任务
-        switcherIcon: ({ expanded }) => (
-          <span style={{
-            color: '#f59e0b',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            transition: 'transform 0.2s',
-            display: 'inline-block',
-            transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
-          }}>
-            ▶
-          </span>
+        isLeaf: false,
+        switcherIcon: ({ expanded }) => expanded ? (
+          <DownOutlined style={{ fontSize: 12, color: '#f87171' }} />
+        ) : (
+          <RightOutlined style={{ fontSize: 12, color: '#f87171' }} />
         ),
       });
     });
@@ -214,7 +243,6 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
       const node = moduleMap.get(module.id);
       if (node && module.tasks && Array.isArray(module.tasks) && module.tasks.length > 0) {
         const taskChildren: TreeDataNode[] = module.tasks.map((task: any) => {
-          // 任务菜单项
           const taskMenuItems: MenuProps['items'] = [
             {
               key: 'edit',
@@ -222,7 +250,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
               icon: <EditOutlined style={{ color: '#e94560' }} />,
               onClick: (e) => {
                 e?.domEvent?.stopPropagation();
-                onEditTask?.(task.id);
+                onEditTask?.(task.id, projectId);
               },
             },
             {
@@ -231,7 +259,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
               icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
               onClick: (e) => {
                 e?.domEvent?.stopPropagation();
-                onCheckTask?.(task.id);
+                onCheckTask?.(task.id, projectId);
               },
             },
             {
@@ -240,7 +268,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
               icon: <ReloadOutlined style={{ color: '#1890ff' }} />,
               onClick: (e) => {
                 e?.domEvent?.stopPropagation();
-                onRefactorTask?.(task.id);
+                onRefactorTask?.(task.id, projectId);
               },
             },
             {
@@ -254,7 +282,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
               onClick: (e) => {
                 e?.domEvent?.stopPropagation();
                 if (window.confirm(`确定要删除任务 "${task.name}" 吗？`)) {
-                  onDeleteTask?.(task.id);
+                  onDeleteTask?.(task.id, projectId);
                 }
               },
             },
@@ -275,15 +303,18 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
               }}>
                 <span style={{
                   flex: 1,
-                  fontSize: '12px',
-                  color: '#a78bfa',
+                  fontSize: '13px',
+                  color: task.status === 'completed' ? '#10b981' : '#fff2f2',
+                  fontWeight: 400,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
+                  textDecoration: task.status === 'completed' ? 'line-through' : 'none',
                 }}>{task.name}</span>
                 <Dropdown
                   menu={{ items: taskMenuItems }}
                   trigger={['click']}
+                  placement="bottomRight"
                   open={taskMenuOpen && selectedTaskForMenu?.id === task.id}
                   onOpenChange={(open) => {
                     setTaskMenuOpen(open);
@@ -293,7 +324,7 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
                       setSelectedTaskForMenu(null);
                     }
                   }}
-                  getPopupContainer={(trigger) => trigger.parentNode as HTMLElement}
+                  destroyPopupOnHide
                 >
                   <Button
                     type="text"
@@ -302,22 +333,22 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
                     onClick={(e) => e.stopPropagation()}
                     style={{
                       transition: 'all 0.2s',
-                      color: '#a0a0a0',
-                      padding: '0 4px',
-                      height: '20px',
-                      minWidth: '24px',
+                      color: '#808080',
+                      padding: '0 6px',
+                      height: '24px',
+                      minWidth: '28px',
                       background: 'transparent',
                       border: '1px solid transparent',
                       borderRadius: '4px',
                     }}
                     className="task-tree-action"
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.color = '#a78bfa';
-                      e.currentTarget.style.background = 'rgba(167, 139, 250, 0.1)';
-                      e.currentTarget.style.borderColor = 'rgba(167, 139, 250, 0.3)';
+                      e.currentTarget.style.color = '#fff2f2';
+                      e.currentTarget.style.background = 'rgba(255, 242, 242, 0.15)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 242, 242, 0.3)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.color = '#a0a0a0';
+                      e.currentTarget.style.color = '#808080';
                       e.currentTarget.style.background = 'transparent';
                       e.currentTarget.style.borderColor = 'transparent';
                     }}
@@ -325,43 +356,34 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
                 </Dropdown>
               </div>
             ),
-            icon: <FileOutlined style={{ color: '#a78bfa', fontSize: '12px' }} />,
+            icon: <FileTextOutlined style={{ color: task.status === 'completed' ? '#10b981' : '#fff2f2', fontSize: '14px' }} />,
             isLeaf: true,
           };
         });
-        node.children = [...(node.children || []), ...taskChildren];
-        // 更新 isLeaf：有任务的模块不是叶子节点
-        node.isLeaf = false;
+        
+        if (node.children) {
+          node.children = [...taskChildren, ...node.children];
+        } else {
+          node.children = taskChildren;
+        }
       }
     });
 
     return rootNodes;
   };
 
-  const treeData = modules && Array.isArray(modules) ? convertToTreeData(modules) : [];
-
-  const handleSelect: TreeProps['onSelect'] = (selectedKeys) => {
+  const handleSelect: TreeProps['onSelect'] = (selectedKeys, info) => {
     if (selectedKeys.length > 0) {
-      onSelectModule(selectedKeys[0] as string);
+      const key = selectedKeys[0] as string;
+      if (!key.startsWith('task-')) {
+        onSelectModule(key, projectId);
+      }
     }
   };
 
-  // 处理模块添加后的刷新
-  React.useEffect(() => {
-    if (onAddModule || onAddTask) {
-      // 订阅查询客户端，在添加操作后刷新数据
-      const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-        if (event?.query.queryKey[0] === 'modules') {
-          // 数据已更新，无需操作
-        }
-      });
-      return () => unsubscribe();
-    }
-  }, [queryClient, onAddModule, onAddTask]);
-
   if (isLoading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
+      <div style={{ padding: '20px', textAlign: 'center' }}>
         <Spin size="small" />
       </div>
     );
@@ -369,178 +391,158 @@ const ModuleTree: React.FC<ModuleTreeProps> = ({
 
   if (error) {
     return (
-      <div style={{ padding: '16px', color: '#ff4d4f', textAlign: 'center', fontSize: '13px' }}>
-        加载模块失败
+      <div style={{ padding: '20px', textAlign: 'center', color: '#ff4d4f' }}>
+        加载失败
+      </div>
+    );
+  }
+
+  const treeData = modules ? convertToTreeData(modules as any[]) : [];
+
+  if (treeData.length === 0) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center', color: '#808080' }}>
+        暂无模块
       </div>
     );
   }
 
   return (
-    <div style={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      background: '#16213e',
-    }}>
-      <style>{`
-        .module-tree-with-actions .ant-tree-treenode:hover .module-tree-action,
-        .module-tree-with-actions .module-tree-action,
-        .module-tree-with-actions .ant-tree-treenode .module-tree-action {
-          opacity: 1 !important;
-          visibility: visible !important;
-          display: inline-flex !important;
-        }
-        .module-tree-with-actions .ant-dropdown-menu {
-          background: #1a1a2e !important;
-          border: 1px solid #0f3460 !important;
-        }
-        .module-tree-with-actions .ant-dropdown-menu-item {
-          color: #e8e8e8 !important;
-        }
-        .module-tree-with-actions .ant-dropdown-menu-item:hover {
-          background: rgba(233, 69, 96, 0.15) !important;
-        }
-        .module-tree-with-actions .ant-tree-node-content-wrapper {
-          padding: 2px 6px !important;
-          border-radius: 4px;
-          margin: 0 2px;
-          min-height: 24px !important;
-          height: 24px !important;
-          display: flex !important;
-          align-items: center !important;
-          transition: all 0.2s ease;
-        }
-        .module-tree-with-actions .ant-tree-node-content-wrapper:hover {
-          background-color: rgba(251, 191, 36, 0.12) !important;
-        }
-        .module-tree-with-actions .ant-tree-node-content-wrapper.ant-tree-node-selected {
-          background-color: rgba(251, 191, 36, 0.2) !important;
-          border: 1px solid rgba(251, 191, 36, 0.4);
-        }
-        .module-tree-with-actions .ant-tree-indent-unit {
-          width: 16px;
-        }
-        .module-tree-with-actions .ant-tree-switcher {
-          width: 16px;
-        }
-        .module-tree-with-actions .ant-tree {
-          background: transparent !important;
-          color: #e8e8e8;
-        }
-        .module-tree-with-actions .ant-tree-treenode {
-          color: #e8e8e8;
-          padding: 2px 0;
-          margin: 0;
-        }
-        /* 模块节点（有图标的）增加上边距 */
-        .module-tree-with-actions .ant-tree-treenode:has(.ant-tree-icon__customize) {
-          margin-top: 4px;
-        }
-        .module-tree-with-actions .ant-tree-treenode:hover {
-          background: rgba(251, 191, 36, 0.06);
-          border-radius: 6px;
-        }
-        .module-tree-with-actions .ant-tree-title {
-          color: #e8e8e8;
-        }
-        .module-tree-with-actions .ant-tree-node-content-wrapper .ant-tree-icon {
-          color: #f59e0b;
-        }
-        .module-tree-with-actions .ant-tree-title {
-          display: flex !important;
-          align-items: center !important;
-          height: 100% !important;
-          width: 100% !important;
-          flex: 1 !important;
-        }
-        .module-tree-with-actions .ant-tree-treenode {
-          width: 100% !important;
-        }
-        .module-tree-with-actions .ant-tree-node-content-wrapper {
-          flex: 1 !important;
-          width: 100% !important;
-        }
-        .module-tree-with-actions .ant-tree-iconEle {
-          background: transparent !important;
-        }
-        .module-tree-with-actions .ant-tree-icon__customize {
-          background: transparent !important;
-        }
-        .module-tree-with-actions .ant-tree-switcher {
-          background: transparent !important;
-        }
-        .module-tree-with-actions .ant-tree-switcher:hover {
-          color: #fbbf24 !important;
-        }
-      `}</style>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '2px',
-        paddingBottom: '2px',
-        borderBottom: '1px solid #2d2d44',
-        paddingLeft: '2px',
-        paddingRight: '2px',
-      }}>
-        <span style={{
-          fontSize: '13px',
-          fontWeight: 700,
-          color: '#c0c0c0',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-        }}>模块列表</span>
-        {onAddModule && (
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            size="small"
-            onClick={() => {
-              onAddModule();
-              // 添加后刷新数据
-              queryClient.invalidateQueries({ queryKey: ['modules', projectId] });
-            }}
-            style={{
-              background: 'linear-gradient(135deg, #e94560 0%, #ff6b6b 100%)',
-              border: 'none',
-              height: 26,
-              fontSize: 12,
-              fontWeight: 500,
-              boxShadow: '0 2px 8px rgba(233, 69, 96, 0.3)',
-            }}
-          >
-            新建
-          </Button>
-        )}
-      </div>
+    <Tree
+      showIcon
+      blockNode
+      selectedKeys={selectedModuleId ? [selectedModuleId] : []}
+      treeData={treeData}
+      onSelect={handleSelect}
+      style={{ background: 'transparent' }}
+    />
+  );
+};
 
-      {treeData.length === 0 ? (
-        <Empty 
-          description={<span style={{ color: '#6b7280', fontSize: '13px' }}>暂无模块</span>} 
-          styles={{ 
-            image: { opacity: 0.4, filter: 'grayscale(100%)' },
-            description: { color: '#6b7280' }
-          }}
-          style={{ padding: '30px 0' }}
-        />
-      ) : (
-        <Tree
-          showIcon
-          defaultExpandAll
-          selectedKeys={selectedModuleId ? [selectedModuleId] : []}
-          treeData={treeData}
-          onSelect={handleSelect}
-          style={{
-            background: 'transparent',
-            fontSize: '14px',
-            padding: '0',
-          }}
-          blockNode
-          className="module-tree-with-actions"
-        />
-      )}
+// 主组件：按Project分组显示模块树
+const ProjectGroupedTree: React.FC<ProjectGroupedTreeProps> = ({
+  selectedProjectIds,
+  projects,
+  onSelectModule,
+  selectedModuleId,
+  onAddModule,
+  onAddTask,
+  onDeleteModule,
+  onEditTask,
+  onDeleteTask,
+  onCheckTask,
+  onRefactorTask,
+}) => {
+  // 从本地存储加载展开状态，如果没有则使用选中的项目ID
+  const [expandedProjects, setExpandedProjects] = useState<string[]>(() => {
+    const savedExpandedKeys = localStorageService.getExpandedKeys();
+    // 过滤出仍然有效的项目ID
+    const validProjectIds = selectedProjectIds.filter(id => 
+      projects.some(p => p.id === id)
+    );
+    if (savedExpandedKeys.length > 0) {
+      // 使用保存的展开状态，但只保留当前选中的项目
+      return savedExpandedKeys.filter(id => validProjectIds.includes(id));
+    }
+    return validProjectIds;
+  });
+
+  // 当选中的项目变化时，更新展开状态
+  useEffect(() => {
+    const validProjectIds = selectedProjectIds.filter(id => 
+      projects.some(p => p.id === id)
+    );
+    setExpandedProjects(prev => {
+      // 合并之前保存的展开状态和新选中的项目
+      const newExpanded = [...new Set([...prev, ...validProjectIds])];
+      return newExpanded.filter(id => validProjectIds.includes(id));
+    });
+  }, [selectedProjectIds, projects]);
+
+  // 保存展开状态到本地存储
+  useEffect(() => {
+    console.log('[ProjectGroupedTree] 保存展开状态:', expandedProjects);
+    localStorageService.setExpandedKeys(expandedProjects);
+  }, [expandedProjects]);
+
+  const toggleProjectExpand = (projectId: string) => {
+    setExpandedProjects(prev => 
+      prev.includes(projectId)
+        ? prev.filter(id => id !== projectId)
+        : [...prev, projectId]
+    );
+  };
+
+  // 过滤出选中的项目
+  const selectedProjects = projects.filter(p => selectedProjectIds.includes(p.id));
+
+  if (selectedProjects.length === 0) {
+    return (
+      <Empty
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+        description="请选择至少一个项目"
+        style={{ padding: '40px 0', color: '#808080' }}
+      />
+    );
+  }
+
+  return (
+    <div className="project-grouped-tree">
+      {selectedProjects.map((project) => {
+        const isExpanded = expandedProjects.includes(project.id);
+        const moduleCount = '(加载中...)';
+        
+        return (
+          <div key={project.id} className="project-tree-group">
+            <div 
+              className="project-tree-header"
+              onClick={() => toggleProjectExpand(project.id)}
+            >
+              <div className="project-tree-header-left">
+                {isExpanded ? (
+                  <DownOutlined style={{ fontSize: 12, color: '#ec4899' }} />
+                ) : (
+                  <RightOutlined style={{ fontSize: 12, color: '#ec4899' }} />
+                )}
+                <ProjectOutlined style={{ fontSize: 16, color: '#ec4899' }} />
+                <span className="project-tree-name">{project.name}</span>
+              </div>
+              <Button
+                type="text"
+                size="small"
+                icon={<PlusOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddModule?.(project.id);
+                }}
+                style={{
+                  color: '#ec4899',
+                  opacity: 0.7,
+                }}
+                title="添加模块"
+              />
+            </div>
+            {isExpanded && (
+              <div className="project-tree-content">
+                <ModuleTreeByProject
+                  projectId={project.id}
+                  onSelectModule={onSelectModule}
+                  selectedModuleId={selectedModuleId}
+                  onAddModule={onAddModule}
+                  onAddTask={onAddTask}
+                  onDeleteModule={onDeleteModule}
+                  onEditTask={onEditTask}
+                  onDeleteTask={onDeleteTask}
+                  onCheckTask={onCheckTask}
+                  onRefactorTask={onRefactorTask}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
 
-export default ModuleTree;
+export default ProjectGroupedTree;

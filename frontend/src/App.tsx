@@ -6,6 +6,11 @@ import MainLayout from './components/layout/MainLayout';
 import { useProjectStore } from './stores/useProjectStore';
 import './App.css';
 
+// [DEBUG] CSS 加载调试
+console.log('[App.tsx] Component rendering, CSS should be loaded');
+console.log('[App.tsx] Checking body background:', document.body.style.backgroundColor, window.getComputedStyle(document.body).backgroundColor);
+console.log('[App.tsx] Checking root element:', document.getElementById('root')?.style.backgroundColor);
+
 // 占位页面组件
 const DashboardPage = React.lazy(() => import('./features/dashboard'));
 const ModulesPage = React.lazy(() => import('./features/modules'));

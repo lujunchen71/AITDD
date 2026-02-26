@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strings"
 	"time"
 
 	"github.com/aitdd/backend/internal/database"
@@ -15,15 +16,24 @@ func GetTasks(c *gin.Context) {
 
 	query := database.DB.Model(&models.Task{})
 
-	// 过滤条件
+	// 过滤条件 - 支持多个项目ID（逗号分隔）
+	if projectIDs := c.Query("projectIds"); projectIDs != "" {
+		// 通过模块关联查询任务
+		query = query.Joins("JOIN modules ON modules.id = tasks.module_id").
+			Where("modules.project_id IN ?", strings.Split(projectIDs, ","))
+	} else if projectID := c.Query("projectId"); projectID != "" {
+		// 兼容单个项目ID
+		query = query.Joins("JOIN modules ON modules.id = tasks.module_id").
+			Where("modules.project_id = ?", projectID)
+	}
 	if moduleID := c.Query("moduleId"); moduleID != "" {
-		query = query.Where("module_id = ?", moduleID)
+		query = query.Where("tasks.module_id = ?", moduleID)
 	}
 	if status := c.Query("status"); status != "" {
-		query = query.Where("status = ?", status)
+		query = query.Where("tasks.status = ?", status)
 	}
 	if assignee := c.Query("assignee"); assignee != "" {
-		query = query.Where("assignee = ?", assignee)
+		query = query.Where("tasks.assignee = ?", assignee)
 	}
 
 	// 分页
@@ -226,5 +236,153 @@ func DeleteTask(c *gin.Context) {
 
 	Success(c, gin.H{
 		"deleted": true,
+	})
+}
+
+// CheckTask 检查任务
+func CheckTask(c *gin.Context) {
+	id := c.Param("id")
+
+	var task models.Task
+	if err := database.DB.First(&task, "id = ?", id).Error; err != nil {
+		NotFound(c, "任务不存在")
+		return
+	}
+
+	// TODO: 实现实际的检查逻辑
+	// 这里可以检查任务的完整性、依赖关系等
+	hasIssues := false
+	var issues []string
+
+	if task.Name == "" {
+		hasIssues = true
+		issues = append(issues, "任务名称不能为空")
+	}
+	if task.Prompt == "" {
+		hasIssues = true
+		issues = append(issues, "任务提示词不能为空")
+	}
+
+	if hasIssues {
+		Success(c, gin.H{
+			"success": false,
+			"message": "任务检查发现问题",
+			"issues":  issues,
+		})
+		return
+	}
+
+	Success(c, gin.H{
+		"success": true,
+		"message": "任务检查通过",
+	})
+}
+
+// RefactorTask 重构任务
+func RefactorTask(c *gin.Context) {
+	id := c.Param("id")
+
+	var task models.Task
+	if err := database.DB.First(&task, "id = ?", id).Error; err != nil {
+		NotFound(c, "任务不存在")
+		return
+	}
+
+	// 检查是否锁定
+	if task.Locked {
+		Locked(c, "任务已被锁定，无法重构", gin.H{
+			"lockedBy": task.LockedBy,
+		})
+		return
+	}
+
+	// TODO: 实现实际的重构逻辑
+	// 这里可以重新分析任务的结构和依赖
+
+	task.Version++
+	task.UpdatedAt = time.Now().UnixMilli()
+
+	if err := database.DB.Save(&task).Error; err != nil {
+		InternalError(c, "重构任务失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"task":    task,
+		"message": "任务重构成功",
+	})
+}
+
+// DuplicateTask 复制任务
+func DuplicateTask(c *gin.Context) {
+	id := c.Param("id")
+
+	var task models.Task
+	if err := database.DB.First(&task, "id = ?", id).Error; err != nil {
+		NotFound(c, "任务不存在")
+		return
+	}
+
+	// 创建新任务
+	newTask := models.Task{
+		ID:                       uuid.New().String(),
+		ModuleID:                 task.ModuleID,
+		Name:                     task.Name + " (副本)",
+		Description:              task.Description,
+		Prompt:                   task.Prompt,
+		UpstreamContractDetail:   task.UpstreamContractDetail,
+		DownstreamContractDetail: task.DownstreamContractDetail,
+		Status:                   models.TaskStatusReady,
+		CreatedAt:                time.Now().UnixMilli(),
+		UpdatedAt:                time.Now().UnixMilli(),
+		Version:                  1,
+		SyncStatus:               models.SyncStatusSynced,
+	}
+
+	if err := database.DB.Create(&newTask).Error; err != nil {
+		InternalError(c, "复制任务失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"task":    newTask,
+		"message": "任务复制成功",
+	})
+}
+
+// ToggleTaskLock 切换任务锁定状态
+func ToggleTaskLock(c *gin.Context) {
+	id := c.Param("id")
+
+	var task models.Task
+	if err := database.DB.First(&task, "id = ?", id).Error; err != nil {
+		NotFound(c, "任务不存在")
+		return
+	}
+
+	// 切换锁定状态
+	task.Locked = !task.Locked
+	task.UpdatedAt = time.Now().UnixMilli()
+
+	// TODO: 从请求中获取当前用户
+	// if task.Locked {
+	//     task.LockedBy = currentUser
+	// } else {
+	//     task.LockedBy = ""
+	// }
+
+	if err := database.DB.Save(&task).Error; err != nil {
+		InternalError(c, "切换锁定状态失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"locked":  task.Locked,
+		"message": func() string {
+			if task.Locked {
+				return "任务已锁定"
+			}
+			return "任务已解锁"
+		}(),
 	})
 }

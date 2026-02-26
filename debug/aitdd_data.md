@@ -361,6 +361,119 @@ get_history(limit: int, offset: int) -> List[Record]
 
 ## 完整示例
 
+以下是一个完整的AITDD任务数据JSON文件结构示例：
+
+```json
+{
+  "project": {
+    "name": "项目名称",
+    "description": "项目描述"
+  },
+  "modules": [
+    {
+      "id": "mod-ui-main",
+      "name": "主界面模块",
+      "description": "计算器主窗口UI组件",
+      "status": "developing",
+      "file_path": "src/ui/main_window.py"
+    },
+    {
+      "id": "mod-calc-core",
+      "name": "计算核心模块",
+      "description": "核心计算引擎",
+      "status": "developing",
+      "file_path": "src/core/calculator.py"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-main-window",
+      "name": "主窗口框架",
+      "description": "创建QMainWindow主窗口类",
+      "moduleId": "mod-ui-main",
+      "status": "completed",
+      "prompt": "创建CalculatorMainWindow类继承自QMainWindow。\n\n要求：\n1. 设置窗口标题\n2. 创建中央widget\n\n输出文件：src/ui/main_window.py",
+      "upstreamContractDetail": {
+        "title": "无上游依赖",
+        "list": []
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "获取主布局",
+            "contract_api": "get_main_layout() -> QVBoxLayout",
+            "from": "task-main-window"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证窗口创建",
+          "api": "test_window_creation()"
+        }
+      ],
+      "test_result": ["test_window_creation() - 通过"],
+      "codePaths": "[\"src/ui/main_window.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    },
+    {
+      "id": "task-buttons",
+      "name": "按钮面板",
+      "description": "创建计算器按钮网格布局",
+      "moduleId": "mod-ui-main",
+      "status": "ready",
+      "prompt": "创建ButtonPanel类继承自QWidget。\n\n要求：\n1. 使用QGridLayout创建按钮网格\n2. 按钮点击发送button_clicked信号\n\n输出文件：src/ui/buttons.py",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-main-window 提供",
+        "list": [
+          {
+            "label": "将按钮面板添加到布局中",
+            "contract_api": "get_main_layout() -> QVBoxLayout",
+            "from": "task-main-window"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "按钮点击信号",
+            "contract_api": "button_clicked: Signal(str)",
+            "from": "task-buttons"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证按钮布局",
+          "api": "test_button_layout()"
+        }
+      ],
+      "test_result": [],
+      "codePaths": "[\"src/ui/buttons.py\"]",
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
+    }
+  ],
+  "taskDependencies": [
+    {
+      "id": "dep-001",
+      "upstreamTaskId": "task-main-window",
+      "downstreamTaskId": "task-buttons",
+      "interfaceContract": "get_main_layout() -> QVBoxLayout"
+    }
+  ]
+}
+```
+
+### 单个任务示例
+
+如果只需要查看单个任务的详细结构：
+
 ```json
 {
   "id": "task-buttons",
@@ -380,7 +493,7 @@ get_history(limit: int, offset: int) -> List[Record]
       {
         "label": "点击按钮时更新表达式显示",
         "contract_api": "setExpression(text: str)",
-        "from": "task-main-window"
+        "from": "task-display"
       }
     ]
   },

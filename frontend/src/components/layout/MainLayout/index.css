@@ -4,10 +4,11 @@
 }
 
 .main-layout-content-wrapper {
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
+  height: 100vh;
   background: #1a1a2e;
+  overflow: hidden;
 }
 
 .main-layout-content {

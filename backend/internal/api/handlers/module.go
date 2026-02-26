@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strings"
 	"time"
 
 	"github.com/aitdd/backend/internal/database"
@@ -15,8 +16,12 @@ func GetModules(c *gin.Context) {
 
 	query := database.DB.Model(&models.Module{})
 
-	// 过滤条件
-	if projectID := c.Query("projectId"); projectID != "" {
+	// 过滤条件 - 支持多个项目ID（逗号分隔）
+	if projectIDs := c.Query("projectIds"); projectIDs != "" {
+		// 分割逗号分隔的项目ID列表
+		query = query.Where("project_id IN ?", strings.Split(projectIDs, ","))
+	} else if projectID := c.Query("projectId"); projectID != "" {
+		// 兼容单个项目ID
 		query = query.Where("project_id = ?", projectID)
 	}
 	if parentID := c.Query("parentId"); parentID != "" {

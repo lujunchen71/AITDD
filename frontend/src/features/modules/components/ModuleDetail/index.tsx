@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { Descriptions, Tag, Progress, Empty, Spin, Button, Tabs, Table, Space, Popconfirm, message } from 'antd';
-import { EditOutlined, DeleteOutlined, PlusOutlined, FileTextOutlined, FolderOutlined } from '@ant-design/icons';
+import { Descriptions, Tag, Progress, Empty, Spin, Button, Tabs, Table, message, Dropdown, Modal } from 'antd';
+import { EditOutlined, DeleteOutlined, PlusOutlined, FileTextOutlined, FolderOutlined, MoreOutlined, CheckCircleOutlined, ReloadOutlined, CopyOutlined, LockOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../../../services/api';
 import type { ColumnsType } from 'antd/es/table';
+import type { MenuProps } from 'antd';
+
+const { confirm } = Modal;
 
 interface ModuleDetailProps {
   moduleId: string | null;
@@ -103,6 +106,66 @@ const ModuleDetail: React.FC<ModuleDetailProps> = ({
     }
   };
 
+  // 检查任务
+  const handleCheckTask = async (taskId: string) => {
+    try {
+      const response = await apiClient.post(`/tasks/${taskId}/check`);
+      if (response.data.success) {
+        message.success('任务检查通过');
+      } else {
+        message.warning(response.data.message || '任务检查发现问题');
+      }
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error?.message || '检查失败';
+      message.error(errorMsg);
+    }
+  };
+
+  // 重构任务
+  const handleRefactorTask = async (taskId: string) => {
+    confirm({
+      title: '确认重构',
+      icon: <ExclamationCircleOutlined />,
+      content: '确定要重构这个任务吗？这将重新分析任务的结构和依赖。',
+      okText: '重构',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await apiClient.post(`/tasks/${taskId}/refactor`);
+          message.success('任务重构成功');
+          queryClient.invalidateQueries({ queryKey: ['moduleTasks', moduleId] });
+        } catch (error: any) {
+          const errorMsg = error?.response?.data?.error?.message || '重构失败';
+          message.error(errorMsg);
+        }
+      },
+    });
+  };
+
+  // 复制任务
+  const handleDuplicateTask = async (taskId: string) => {
+    try {
+      await apiClient.post(`/tasks/${taskId}/duplicate`);
+      message.success('任务复制成功');
+      queryClient.invalidateQueries({ queryKey: ['moduleTasks', moduleId] });
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error?.message || '复制失败';
+      message.error(errorMsg);
+    }
+  };
+
+  // 锁定/解锁任务
+  const handleLockTask = async (taskId: string) => {
+    try {
+      const response = await apiClient.post(`/tasks/${taskId}/toggle-lock`);
+      message.success(response.data.locked ? '任务已锁定' : '任务已解锁');
+      queryClient.invalidateQueries({ queryKey: ['moduleTasks', moduleId] });
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error?.message || '操作失败';
+      message.error(errorMsg);
+    }
+  };
+
   const taskColumns: ColumnsType<any> = [
     {
       title: '任务名称',
@@ -149,31 +212,68 @@ const ModuleDetail: React.FC<ModuleDetailProps> = ({
     {
       title: '操作',
       key: 'action',
-      width: 80,
+      width: 60,
       fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <Button
-            type="text"
-            size="small"
-            icon={<EditOutlined style={{ color: '#00d9ff' }} />}
-            onClick={() => onEditTask?.(record.id, moduleId!)}
-          />
-          <Popconfirm
-            title="确定删除此任务？"
-            onConfirm={() => handleDeleteTask(record.id)}
-            okText="确定"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
-          >
-            <Button
-              type="text"
-              size="small"
-              icon={<DeleteOutlined style={{ color: '#ff4d4f' }} />}
-            />
-          </Popconfirm>
-        </Space>
-      ),
+      render: (_, record) => {
+        const menuItems: MenuProps['items'] = [
+          {
+            key: 'edit',
+            label: '编辑',
+            icon: <EditOutlined />,
+            onClick: () => onEditTask?.(record.id, moduleId!),
+          },
+          {
+            key: 'check',
+            label: '检查',
+            icon: <CheckCircleOutlined />,
+            onClick: () => handleCheckTask(record.id),
+          },
+          {
+            key: 'refactor',
+            label: '重构',
+            icon: <ReloadOutlined />,
+            onClick: () => handleRefactorTask(record.id),
+          },
+          {
+            key: 'duplicate',
+            label: '复制',
+            icon: <CopyOutlined />,
+            onClick: () => handleDuplicateTask(record.id),
+          },
+          {
+            key: 'lock',
+            label: record.locked ? '解锁' : '锁定',
+            icon: <LockOutlined />,
+            onClick: () => handleLockTask(record.id),
+          },
+          {
+            type: 'divider',
+          },
+          {
+            key: 'delete',
+            label: '删除',
+            icon: <DeleteOutlined />,
+            danger: true,
+            onClick: () => {
+              confirm({
+                title: '确认删除',
+                icon: <ExclamationCircleOutlined />,
+                content: '确定要删除这个任务吗？此操作不可恢复。',
+                okText: '删除',
+                okType: 'danger',
+                cancelText: '取消',
+                onOk: () => handleDeleteTask(record.id),
+              });
+            },
+          },
+        ];
+
+        return (
+          <Dropdown menu={{ items: menuItems }} trigger={['click']}>
+            <Button type="text" size="small" icon={<MoreOutlined style={{ color: '#a0a0a0' }} />} />
+          </Dropdown>
+        );
+      },
     },
   ];
 

@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strings"
+
 	"github.com/aitdd/backend/internal/database"
 	"github.com/aitdd/backend/internal/models"
 	"github.com/gin-gonic/gin"
@@ -110,15 +112,25 @@ func GetModulePorts(c *gin.Context) {
 
 // GetProjectGraph 获取完整的项目图表数据
 func GetProjectGraph(c *gin.Context) {
+	// 支持多项目ID
+	projectIDsStr := c.Query("projectIds")
 	projectID := c.Query("projectId")
-	if projectID == "" {
-		BadRequest(c, "缺少 projectId 参数")
+
+	var projectIDs []string
+	if projectIDsStr != "" {
+		// 解析逗号分隔的项目ID列表
+		projectIDs = strings.Split(projectIDsStr, ",")
+	} else if projectID != "" {
+		// 兼容旧的单项目ID参数
+		projectIDs = []string{projectID}
+	} else {
+		BadRequest(c, "缺少 projectId 或 projectIds 参数")
 		return
 	}
 
-	// 获取所有模块
+	// 获取所有模块（使用 IN 查询）
 	var modules []models.Module
-	if err := database.DB.Where("project_id = ?", projectID).Find(&modules).Error; err != nil {
+	if err := database.DB.Where("project_id IN ?", projectIDs).Find(&modules).Error; err != nil {
 		InternalError(c, "查询模块失败")
 		return
 	}

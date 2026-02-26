@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Row, Col, Card, Typography, Button, Space, Segmented, message } from 'antd';
-import { PlusOutlined, UnorderedListOutlined, ApartmentOutlined } from '@ant-design/icons';
+import { Row, Col, Card, Typography, Button, Space, Segmented, message, Modal } from 'antd';
+import { PlusOutlined, UnorderedListOutlined, ApartmentOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import TaskList from './components/TaskList';
 import TaskForm from './components/TaskForm';
 import TaskGraph from './components/TaskGraph';
@@ -9,6 +9,7 @@ import { apiClient } from '../../services/api';
 import { useProjectId } from '../../stores/useProjectStore';
 
 const { Title } = Typography;
+const { confirm } = Modal;
 
 const TasksPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'graph'>('list');
@@ -80,6 +81,88 @@ const TasksPage: React.FC = () => {
     setSelectedTaskId(null);
   };
 
+  // 删除任务
+  const handleDeleteTask = (taskId: string) => {
+    confirm({
+      title: '确认删除',
+      icon: <ExclamationCircleOutlined />,
+      content: '确定要删除这个任务吗？此操作不可恢复。',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await apiClient.delete(`/tasks/${taskId}`);
+          message.success('任务删除成功');
+          setRefreshKey((prev) => prev + 1);
+        } catch (error: any) {
+          const errorMsg = error?.response?.data?.error?.message || '删除失败';
+          message.error(errorMsg);
+        }
+      },
+    });
+  };
+
+  // 检查任务
+  const handleCheckTask = async (taskId: string) => {
+    try {
+      const response = await apiClient.post(`/tasks/${taskId}/check`);
+      if (response.data.success) {
+        message.success('任务检查通过');
+      } else {
+        message.warning(response.data.message || '任务检查发现问题');
+      }
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error?.message || '检查失败';
+      message.error(errorMsg);
+    }
+  };
+
+  // 重构任务
+  const handleRefactorTask = async (taskId: string) => {
+    confirm({
+      title: '确认重构',
+      icon: <ExclamationCircleOutlined />,
+      content: '确定要重构这个任务吗？这将重新分析任务的结构和依赖。',
+      okText: '重构',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await apiClient.post(`/tasks/${taskId}/refactor`);
+          message.success('任务重构成功');
+          setRefreshKey((prev) => prev + 1);
+        } catch (error: any) {
+          const errorMsg = error?.response?.data?.error?.message || '重构失败';
+          message.error(errorMsg);
+        }
+      },
+    });
+  };
+
+  // 复制任务
+  const handleDuplicateTask = async (taskId: string) => {
+    try {
+      await apiClient.post(`/tasks/${taskId}/duplicate`);
+      message.success('任务复制成功');
+      setRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error?.message || '复制失败';
+      message.error(errorMsg);
+    }
+  };
+
+  // 锁定/解锁任务
+  const handleLockTask = async (taskId: string) => {
+    try {
+      const response = await apiClient.post(`/tasks/${taskId}/toggle-lock`);
+      message.success(response.data.locked ? '任务已锁定' : '任务已解锁');
+      setRefreshKey((prev) => prev + 1);
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error?.message || '操作失败';
+      message.error(errorMsg);
+    }
+  };
+
   return (
     <div style={{ padding: 24 }}>
       <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
@@ -124,6 +207,11 @@ const TasksPage: React.FC = () => {
             moduleId={selectedModuleId || undefined}
             onEdit={handleEditTask}
             onAdd={handleAddTask}
+            onDelete={handleDeleteTask}
+            onCheck={handleCheckTask}
+            onRefactor={handleRefactorTask}
+            onDuplicate={handleDuplicateTask}
+            onLock={handleLockTask}
           />
         ) : (
           <div style={{ height: 600 }}>

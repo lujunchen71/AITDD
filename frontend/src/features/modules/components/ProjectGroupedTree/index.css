@@ -1,0 +1,138 @@
+.project-grouped-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.project-tree-group {
+  border: 1px solid #2d2d3d;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(26, 26, 46, 0.5);
+}
+
+.project-tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 1px solid transparent;
+}
+
+.project-tree-header:hover {
+  background: linear-gradient(135deg, #1f1f35 0%, #1a2744 100%);
+}
+
+.project-tree-group:not(:last-child) {
+  margin-bottom: 0;
+}
+
+.project-tree-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.project-tree-header-left .anticon {
+  flex-shrink: 0;
+}
+
+.project-tree-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ec4899;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 粉红-红色系配色方案：从外到内逐渐变亮* Project: #ec4899 (粉红色，最外层)* Module: #f87171 (淡红色，中间层)* Task: #fff2f2 (白色+5%红，最内层)*/
+
+.project-tree-content {
+  padding: 8px 0;
+  background: rgba(22, 33, 62, 0.3);
+}
+
+/* 树形组件内部样式调整 */
+.project-tree-content .ant-tree {
+  background: transparent !important;
+  color: #e8e8e8;
+}
+
+.project-tree-content .ant-tree .ant-tree-treenode {
+  padding: 2px 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.project-tree-content .ant-tree .ant-tree-treenode > * {
+  flex-shrink: 0;
+}
+
+.project-tree-content .ant-tree .ant-tree-iconEle {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.project-tree-content .ant-tree .ant-tree-node-content-wrapper {
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
+  flex-wrap: nowrap;
+}
+
+.project-tree-content .ant-tree .ant-tree-node-content-wrapper > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  width: 100%;
+  overflow: visible;
+}
+
+/* 确保模块/任务名称能够收缩，按钮能够右对齐 */
+.project-tree-content .ant-tree .ant-tree-node-content-wrapper > div > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 确保下拉菜单按钮可以点击 */
+.project-tree-content .ant-tree .ant-tree-node-content-wrapper .ant-dropdown-trigger {
+  flex-shrink: 0;
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.project-tree-content .ant-tree .ant-tree-node-content-wrapper:hover {
+  background: rgba(248, 113, 113, 0.15);
+}
+
+.project-tree-content .ant-tree .ant-tree-node-selected .ant-tree-node-content-wrapper {
+  background: rgba(248, 113, 113, 0.25) !important;
+}
+
+/* 空状态样式 */
+.project-grouped-tree .ant-empty {
+  margin: 40px 0;
+}
+
+.project-grouped-tree .ant-empty-description {
+  color: #808080;
+}

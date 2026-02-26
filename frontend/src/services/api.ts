@@ -36,6 +36,11 @@ apiClient.interceptors.request.use(
 // 响应拦截器
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
+    console.log('[API] 响应拦截器 - 原始响应:', {
+      url: response.config.url,
+      status: response.status,
+      data: response.data
+    });
     return response.data;
   },
   (error) => {

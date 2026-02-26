@@ -93,3 +93,95 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #e94560;
 }
+
+/* Ant Design Tree 深色主题覆盖 */
+.ant-tree {
+  background: transparent !important;
+  color: #e8e8e8 !important;
+}
+
+.ant-tree .ant-tree-treenode {
+  color: #e8e8e8 !important;
+}
+
+.ant-tree .ant-tree-node-content-wrapper {
+  color: #e8e8e8 !important;
+}
+
+.ant-tree .ant-tree-title {
+  color: #e8e8e8 !important;
+}
+
+.ant-tree .ant-tree-switcher {
+  color: #f59e0b !important;
+  background: transparent !important;
+}
+
+.ant-tree .ant-tree-switcher:hover {
+  color: #fbbf24 !important;
+}
+
+.ant-tree .ant-tree-node-content-wrapper:hover {
+  background-color: rgba(251, 191, 36, 0.12) !important;
+}
+
+.ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background-color: rgba(251, 191, 36, 0.2) !important;
+}
+
+.ant-tree .ant-tree-checkbox-inner {
+  background: transparent !important;
+  border-color: #0f3460 !important;
+}
+
+.ant-tree.ant-tree-show-line .ant-tree-switcher {
+  background: #16213e !important;
+}
+
+/* Ant Design Empty 深色主题 */
+.ant-empty-description {
+  color: #9ca3af !important;
+}
+
+/* Ant Design Statistic 深色主题 */
+.ant-statistic-title {
+  color: #a0a0a0 !important;
+}
+
+.ant-statistic-content {
+  color: #e8e8e8 !important;
+}
+
+.ant-statistic-content-prefix {
+  color: #f59e0b !important;
+}
+
+/* Ant Design Card 深色主题 */
+.ant-card-head-title {
+  color: #e8e8e8 !important;
+}
+
+.ant-card-head {
+  color: #e8e8e8 !important;
+  border-color: #0f3460 !important;
+}
+
+/* Ant Design List 深色主题 */
+.ant-list-item {
+  color: #e8e8e8 !important;
+  border-color: #2d2d44 !important;
+}
+
+.ant-list-empty-text {
+  color: #9ca3af !important;
+}
+
+/* Ant Design Progress 深色主题 */
+.ant-progress-text {
+  color: #e8e8e8 !important;
+}
+
+/* Ant Design Typography Text secondary */
+.ant-typography.ant-typography-secondary {
+  color: #a0a0a0 !important;
+}

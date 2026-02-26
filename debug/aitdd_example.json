@@ -48,12 +48,53 @@
       "moduleId": "mod-ui-main",
       "status": "completed",
       "prompt": "创建CalculatorMainWindow类继承自QMainWindow。\n\n要求：\n1. 设置窗口标题为'科学计算器'\n2. 窗口大小300x500，固定大小\n3. 设置窗口图标\n4. 创建中央widget和主垂直布局\n5. 窗口居中显示\n\n输出文件：src/ui/main_window.py",
-      "upstreamContractDetail": "无上游依赖，这是基础组件",
-      "downstreamContractDetail": "提供以下接口给下游任务使用：\n1. get_central_widget() -> QWidget: 获取中央widget用于添加子组件\n2. get_main_layout() -> QVBoxLayout: 获取主布局用于添加其他布局\n3. set_window_style(style_sheet: str): 设置窗口样式",
-      "tests": "[\"test_window_title()\", \"test_window_size()\", \"test_central_widget_exists()\"]",
+      "upstreamContractDetail": {
+        "title": "无上游依赖，这是基础组件",
+        "list": []
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "获取中央widget用于添加子组件",
+            "contract_api": "get_central_widget() -> QWidget",
+            "from": "task-main-window"
+          },
+          {
+            "label": "获取主布局用于添加其他布局",
+            "contract_api": "get_main_layout() -> QVBoxLayout",
+            "from": "task-main-window"
+          },
+          {
+            "label": "设置窗口样式",
+            "contract_api": "set_window_style(style_sheet: str)",
+            "from": "task-main-window"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证窗口标题是否正确设置",
+          "api": "test_window_title()"
+        },
+        {
+          "target": "验证窗口大小是否为300x500",
+          "api": "test_window_size()"
+        },
+        {
+          "target": "验证中央widget是否存在",
+          "api": "test_central_widget_exists()"
+        }
+      ],
+      "test_result": [
+        "test_window_title() - 通过: 窗口标题为'科学计算器'",
+        "test_window_size() - 通过: 窗口大小为300x500",
+        "test_central_widget_exists() - 通过: 中央widget已创建"
+      ],
       "codePaths": "[\"src/ui/main_window.py\"]",
-      "logs": "",
-      "humanAssistance": "{}"
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
     },
     {
       "id": "task-display",
@@ -62,12 +103,64 @@
       "moduleId": "mod-ui-main",
       "status": "completed",
       "prompt": "创建DisplayWidget类继承自QWidget。\n\n要求：\n1. 使用QLabel显示表达式和结果\n2. 表达式行：显示用户输入，右对齐，灰色字体\n3. 结果行：显示计算结果，右对齐，大号白色字体\n4. 支持clear()方法清空显示\n5. 支持setExpression(text)设置表达式\n6. 支持setResult(text)设置结果\n\n输出文件：src/ui/display.py",
-      "upstreamContractDetail": "依赖 task-main-window 提供：\n1. get_main_layout() -> QVBoxLayout: 将显示屏添加到布局顶部",
-      "downstreamContractDetail": "提供以下接口给下游任务使用：\n1. clear(): 清空表达式和结果\n2. setExpression(text: str): 设置表达式文本\n3. setResult(text: str): 设置结果文本\n4. get_display_widget() -> QWidget: 获取显示组件",
-      "tests": "[\"test_display_clear()\", \"test_set_expression()\", \"test_set_result()\"]",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-main-window 提供",
+        "list": [
+          {
+            "label": "将显示屏添加到布局顶部",
+            "contract_api": "get_main_layout() -> QVBoxLayout",
+            "from": "task-main-window"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "清空表达式和结果",
+            "contract_api": "clear()",
+            "from": "task-display"
+          },
+          {
+            "label": "设置表达式文本",
+            "contract_api": "setExpression(text: str)",
+            "from": "task-display"
+          },
+          {
+            "label": "设置结果文本",
+            "contract_api": "setResult(text: str)",
+            "from": "task-display"
+          },
+          {
+            "label": "获取显示组件",
+            "contract_api": "get_display_widget() -> QWidget",
+            "from": "task-display"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证清空显示功能",
+          "api": "test_display_clear()"
+        },
+        {
+          "target": "验证设置表达式功能",
+          "api": "test_set_expression()"
+        },
+        {
+          "target": "验证设置结果功能",
+          "api": "test_set_result()"
+        }
+      ],
+      "test_result": [
+        "test_display_clear() - 通过: 表达式和结果均已清空",
+        "test_set_expression() - 通过: 表达式'1+2'正确显示",
+        "test_set_result() - 通过: 结果'3'正确显示"
+      ],
       "codePaths": "[\"src/ui/display.py\"]",
-      "logs": "",
-      "humanAssistance": "{}"
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
     },
     {
       "id": "task-buttons",
@@ -76,12 +169,60 @@
       "moduleId": "mod-ui-main",
       "status": "ready",
       "prompt": "创建ButtonPanel类继承自QWidget。\n\n要求：\n1. 使用QGridLayout创建4x5按钮网格\n2. 数字按钮0-9\n3. 运算符按钮：+、-、*、/、=、.\n4. 功能按钮：C(清除)、CE(清除所有)、退格\n5. 按钮点击发送button_clicked信号\n6. 按钮样式：圆角、渐变背景、悬停效果\n\n输出文件：src/ui/buttons.py",
-      "upstreamContractDetail": "依赖 task-main-window 提供：\n1. get_main_layout() -> QVBoxLayout: 将按钮面板添加到布局中\n\n依赖 task-display 提供：\n1. setExpression(text: str): 点击按钮时更新表达式显示",
-      "downstreamContractDetail": "提供以下接口给下游任务使用：\n1. button_clicked: Signal(str) - 按钮点击信号，传递按钮文本\n2. get_button_panel() -> QWidget: 获取按钮面板组件\n3. set_button_enabled(text: str, enabled: bool): 设置按钮启用状态",
-      "tests": "[\"test_button_grid_layout()\", \"test_button_click_signal()\", \"test_all_buttons_exist()\"]",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-main-window 和 *task-display 提供",
+        "list": [
+          {
+            "label": "将按钮面板添加到布局中",
+            "contract_api": "get_main_layout() -> QVBoxLayout",
+            "from": "task-main-window"
+          },
+          {
+            "label": "点击按钮时更新表达式显示",
+            "contract_api": "setExpression(text: str)",
+            "from": "task-display"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "按钮点击信号，传递按钮文本",
+            "contract_api": "button_clicked: Signal(str)",
+            "from": "task-buttons"
+          },
+          {
+            "label": "获取按钮面板组件",
+            "contract_api": "get_button_panel() -> QWidget",
+            "from": "task-buttons"
+          },
+          {
+            "label": "设置按钮启用状态",
+            "contract_api": "set_button_enabled(text: str, enabled: bool)",
+            "from": "task-buttons"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证按钮网格布局是否正确创建4x5结构",
+          "api": "test_button_grid_layout()"
+        },
+        {
+          "target": "验证按钮点击信号是否正确发送",
+          "api": "test_button_click_signal()"
+        },
+        {
+          "target": "验证所有按钮是否正确初始化并显示",
+          "api": "test_all_buttons_exist()"
+        }
+      ],
+      "test_result": [],
       "codePaths": "[\"src/ui/buttons.py\"]",
-      "logs": "",
-      "humanAssistance": "{}"
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
     },
     {
       "id": "task-sci-buttons",
@@ -90,12 +231,60 @@
       "moduleId": "mod-ui-scientific",
       "status": "ready",
       "prompt": "创建ScientificButtonPanel类继承自QWidget。\n\n要求：\n1. 科学函数按钮：sin、cos、tan、log、ln、sqrt、pow、factorial\n2. 常量按钮：π、e\n3. 括号按钮：(、)\n4. 使用QGridLayout布局\n5. 按钮点击发送sci_button_clicked信号\n6. 支持角度/弧度切换\n\n输出文件：src/ui/scientific_buttons.py",
-      "upstreamContractDetail": "依赖 task-mode-switch 提供：\n1. mode_changed: Signal(str) - 模式切换时显示/隐藏科学按钮\n2. get_mode_panel() -> QWidget: 获取模式面板",
-      "downstreamContractDetail": "提供以下接口给下游任务使用：\n1. sci_button_clicked: Signal(str) - 科学按钮点击信号\n2. set_angle_mode(is_degree: bool): 设置角度/弧度模式\n3. get_panel() -> QWidget: 获取科学按钮面板",
-      "tests": "[\"test_sci_buttons_exist()\", \"test_angle_mode_toggle()\", \"test_pi_button()\"]",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-mode-switch 提供",
+        "list": [
+          {
+            "label": "模式切换时显示/隐藏科学按钮",
+            "contract_api": "mode_changed: Signal(str)",
+            "from": "task-mode-switch"
+          },
+          {
+            "label": "获取模式面板",
+            "contract_api": "get_mode_panel() -> QWidget",
+            "from": "task-mode-switch"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "科学按钮点击信号",
+            "contract_api": "sci_button_clicked: Signal(str)",
+            "from": "task-sci-buttons"
+          },
+          {
+            "label": "设置角度/弧度模式",
+            "contract_api": "set_angle_mode(is_degree: bool)",
+            "from": "task-sci-buttons"
+          },
+          {
+            "label": "获取科学按钮面板",
+            "contract_api": "get_panel() -> QWidget",
+            "from": "task-sci-buttons"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证科学计算按钮是否存在",
+          "api": "test_sci_buttons_exist()"
+        },
+        {
+          "target": "验证角度弧度切换功能",
+          "api": "test_angle_mode_toggle()"
+        },
+        {
+          "target": "验证π常量按钮",
+          "api": "test_pi_button()"
+        }
+      ],
+      "test_result": [],
       "codePaths": "[\"src/ui/scientific_buttons.py\"]",
-      "logs": "",
-      "humanAssistance": "{}"
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
     },
     {
       "id": "task-mode-switch",
@@ -104,12 +293,60 @@
       "moduleId": "mod-ui-scientific",
       "status": "ready",
       "prompt": "创建ModeSwitcher类继承自QWidget。\n\n要求：\n1. 使用QComboBox或切换按钮实现模式选择\n2. 两种模式：standard(标准)、scientific(科学)\n3. 模式切换时发送mode_changed信号\n4. 保存当前模式到配置\n\n输出文件：src/ui/mode_switch.py",
-      "upstreamContractDetail": "依赖 task-main-window 提供：\n1. get_main_layout() -> QVBoxLayout: 将模式切换器添加到布局\n\n依赖 task-buttons 提供：\n1. set_button_enabled(): 模式切换时可能需要禁用某些按钮",
-      "downstreamContractDetail": "提供以下接口给下游任务使用：\n1. mode_changed: Signal(str) - 模式切换信号，'standard'或'scientific'\n2. get_current_mode() -> str: 获取当前模式\n3. set_mode(mode: str): 设置模式",
-      "tests": "[\"test_mode_switch()\", \"test_mode_signal()\", \"test_default_mode()\"]",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-main-window 和 *task-buttons 提供",
+        "list": [
+          {
+            "label": "将模式切换器添加到布局",
+            "contract_api": "get_main_layout() -> QVBoxLayout",
+            "from": "task-main-window"
+          },
+          {
+            "label": "模式切换时可能需要禁用某些按钮",
+            "contract_api": "set_button_enabled(text: str, enabled: bool)",
+            "from": "task-buttons"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "模式切换信号",
+            "contract_api": "mode_changed: Signal(str)",
+            "from": "task-mode-switch"
+          },
+          {
+            "label": "获取当前模式",
+            "contract_api": "get_current_mode() -> str",
+            "from": "task-mode-switch"
+          },
+          {
+            "label": "设置模式",
+            "contract_api": "set_mode(mode: str)",
+            "from": "task-mode-switch"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证模式切换功能",
+          "api": "test_mode_switch()"
+        },
+        {
+          "target": "验证模式切换信号",
+          "api": "test_mode_signal()"
+        },
+        {
+          "target": "验证默认模式",
+          "api": "test_default_mode()"
+        }
+      ],
+      "test_result": [],
       "codePaths": "[\"src/ui/mode_switch.py\"]",
-      "logs": "",
-      "humanAssistance": "{}"
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
     },
     {
       "id": "task-basic-calc",
@@ -118,12 +355,63 @@
       "moduleId": "mod-calc-core",
       "status": "completed",
       "prompt": "创建BasicCalculator类。\n\n要求：\n1. 支持加减乘除四则运算\n2. 支持小数运算\n3. 处理除零错误\n4. 支持连续运算\n5. 提供calculate(expression: str) -> str方法\n6. 运算优先级处理（先乘除后加减）\n\n输出文件：src/core/basic_calc.py",
-      "upstreamContractDetail": "无上游依赖，这是基础计算模块",
-      "downstreamContractDetail": "提供以下接口给下游任务使用：\n1. calculate(expression: str) -> str: 计算表达式并返回结果\n2. validate_expression(expression: str) -> bool: 验证表达式是否有效\n3. get_last_result() -> str: 获取最后一次计算结果",
-      "tests": "[\"test_addition()\", \"test_subtraction()\", \"test_multiplication()\", \"test_division()\", \"test_divide_by_zero()\"]",
+      "upstreamContractDetail": {
+        "title": "无上游依赖，这是基础计算模块",
+        "list": []
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "计算表达式并返回结果",
+            "contract_api": "calculate(expression: str) -> str",
+            "from": "task-basic-calc"
+          },
+          {
+            "label": "验证表达式是否有效",
+            "contract_api": "validate_expression(expression: str) -> bool",
+            "from": "task-basic-calc"
+          },
+          {
+            "label": "获取最后一次计算结果",
+            "contract_api": "get_last_result() -> str",
+            "from": "task-basic-calc"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证加法运算",
+          "api": "test_addition()"
+        },
+        {
+          "target": "验证减法运算",
+          "api": "test_subtraction()"
+        },
+        {
+          "target": "验证乘法运算",
+          "api": "test_multiplication()"
+        },
+        {
+          "target": "验证除法运算",
+          "api": "test_division()"
+        },
+        {
+          "target": "验证除零错误处理",
+          "api": "test_divide_by_zero()"
+        }
+      ],
+      "test_result": [
+        "test_addition() - 通过: 1+2=3",
+        "test_subtraction() - 通过: 5-3=2",
+        "test_multiplication() - 通过: 3*4=12",
+        "test_division() - 通过: 10/2=5",
+        "test_divide_by_zero() - 通过: 正确抛出除零错误"
+      ],
       "codePaths": "[\"src/core/basic_calc.py\"]",
-      "logs": "",
-      "humanAssistance": "{}"
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
     },
     {
       "id": "task-expression-parser",
@@ -132,12 +420,59 @@
       "moduleId": "mod-calc-core",
       "status": "in_progress",
       "prompt": "创建ExpressionParser类。\n\n要求：\n1. 解析字符串表达式为抽象语法树\n2. 支持括号嵌套\n3. 支持科学计数法\n4. 支持负数\n5. 验证表达式语法\n6. 提供parse(expression: str) -> AST方法\n\n输出文件：src/core/parser.py",
-      "upstreamContractDetail": "依赖 task-basic-calc 提供：\n1. validate_expression(expression: str) -> bool: 验证表达式格式",
-      "downstreamContractDetail": "提供以下接口给下游任务使用：\n1. parse(expression: str) -> AST: 解析表达式返回语法树\n2. is_valid() -> bool: 检查表达式是否有效\n3. get_error() -> str: 获取解析错误信息",
-      "tests": "[\"test_parse_simple()\", \"test_parse_brackets()\", \"test_parse_negative()\", \"test_parse_scientific()\"]",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-basic-calc 提供",
+        "list": [
+          {
+            "label": "验证表达式格式",
+            "contract_api": "validate_expression(expression: str) -> bool",
+            "from": "task-basic-calc"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "解析表达式返回语法树",
+            "contract_api": "parse(expression: str) -> AST",
+            "from": "task-expression-parser"
+          },
+          {
+            "label": "检查表达式是否有效",
+            "contract_api": "is_valid() -> bool",
+            "from": "task-expression-parser"
+          },
+          {
+            "label": "获取解析错误信息",
+            "contract_api": "get_error() -> str",
+            "from": "task-expression-parser"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证简单表达式解析",
+          "api": "test_parse_simple()"
+        },
+        {
+          "target": "验证括号嵌套解析",
+          "api": "test_parse_brackets()"
+        },
+        {
+          "target": "验证负数解析",
+          "api": "test_parse_negative()"
+        },
+        {
+          "target": "验证科学计数法解析",
+          "api": "test_parse_scientific()"
+        }
+      ],
+      "test_result": [],
       "codePaths": "[\"src/core/parser.py\"]",
-      "logs": "解析嵌套括号时遇到边界情况需要处理",
-      "humanAssistance": "{\"need_review\": true, \"notes\": \"括号匹配算法需要优化\"}"
+      "bug_log": "解析嵌套括号时遇到边界情况需要处理",
+      "humanAssistance": "{\"need_review\": true, \"notes\": \"括号匹配算法需要优化\"}",
+      "issue_details": ""
     },
     {
       "id": "task-sci-calc",
@@ -146,12 +481,68 @@
       "moduleId": "mod-calc-core",
       "status": "ready",
       "prompt": "创建ScientificCalculator类继承自BasicCalculator。\n\n要求：\n1. 三角函数：sin、cos、tan（支持角度和弧度）\n2. 反三角函数：asin、acos、atan\n3. 对数函数：log10、log(ln)\n4. 幂运算：pow、sqrt\n5. 阶乘：factorial\n6. 常量：π、e\n\n输出文件：src/core/scientific_calc.py",
-      "upstreamContractDetail": "依赖 task-basic-calc 提供：\n1. calculate(expression: str) -> str: 基础运算功能\n\n依赖 task-expression-parser 提供：\n1. parse(expression: str) -> AST: 解析科学计算表达式",
-      "downstreamContractDetail": "提供以下接口给下游任务使用：\n1. calculate_scientific(func: str, value: float) -> float: 执行科学计算\n2. set_angle_mode(mode: str): 设置角度模式('degree'或'radian')\n3. get_constants() -> dict: 获取常量字典",
-      "tests": "[\"test_sin()\", \"test_cos()\", \"test_log()\", \"test_sqrt()\", \"test_factorial()\"]",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-basic-calc 和 *task-expression-parser 提供",
+        "list": [
+          {
+            "label": "基础运算功能",
+            "contract_api": "calculate(expression: str) -> str",
+            "from": "task-basic-calc"
+          },
+          {
+            "label": "解析科学计算表达式",
+            "contract_api": "parse(expression: str) -> AST",
+            "from": "task-expression-parser"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "执行科学计算",
+            "contract_api": "calculate_scientific(func: str, value: float) -> float",
+            "from": "task-sci-calc"
+          },
+          {
+            "label": "设置角度模式",
+            "contract_api": "set_angle_mode(mode: str)",
+            "from": "task-sci-calc"
+          },
+          {
+            "label": "获取常量字典",
+            "contract_api": "get_constants() -> dict",
+            "from": "task-sci-calc"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证正弦函数",
+          "api": "test_sin()"
+        },
+        {
+          "target": "验证余弦函数",
+          "api": "test_cos()"
+        },
+        {
+          "target": "验证对数函数",
+          "api": "test_log()"
+        },
+        {
+          "target": "验证平方根函数",
+          "api": "test_sqrt()"
+        },
+        {
+          "target": "验证阶乘函数",
+          "api": "test_factorial()"
+        }
+      ],
+      "test_result": [],
       "codePaths": "[\"src/core/scientific_calc.py\"]",
-      "logs": "",
-      "humanAssistance": "{}"
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
     },
     {
       "id": "task-history-storage",
@@ -160,12 +551,64 @@
       "moduleId": "mod-data-history",
       "status": "ready",
       "prompt": "创建HistoryStorage类。\n\n要求：\n1. 使用SQLite或JSON文件存储历史记录\n2. 每条记录包含：表达式、结果、时间戳\n3. 支持分页查询\n4. 支持按日期范围筛选\n5. 支持清除历史\n6. 最大存储1000条记录\n\n输出文件：src/data/history_storage.py",
-      "upstreamContractDetail": "依赖 task-basic-calc 提供：\n1. get_last_result() -> str: 获取计算结果用于存储",
-      "downstreamContractDetail": "提供以下接口给下游任务使用：\n1. add_record(expression: str, result: str): 添加历史记录\n2. get_history(limit: int, offset: int) -> List[Record]: 获取历史列表\n3. clear_history(): 清除所有历史\n4. search_history(keyword: str) -> List[Record]: 搜索历史",
-      "tests": "[\"test_add_record()\", \"test_get_history()\", \"test_clear_history()\", \"test_pagination()\"]",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-basic-calc 提供",
+        "list": [
+          {
+            "label": "获取计算结果用于存储",
+            "contract_api": "get_last_result() -> str",
+            "from": "task-basic-calc"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "添加历史记录",
+            "contract_api": "add_record(expression: str, result: str)",
+            "from": "task-history-storage"
+          },
+          {
+            "label": "获取历史列表",
+            "contract_api": "get_history(limit: int, offset: int) -> List[Record]",
+            "from": "task-history-storage"
+          },
+          {
+            "label": "清除所有历史",
+            "contract_api": "clear_history()",
+            "from": "task-history-storage"
+          },
+          {
+            "label": "搜索历史",
+            "contract_api": "search_history(keyword: str) -> List[Record]",
+            "from": "task-history-storage"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证添加历史记录",
+          "api": "test_add_record()"
+        },
+        {
+          "target": "验证获取历史列表",
+          "api": "test_get_history()"
+        },
+        {
+          "target": "验证清除历史",
+          "api": "test_clear_history()"
+        },
+        {
+          "target": "验证分页功能",
+          "api": "test_pagination()"
+        }
+      ],
+      "test_result": [],
       "codePaths": "[\"src/data/history_storage.py\"]",
-      "logs": "",
-      "humanAssistance": "{}"
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
     },
     {
       "id": "task-history-panel",
@@ -174,12 +617,65 @@
       "moduleId": "mod-data-history",
       "status": "ready",
       "prompt": "创建HistoryPanel类继承自QWidget。\n\n要求：\n1. 使用QListWidget显示历史记录\n2. 每条记录显示：表达式 = 结果\n3. 双击记录可将表达式复制到输入框\n4. 支持滚动加载更多\n5. 提供清除按钮\n6. 支持搜索过滤\n\n输出文件：src/ui/history_panel.py",
-      "upstreamContractDetail": "依赖 task-history-storage 提供：\n1. get_history(limit: int, offset: int) -> List[Record]: 获取历史数据\n2. search_history(keyword: str) -> List[Record]: 搜索历史\n\n依赖 task-display 提供：\n1. setExpression(text: str): 双击历史时设置表达式",
-      "downstreamContractDetail": "提供以下接口给下游任务使用：\n1. refresh(): 刷新历史列表\n2. history_selected: Signal(str) - 选择历史记录信号\n3. get_panel() -> QWidget: 获取历史面板组件",
-      "tests": "[\"test_display_history()\", \"test_double_click_select()\", \"test_search_filter()\"]",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-history-storage 和 *task-display 提供",
+        "list": [
+          {
+            "label": "获取历史数据",
+            "contract_api": "get_history(limit: int, offset: int) -> List[Record]",
+            "from": "task-history-storage"
+          },
+          {
+            "label": "搜索历史",
+            "contract_api": "search_history(keyword: str) -> List[Record]",
+            "from": "task-history-storage"
+          },
+          {
+            "label": "双击历史时设置表达式",
+            "contract_api": "setExpression(text: str)",
+            "from": "task-display"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "刷新历史列表",
+            "contract_api": "refresh()",
+            "from": "task-history-panel"
+          },
+          {
+            "label": "选择历史记录信号",
+            "contract_api": "history_selected: Signal(str)",
+            "from": "task-history-panel"
+          },
+          {
+            "label": "获取历史面板组件",
+            "contract_api": "get_panel() -> QWidget",
+            "from": "task-history-panel"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证显示历史记录",
+          "api": "test_display_history()"
+        },
+        {
+          "target": "验证双击选择功能",
+          "api": "test_double_click_select()"
+        },
+        {
+          "target": "验证搜索过滤功能",
+          "api": "test_search_filter()"
+        }
+      ],
+      "test_result": [],
       "codePaths": "[\"src/ui/history_panel.py\"]",
-      "logs": "",
-      "humanAssistance": "{}"
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
     },
     {
       "id": "task-settings-dialog",
@@ -188,12 +684,60 @@
       "moduleId": "mod-config",
       "status": "ready",
       "prompt": "创建SettingsDialog类继承自QDialog。\n\n要求：\n1. 主题选择：亮色/暗色\n2. 计算精度设置：小数位数\n3. 角度模式默认值：角度/弧度\n4. 历史记录开关\n5. 使用QSettings保存配置\n6. 应用/取消按钮\n\n输出文件：src/ui/settings_dialog.py",
-      "upstreamContractDetail": "依赖 task-mode-switch 提供：\n1. set_mode(mode: str): 设置默认模式\n\n依赖 task-sci-calc 提供：\n1. set_angle_mode(mode: str): 设置默认角度模式",
-      "downstreamContractDetail": "提供以下接口给下游任务使用：\n1. get_theme() -> str: 获取当前主题\n2. get_precision() -> int: 获取计算精度\n3. settings_changed: Signal() - 设置变更信号",
-      "tests": "[\"test_theme_selection()\", \"test_precision_setting()\", \"test_settings_persistence()\"]",
+      "upstreamContractDetail": {
+        "title": "依赖 *task-mode-switch 和 *task-sci-calc 提供",
+        "list": [
+          {
+            "label": "设置默认模式",
+            "contract_api": "set_mode(mode: str)",
+            "from": "task-mode-switch"
+          },
+          {
+            "label": "设置默认角度模式",
+            "contract_api": "set_angle_mode(mode: str)",
+            "from": "task-sci-calc"
+          }
+        ]
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "获取当前主题",
+            "contract_api": "get_theme() -> str",
+            "from": "task-settings-dialog"
+          },
+          {
+            "label": "获取计算精度",
+            "contract_api": "get_precision() -> int",
+            "from": "task-settings-dialog"
+          },
+          {
+            "label": "设置变更信号",
+            "contract_api": "settings_changed: Signal()",
+            "from": "task-settings-dialog"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证主题选择功能",
+          "api": "test_theme_selection()"
+        },
+        {
+          "target": "验证精度设置功能",
+          "api": "test_precision_setting()"
+        },
+        {
+          "target": "验证设置持久化",
+          "api": "test_settings_persistence()"
+        }
+      ],
+      "test_result": [],
       "codePaths": "[\"src/ui/settings_dialog.py\"]",
-      "logs": "",
-      "humanAssistance": "{}"
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
     },
     {
       "id": "task-config-persist",
@@ -202,12 +746,64 @@
       "moduleId": "mod-config",
       "status": "ready",
       "prompt": "创建ConfigManager类。\n\n要求：\n1. 使用JSON文件存储配置\n2. 配置项：主题、精度、角度模式、窗口位置\n3. 首次运行创建默认配置\n4. 配置变更自动保存\n5. 支持配置导入/导出\n6. 配置文件路径：~/.calculator/config.json\n\n输出文件：src/config/config_manager.py",
-      "upstreamContractDetail": "无上游依赖，这是基础配置模块",
-      "downstreamContractDetail": "提供以下接口给下游任务使用：\n1. get(key: str, default: Any) -> Any: 获取配置项\n2. set(key: str, value: Any): 设置配置项\n3. save(): 保存配置到文件\n4. load(): 从文件加载配置\n5. export_config(path: str): 导出配置\n6. import_config(path: str): 导入配置",
-      "tests": "[\"test_default_config()\", \"test_save_load()\", \"test_import_export()\"]",
+      "upstreamContractDetail": {
+        "title": "无上游依赖，这是基础配置模块",
+        "list": []
+      },
+      "downstreamContractDetail": {
+        "title": "为下游任务提供以下接口",
+        "list": [
+          {
+            "label": "获取配置项",
+            "contract_api": "get(key: str, default: Any) -> Any",
+            "from": "task-config-persist"
+          },
+          {
+            "label": "设置配置项",
+            "contract_api": "set(key: str, value: Any)",
+            "from": "task-config-persist"
+          },
+          {
+            "label": "保存配置到文件",
+            "contract_api": "save()",
+            "from": "task-config-persist"
+          },
+          {
+            "label": "从文件加载配置",
+            "contract_api": "load()",
+            "from": "task-config-persist"
+          },
+          {
+            "label": "导出配置",
+            "contract_api": "export_config(path: str)",
+            "from": "task-config-persist"
+          },
+          {
+            "label": "导入配置",
+            "contract_api": "import_config(path: str)",
+            "from": "task-config-persist"
+          }
+        ]
+      },
+      "tests": [
+        {
+          "target": "验证默认配置",
+          "api": "test_default_config()"
+        },
+        {
+          "target": "验证保存和加载",
+          "api": "test_save_load()"
+        },
+        {
+          "target": "验证导入导出",
+          "api": "test_import_export()"
+        }
+      ],
+      "test_result": [],
       "codePaths": "[\"src/config/config_manager.py\"]",
-      "logs": "",
-      "humanAssistance": "{}"
+      "bug_log": "",
+      "humanAssistance": "{}",
+      "issue_details": ""
     }
   ],
   "taskDependencies": [

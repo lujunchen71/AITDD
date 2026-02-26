@@ -1,25 +1,40 @@
 /**
  * AITDD 测试数据导入脚本
- * 将 aitdd_example.json 中的数据导入到 SQLite 数据库
+ * 通过后端 API 导入数据，确保数据结构一致性
  * 
  * 使用方法: node scripts/import-aitdd-data.js [json文件路径]
- * 默认使用 ../aitdd_example.json
+ * 默认使用 debug/aitdd_example.json
+ * 
+ * 前提条件: 后端服务必须已经启动 (http://localhost:34567)
  */
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
-const Database = require('better-sqlite3');
 
-// 数据库路径 - 使用与后端相同的路径 (~/.aitdd/aitdd.db)
-const DB_PATH = path.join(os.homedir(), '.aitdd', 'aitdd.db');
-const DEFAULT_JSON = path.join(__dirname, '..', 'aitdd_example.json');
+const API_BASE = 'http://localhost:34567/api/v1';
+const DEFAULT_JSON = path.join(__dirname, '..', 'debug', 'aitdd_example.json');
 
 // 获取 JSON 文件路径
 const jsonPath = process.argv[2] || DEFAULT_JSON;
 
 console.log('📁 JSON文件:', jsonPath);
-console.log('🗄️  数据库路径:', DB_PATH);
+console.log('🌐 API地址:', API_BASE);
+
+// 检查后端是否运行
+async function checkBackend() {
+  try {
+    const response = await fetch(`${API_BASE.replace('/api/v1', '')}/health`);
+    if (!response.ok) {
+      throw new Error(`Health check failed: ${response.status}`);
+    }
+    console.log('✅ 后端服务正常运行');
+    return true;
+  } catch (err) {
+    console.error('❌ 后端服务未运行，请先启动后端: start-backend.bat');
+    console.error('   错误:', err.message);
+    return false;
+  }
+}
 
 // 读取 JSON 文件
 let jsonData;
@@ -32,306 +47,338 @@ try {
   process.exit(1);
 }
 
-// 打开数据库
-const db = new Database(DB_PATH);
-db.pragma('foreign_keys = OFF'); // 暂时禁用外键约束
-
-// 获取或创建项目ID
-let projectId;
-const existingProject = db.prepare('SELECT id FROM projects LIMIT 1').get();
-if (existingProject) {
-  projectId = existingProject.id;
-  console.log(`📌 使用现有项目 ID: ${projectId}`);
-} else {
-  projectId = jsonData.project?.id || 'proj-001';
-  console.log(`📌 创建新项目 ID: ${projectId}`);
+// API 请求封装
+async function apiRequest(method, endpoint, data = null) {
+  const options = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  };
+  if (data) {
+    options.body = JSON.stringify(data);
+  }
+  const response = await fetch(`${API_BASE}${endpoint}`, options);
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(`API Error ${response.status}: ${responseText}`);
+  }
+  return JSON.parse(responseText);
 }
 
-// 初始化表结构
-console.log('\n🔧 初始化表结构...');
-db.exec(`
-  CREATE TABLE IF NOT EXISTS projects (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      constitution TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      version INTEGER NOT NULL DEFAULT 1,
-      sync_status TEXT NOT NULL DEFAULT 'SYNCED'
-  );
-
-  CREATE TABLE IF NOT EXISTS modules (
-      id TEXT PRIMARY KEY,
-      parent_id TEXT,
-      project_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT,
-      prompt TEXT,
-      status TEXT NOT NULL DEFAULT 'designing',
-      test_coverage REAL DEFAULT 0,
-      upstream_contract_summary TEXT,
-      downstream_contract_summary TEXT,
-      file_path TEXT,
-      locked INTEGER NOT NULL DEFAULT 0,
-      locked_by TEXT,
-      locked_at INTEGER,
-      lock_expires_at INTEGER,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      version INTEGER NOT NULL DEFAULT 1,
-      sync_status TEXT NOT NULL DEFAULT 'SYNCED'
-  );
-
-  CREATE TABLE IF NOT EXISTS tasks (
-      id TEXT PRIMARY KEY,
-      module_id TEXT NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT,
-      status TEXT NOT NULL DEFAULT 'ready',
-      assignee TEXT,
-      upstream_contract_detail TEXT,
-      downstream_contract_detail TEXT,
-      prompt TEXT,
-      tests TEXT,
-      test_result TEXT,
-      bug_log TEXT,
-      code_paths TEXT,
-      human_assistance TEXT,
-      issue_details TEXT,
-      locked INTEGER NOT NULL DEFAULT 0,
-      locked_by TEXT,
-      locked_at INTEGER,
-      lock_expires_at INTEGER,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      version INTEGER NOT NULL DEFAULT 1,
-      sync_status TEXT NOT NULL DEFAULT 'SYNCED'
-  );
-
-  CREATE TABLE IF NOT EXISTS dependencies (
-      id TEXT PRIMARY KEY,
-      upstream_task_id TEXT NOT NULL,
-      downstream_task_id TEXT NOT NULL,
-      interface_contract TEXT,
-      created_at INTEGER NOT NULL,
-      version INTEGER NOT NULL DEFAULT 1,
-      sync_status TEXT NOT NULL DEFAULT 'SYNCED'
-  );
-
-  CREATE TABLE IF NOT EXISTS module_dependencies (
-      id TEXT PRIMARY KEY,
-      upstream_module_id TEXT NOT NULL,
-      downstream_module_id TEXT NOT NULL,
-      contract_summary TEXT,
-      created_at INTEGER NOT NULL,
-      version INTEGER NOT NULL DEFAULT 1,
-      sync_status TEXT NOT NULL DEFAULT 'SYNCED'
-  );
-`);
-console.log('   表结构已就绪');
-
-// 开始事务
-const importData = db.transaction(() => {
-  const now = Date.now();
-  
-  // 1. 清理旧数据（不删除项目，只删除模块和任务）
-  console.log('\n🧹 清理旧数据...');
-  db.exec(`
-    DELETE FROM dependencies;
-    DELETE FROM module_dependencies;
-    DELETE FROM tasks;
-    DELETE FROM modules;
-  `);
-  
-  // 2. 插入/更新项目
-  console.log('\n📝 插入项目...');
-  const project = db.prepare('SELECT 1 FROM projects WHERE id = ?').get(projectId);
-  if (!project) {
-    db.prepare(`
-      INSERT INTO projects (id, name, constitution, created_at, updated_at, version, sync_status)
-      VALUES (?, ?, ?, ?, ?, 1, 'SYNCED')
-    `).run(projectId, jsonData.project?.name || '示例项目', '', now, now);
-    console.log(`   创建项目: ${projectId}`);
-  } else {
-    db.prepare(`
-      UPDATE projects SET name = ?, updated_at = ? WHERE id = ?
-    `).run(jsonData.project?.name || '示例项目', now, projectId);
-    console.log(`   更新项目: ${projectId}`);
+// 导入数据
+async function importData() {
+  // 检查后端
+  if (!await checkBackend()) {
+    process.exit(1);
   }
 
-  // 3. 插入模块
-  console.log('\n📝 插入模块...');
-  const insertModule = db.prepare(`
-    INSERT INTO modules (id, project_id, name, description, status, created_at, updated_at, version, sync_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'SYNCED')
-  `);
-  
-  for (const mod of jsonData.modules || []) {
-    insertModule.run(
-      mod.id,
-      projectId,
-      mod.name,
-      mod.description || '',
-      mod.status || 'designing',
-      now,
-      now
-    );
-    console.log(`   模块: ${mod.name} (${mod.id})`);
-  }
+  console.log('\n🚀 开始导入数据...\n');
 
-  // 4. 插入任务
-  console.log('\n📝 插入任务...');
-  const insertTask = db.prepare(`
-    INSERT OR REPLACE INTO tasks (
-      id, module_id, name, description, status, assignee,
-      upstream_contract_detail, downstream_contract_detail, prompt,
-      tests, test_result, bug_log, code_paths, human_assistance, issue_details,
-      locked, locked_by, locked_at, lock_expires_at,
-      created_at, updated_at, version, sync_status
-    ) VALUES (
-      @id, @moduleId, @name, @description, @status, @assignee,
-      @upstreamContractDetail, @downstreamContractDetail, @prompt,
-      @tests, @testResult, @bugLog, @codePaths, @humanAssistance, @issueDetails,
-      @locked, @lockedBy, @lockedAt, @lockExpiresAt,
-      @createdAt, @updatedAt, @version, @syncStatus
-    )
-  `);
-  
-  // 辅助函数：将契约详情对象序列化为JSON字符串
-  const serializeContractDetail = (detail) => {
-    if (!detail) return '';
-    if (typeof detail === 'string') return detail;
-    return JSON.stringify(detail);
-  };
-  
-  // 辅助函数：将测试数组序列化为JSON字符串
-  const serializeTests = (tests) => {
-    if (!tests) return '[]';
-    if (typeof tests === 'string') return tests;
-    return JSON.stringify(tests);
-  };
-  
-  // 辅助函数：将测试结果数组序列化为JSON字符串
-  const serializeTestResult = (testResult) => {
-    if (!testResult) return '[]';
-    if (typeof testResult === 'string') return testResult;
-    return JSON.stringify(testResult);
-  };
-  
-  for (const task of jsonData.tasks || []) {
-    insertTask.run({
-      id: task.id,
-      moduleId: task.moduleId,
-      name: task.name,
-      description: task.description || '',
-      status: task.status || 'ready',
-      assignee: task.assignee || null,
-      upstreamContractDetail: serializeContractDetail(task.upstreamContractDetail),
-      downstreamContractDetail: serializeContractDetail(task.downstreamContractDetail),
-      prompt: task.prompt || '',
-      tests: serializeTests(task.tests),
-      testResult: serializeTestResult(task.testResult || task.test_result || []),
-      bugLog: task.bugLog || task.bug_log || task.logs || '',  // 兼容旧字段名
-      codePaths: JSON.stringify(task.codePaths || task.code_paths || []),
-      humanAssistance: typeof task.humanAssistance === 'object'
-        ? JSON.stringify(task.humanAssistance)
-        : (task.humanAssistance || '{}'),
-      issueDetails: task.issueDetails || task.issue_details || '',  // 新增
-      locked: task.locked ? 1 : 0,
-      lockedBy: task.lockedBy || task.locked_by || null,
-      lockedAt: task.lockedAt || task.locked_at || null,
-      lockExpiresAt: task.lockExpiresAt || task.lock_expires_at || null,
-      createdAt: now,
-      updatedAt: now,
-      version: 1,
-      syncStatus: 'SYNCED'
-    });
-    console.log(`   任务: ${task.name} (${task.id}) - ${task.status}`);
-  }
-
-  // 5. 插入任务依赖
-  console.log('\n📝 插入任务依赖...');
-  const insertDep = db.prepare(`
-    INSERT INTO dependencies (id, upstream_task_id, downstream_task_id, contract_summary, created_at, version, sync_status)
-    VALUES (?, ?, ?, ?, ?, 1, 'SYNCED')
-  `);
-  
-  for (const dep of jsonData.taskDependencies || []) {
-    insertDep.run(
-      dep.id,
-      dep.upstreamTaskId,
-      dep.downstreamTaskId,
-      dep.interfaceContract || '',
-      now
-    );
-    console.log(`   依赖: ${dep.upstreamTaskId} -> ${dep.downstreamTaskId}`);
-    if (dep.interfaceContract) {
-      console.log(`      接口: ${dep.interfaceContract}`);
-    }
-  }
-
-  // 6. 计算模块依赖
-  console.log('\n📝 计算模块依赖...');
-  const moduleDeps = new Map();
-  
-  for (const dep of jsonData.taskDependencies || []) {
-    const upstreamTask = jsonData.tasks.find(t => t.id === dep.upstreamTaskId);
-    const downstreamTask = jsonData.tasks.find(t => t.id === dep.downstreamTaskId);
+  try {
+    // 1. 创建或获取项目（upsert 模式）
+    console.log('📝 初始化项目...');
+    let projectId;
     
-    if (upstreamTask && downstreamTask && upstreamTask.moduleId !== downstreamTask.moduleId) {
-      const key = `${upstreamTask.moduleId}->${downstreamTask.moduleId}`;
-      if (!moduleDeps.has(key)) {
-        moduleDeps.set(key, {
-          upstream: upstreamTask.moduleId,
-          downstream: downstreamTask.moduleId,
-          interfaces: []
-        });
+    const projectName = jsonData.project?.name || 'New Project';
+    
+    // 先获取所有现有项目，检查是否存在同名项目
+    let existingProject = null;
+    try {
+      const projectsResp = await apiRequest('GET', '/projects');
+      const existingProjects = projectsResp?.data?.projects || projectsResp?.projects || [];
+      existingProject = existingProjects.find(p => p.name === projectName);
+      if (existingProject) {
+        console.log(`   📋 发现已存在项目: ${projectName} (${existingProject.id})`);
       }
-      if (dep.interfaceContract) {
-        moduleDeps.get(key).interfaces.push(dep.interfaceContract);
+    } catch (err) {
+      console.log(`   ⚠️  获取现有项目失败: ${err.message}`);
+    }
+    
+    if (existingProject) {
+      // 项目已存在，使用现有项目，并删除该项目的所有现有数据（实现完全覆盖）
+      projectId = existingProject.id;
+      console.log(`   🔄 使用现有项目: ${projectName} (${projectId})`);
+      
+      // 删除该项目的所有现有任务依赖
+      console.log(`   🗑️  清理现有任务依赖...`);
+      try {
+        // 先获取所有任务
+        const tasksResp = await apiRequest('GET', `/tasks?projectId=${projectId}`);
+        const existingTasks = tasksResp?.data?.tasks || tasksResp?.tasks || [];
+        
+        // 删除每个任务的依赖
+        for (const task of existingTasks) {
+          try {
+            await apiRequest('DELETE', `/tasks/${task.id}/dependencies`);
+          } catch (err) {
+            // 静默失败，依赖可能不存在
+          }
+        }
+        console.log(`   ✅ 已清理任务依赖`);
+      } catch (err) {
+        console.log(`   ⚠️  清理任务依赖失败: ${err.message}`);
+      }
+      
+      // 删除该项目的所有现有任务
+      console.log(`   🗑️  清理现有任务...`);
+      try {
+        const tasksResp = await apiRequest('GET', `/tasks?projectId=${projectId}`);
+        const existingTasks = tasksResp?.data?.tasks || tasksResp?.tasks || [];
+        
+        for (const task of existingTasks) {
+          try {
+            await apiRequest('DELETE', `/tasks/${task.id}`);
+          } catch (err) {
+            // 静默失败
+          }
+        }
+        console.log(`   ✅ 已清理 ${existingTasks.length} 个任务`);
+      } catch (err) {
+        console.log(`   ⚠️  清理任务失败: ${err.message}`);
+      }
+      
+      // 删除该项目的所有现有模块
+      console.log(`   🗑️  清理现有模块...`);
+      try {
+        const modulesResp = await apiRequest('GET', `/modules?projectId=${projectId}`);
+        const existingModules = modulesResp?.data?.modules || modulesResp?.modules || [];
+        
+        for (const mod of existingModules) {
+          try {
+            await apiRequest('DELETE', `/modules/${mod.id}`);
+          } catch (err) {
+            // 静默失败
+          }
+        }
+        console.log(`   ✅ 已清理 ${existingModules.length} 个模块`);
+      } catch (err) {
+        console.log(`   ⚠️  清理模块失败: ${err.message}`);
+      }
+    } else {
+      // 项目不存在，创建新项目
+      const createResp = await apiRequest('POST', '/projects', {
+        name: projectName,
+        description: jsonData.project?.description || ''
+      });
+      const newProject = createResp?.data?.project || createResp?.project;
+      if (newProject) {
+        projectId = newProject.id;
+        console.log(`   ✅ 创建新项目: ${projectName} (${projectId})`);
+      } else {
+        throw new Error('创建项目失败: 响应无效');
       }
     }
-  }
-  
-  const insertModuleDep = db.prepare(`
-    INSERT INTO module_dependencies (id, module_id, depends_on_module_id, contract_summary, created_at, updated_at, version, sync_status)
-    VALUES (?, ?, ?, ?, ?, ?, 1, 'SYNCED')
-  `);
-  
-  let depIndex = 1;
-  for (const [key, dep] of moduleDeps) {
-    const depId = `moddep-${String(depIndex).padStart(3, '0')}`;
-    insertModuleDep.run(
-      depId,
-      dep.downstream,  // module_id (当前模块)
-      dep.upstream,    // depends_on_module_id (依赖的模块)
-      dep.interfaces.join('\n'),
-      now,
-      now
-    );
-    const upMod = jsonData.modules.find(m => m.id === dep.upstream);
-    const downMod = jsonData.modules.find(m => m.id === dep.downstream);
-    console.log(`   模块依赖: ${upMod?.name || dep.upstream} -> ${downMod?.name || dep.downstream}`);
-    depIndex++;
-  }
 
-  console.log('\n✅ 数据导入完成!');
-  console.log(`   - 项目: 1`);
-  console.log(`   - 模块: ${jsonData.modules?.length || 0}`);
-  console.log(`   - 任务: ${jsonData.tasks?.length || 0}`);
-  console.log(`   - 任务依赖: ${jsonData.taskDependencies?.length || 0}`);
-  console.log(`   - 模块依赖: ${moduleDeps.size}`);
-});
+    // 2. 创建或更新模块（upsert 模式）
+    console.log('\n📝 导入模块...');
+    const moduleIdMap = {};
+    
+    // 先获取该项目下所有现有模块，用于判断是否需要更新
+    const existingModulesMap = new Map(); // key: `${projectId}:${moduleName}`, value: module
+    try {
+      const modulesResp = await apiRequest('GET', `/modules?projectId=${projectId}`);
+      const existingModules = modulesResp?.data?.modules || modulesResp?.modules || [];
+      for (const m of existingModules) {
+        const key = `${m.projectId}:${m.name}`;
+        existingModulesMap.set(key, m);
+      }
+      console.log(`   📋 已有模块数量: ${existingModules.length}`);
+    } catch (err) {
+      console.log(`   ⚠️  获取现有模块失败: ${err.message}`);
+    }
+    
+    for (const mod of jsonData.modules || []) {
+      const moduleData = {
+        projectId: projectId,  // 必填字段
+        name: mod.name,
+        description: mod.description || '',
+        prompt: mod.prompt || '',
+      };
+      
+      // 如果有父模块
+      if (mod.parentId && moduleIdMap[mod.parentId]) {
+        moduleData.parentId = mod.parentId;
+      }
+      
+      // 检查是否已存在同名模块（同一项目下）
+      const moduleKey = `${projectId}:${mod.name}`;
+      const existingModule = existingModulesMap.get(moduleKey);
+      
+      try {
+        let result;
+        if (existingModule) {
+          // 模块已存在，使用 PUT 更新（需要包含 version字段）
+          moduleData.version = existingModule.version;
+          result = await apiRequest('PUT', `/modules/${existingModule.id}`, moduleData);
+          moduleIdMap[mod.id] = existingModule.id;
+          console.log(`   🔄 模块更新: ${mod.name} (${existingModule.id})`);
+        } else {
+          // 模块不存在，使用 POST 创建
+          result = await apiRequest('POST', '/modules', moduleData);
+          const createdModule = result?.data?.module || result?.module;
+          moduleIdMap[mod.id] = createdModule.id;
+          console.log(`   ✅ 模块创建: ${mod.name} (${createdModule.id})`);
+        }
+      } catch (err) {
+        if (err.message.includes('already exists') || err.message.includes('duplicate')) {
+          console.log(`   ⏭️  模块已存在: ${mod.name}`);
+          moduleIdMap[mod.id] = mod.id;
+        } else {
+          console.log(`   ❌ 模块操作失败: ${mod.name} - ${err.message}`);
+        }
+      }
+    }
+
+    // 3. 创建或更新任务（upsert 模式）
+    console.log('\n📝 导入任务...');
+    const taskIdMap = {};
+    
+    // 先获取该项目下所有现有任务，用于判断是否需要更新
+    const existingTasksMap = new Map(); // key: `${moduleId}:${taskName}`, value: task
+    try {
+      const tasksResp = await apiRequest('GET', `/tasks?projectId=${projectId}`);
+      const existingTasks = tasksResp?.data?.tasks || tasksResp?.tasks || [];
+      for (const t of existingTasks) {
+        const key = `${t.moduleId}:${t.name}`;
+        existingTasksMap.set(key, t);
+      }
+      console.log(`   📋 已有任务数量: ${existingTasks.length}`);
+    } catch (err) {
+      console.log(`   ⚠️  获取现有任务失败: ${err.message}`);
+    }
+    
+    for (const task of jsonData.tasks || []) {
+      // 获取实际的模块ID
+      const actualModuleId = moduleIdMap[task.moduleId];
+      if (!actualModuleId) {
+        console.log(`   ⚠️  跳过任务 ${task.name}: 模块 ${task.moduleId} 不存在`);
+        console.log(`   🔍 moduleIdMap:`, JSON.stringify(moduleIdMap));
+        continue;
+      }
+      
+      // 只发送 API 支持的字段，将对象转换为 JSON 字符串
+      const taskData = {
+        moduleId: actualModuleId,
+        name: task.name,
+        description: task.description || '',
+        prompt: task.prompt || '',
+        // API 期望字符串，如果是对象则转换为 JSON 字符串
+        upstreamContractDetail: typeof task.upstreamContractDetail === 'object'
+          ? JSON.stringify(task.upstreamContractDetail)
+          : (task.upstreamContractDetail || ''),
+        downstreamContractDetail: typeof task.downstreamContractDetail === 'object'
+          ? JSON.stringify(task.downstreamContractDetail)
+          : (task.downstreamContractDetail || ''),
+      };
+      
+      // 检查是否已存在同名任务（同一模块下）
+      const taskKey = `${actualModuleId}:${task.name}`;
+      const existingTask = existingTasksMap.get(taskKey);
+      
+      try {
+        let result;
+        if (existingTask) {
+          // 任务已存在，使用 PUT 更新（需要包含 version字段）
+          taskData.version = existingTask.version;
+          result = await apiRequest('PUT', `/tasks/${existingTask.id}`, taskData);
+          taskIdMap[task.id] = existingTask.id;
+          console.log(`   🔄 任务更新: ${task.name} (${existingTask.id}) - ${task.status}`);
+        } else {
+          // 任务不存在，使用 POST 创建
+          result = await apiRequest('POST', '/tasks', taskData);
+          const createdTask = result?.data?.task || result?.task;
+          taskIdMap[task.id] = createdTask.id;
+          console.log(`   ✅ 任务创建: ${task.name} (${createdTask.id}) - ${task.status}`);
+        }
+      } catch (err) {
+        console.log(`   ❌ 任务操作失败: ${task.name} - ${err.message}`);
+      }
+    }
+
+    // 4. 创建任务依赖
+    console.log('\n📝 导入任务依赖...');
+    let depCount = 0;
+    
+    // 支持 taskDependencies 或 dependencies 两种字段名
+    const dependencies = jsonData.taskDependencies || jsonData.dependencies || [];
+    for (const dep of dependencies) {
+      const upstreamId = taskIdMap[dep.upstreamTaskId];
+      const downstreamId = taskIdMap[dep.downstreamTaskId];
+      
+      if (!upstreamId || !downstreamId) {
+        console.log(`   ⚠️  跳过依赖: 任务ID不存在`);
+        continue;
+      }
+      
+      const depData = {
+        upstreamTaskId: upstreamId,
+        downstreamTaskId: downstreamId,
+        interfaceContract: dep.interfaceContract || '',
+      };
+      
+      try {
+        await apiRequest('POST', '/dependencies', depData);
+        console.log(`   ✅ 依赖: ${dep.upstreamTaskId} -> ${dep.downstreamTaskId}`);
+        depCount++;
+      } catch (err) {
+        if (err.message.includes('already exists') || err.message.includes('duplicate')) {
+          console.log(`   ⏭️  依赖已存在: ${dep.upstreamTaskId} -> ${dep.downstreamTaskId}`);
+        } else {
+          console.log(`   ❌ 依赖创建失败: ${err.message}`);
+        }
+      }
+    }
+
+    // 5. 创建模块依赖
+    console.log('\n📝 计算模块依赖...');
+    let modDepCount = 0;
+    
+    const moduleDeps = new Set();
+    for (const dep of dependencies) {
+      const task = jsonData.tasks.find(t => t.id === dep.upstreamTaskId);
+      const downstreamTask = jsonData.tasks.find(t => t.id === dep.downstreamTaskId);
+      
+      if (task && downstreamTask && task.moduleId !== downstreamTask.moduleId) {
+        const key = `${task.moduleId}->${downstreamTask.moduleId}`;
+        if (!moduleDeps.has(key)) {
+          moduleDeps.add(key);
+          const upstreamModId = moduleIdMap[task.moduleId];
+          const downstreamModId = moduleIdMap[downstreamTask.moduleId];
+          
+          if (upstreamModId && downstreamModId) {
+            try {
+              await apiRequest('POST', `/modules/${upstreamModId}/dependencies`, {
+                upstreamModuleId: upstreamModId,
+                downstreamModuleId: downstreamModId,
+                contractSummary: dep.interfaceContract || '',
+              });
+              console.log(`   ✅ 模块依赖: ${task.moduleId} -> ${downstreamTask.moduleId}`);
+              modDepCount++;
+            } catch (err) {
+              console.log(`   ⏭️  模块依赖已存在或失败`);
+            }
+          }
+        }
+      }
+    }
+
+    console.log('\n========================================');
+    console.log('✅ 数据导入完成!');
+    console.log(`   - 模块: ${Object.keys(moduleIdMap).length}`);
+    console.log(`   - 任务: ${Object.keys(taskIdMap).length}`);
+    console.log(`   - 任务依赖: ${depCount}`);
+    console.log(`   - 模块依赖: ${modDepCount}`);
+    console.log('========================================\n');
+
+  } catch (err) {
+    console.error('\n❌ 导入失败:', err.message);
+    process.exit(1);
+  }
+}
 
 // 执行导入
-try {
-  importData();
-} catch (err) {
-  console.error('❌ 导入失败:', err.message);
-  console.error(err);
+importData().catch(err => {
+  console.error('❌ 未预期的错误:', err);
   process.exit(1);
-}
-
-// 关闭数据库
-db.close();
-console.log('\n👋 数据库已关闭');
+});

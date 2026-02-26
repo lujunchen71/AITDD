@@ -26,6 +26,13 @@ func SetupRouter() *gin.Engine {
 			project.PUT("/constitution", handlers.UpdateConstitution)
 		}
 
+		// 多项目相关
+		projects := v1.Group("/projects")
+		{
+			projects.GET("", handlers.GetProjects)
+			projects.POST("", handlers.CreateProject)
+		}
+
 		// 模块相关
 		modules := v1.Group("/modules")
 		{
@@ -55,6 +62,10 @@ func SetupRouter() *gin.Engine {
 			tasks.POST("", handlers.CreateTask)
 			tasks.PUT("/:id", handlers.UpdateTask)
 			tasks.DELETE("/:id", handlers.DeleteTask)
+			tasks.POST("/:id/check", handlers.CheckTask)
+			tasks.POST("/:id/refactor", handlers.RefactorTask)
+			tasks.POST("/:id/duplicate", handlers.DuplicateTask)
+			tasks.POST("/:id/toggle-lock", handlers.ToggleTaskLock)
 		}
 
 		// 依赖相关

@@ -12,12 +12,21 @@ import ReactFlow, {
   Position,
   EdgeProps,
   getBezierPath,
+  useReactFlow,
+  ReactFlowProvider,
+  SelectionMode,
+  OnSelectionChangeParams,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Module, Task, TaskDependency, ModuleDependency } from '../../../../types';
-import { AppstoreOutlined, SettingOutlined } from '@ant-design/icons';
-import { Checkbox, Popover, Button, Tooltip, message } from 'antd';
+import { AppstoreOutlined, SettingOutlined, PlayCircleOutlined, ApiOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Checkbox, Popover, Button, Tooltip, message, Dropdown } from 'antd';
 import { modulePositionApi } from '../../../../services/api';
+import { 
+  localStorageService, 
+  DisplaySettings,
+  defaultDisplaySettings as storageDefaultDisplaySettings 
+} from '../../../../services/localStorageService';
 
 interface ModuleGraphViewProps {
   modules: Module[];
@@ -26,33 +35,11 @@ interface ModuleGraphViewProps {
   moduleDependencies: ModuleDependency[];
   onModuleClick?: (moduleId: string) => void;
   onTaskClick?: (taskId: string) => void;
+  onModuleCompile?: (moduleId: string) => void;
+  onModuleAnalyze?: (moduleId: string) => void;
+  onModuleRefactor?: (moduleId: string) => void;
+  onModuleDelete?: (moduleId: string) => void;
 }
-
-// 全局显示设置接口
-interface DisplaySettings {
-  showInternalEdges: boolean;      // 显示模块内部连线
-  showCrossModuleEdges: boolean;   // 显示跨模块连线
-  showPrompt: boolean;             // 显示提示词标识
-  showError: boolean;              // 显示错误信息标识
-  showNotification: boolean;       // 显示通知标识
-  showStatus: boolean;             // 显示状态
-  fontSize: number;                // 全局字体大小
-  requireAltForTooltip: boolean;   // 需要按Alt键才显示Tooltip
-  tooltipScale: number;            // Tooltip整体缩放比例
-}
-
-// 默认显示设置
-const defaultDisplaySettings: DisplaySettings = {
-  showInternalEdges: true,
-  showCrossModuleEdges: true,
-  showPrompt: true,
-  showError: true,
-  showNotification: true,
-  showStatus: true,
-  fontSize: 12,
-  requireAltForTooltip: true,  // 默认开启Alt键显示
-  tooltipScale: 1,             // 默认缩放比例为1
-};
 
 // 模块节点数据 - 包含任务列表
 interface ModuleNodeData {
@@ -65,6 +52,8 @@ interface ModuleNodeData {
   taskDependencies: TaskDependency[];
   onTaskClick?: (taskId: string) => void;
   displaySettings: DisplaySettings;
+  isSelected?: boolean;
+  onContextMenu?: (e: React.MouseEvent, moduleId: string) => void;
 }
 
 const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
@@ -73,17 +62,113 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
   taskDependencies,
   onModuleClick,
   onTaskClick,
+  onModuleCompile: _onModuleCompile,
+  onModuleAnalyze: _onModuleAnalyze,
+  onModuleRefactor: _onModuleRefactor,
+  onModuleDelete: _onModuleDelete,
 }) => {
-  const [collapsedModules, setCollapsedModules] = useState<Set<string>>(new Set());
-  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(defaultDisplaySettings);
+  // 从本地存储加载折叠的模块ID列表
+  const [collapsedModules, setCollapsedModules] = useState<Set<string>>(() => {
+    const savedCollapsedIds = localStorageService.getCollapsedModules();
+    console.log('[ModuleGraphView] 从本地存储加载折叠模块:', savedCollapsedIds);
+    return new Set(savedCollapsedIds);
+  });
+  
+  // 选中的模块ID列表（用于多选和持久化）
+  const [selectedModuleIds, setSelectedModuleIds] = useState<Set<string>>(() => {
+    const savedSelectedIds = localStorageService.getSelectedModules();
+    console.log('[ModuleGraphView] 从本地存储加载选中模块:', savedSelectedIds);
+    return new Set(savedSelectedIds);
+  });
+  // 从本地存储加载显示设置
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>(() => {
+    const savedSettings = localStorageService.getDisplaySettings();
+    console.log('[ModuleGraphView] 从本地存储加载显示设置:', savedSettings);
+    return savedSettings;
+  });
   
   // 防抖保存的 ref
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 获取 ReactFlow 实例用于操作视口
+  const { setViewport, getViewport } = useReactFlow();
+
+  // 组件挂载时恢复视口位置
+  useEffect(() => {
+    const savedViewport = localStorageService.getGraphViewport();
+    console.log('[ModuleGraphView] 恢复视口位置:', savedViewport);
+    setViewport(savedViewport);
+  }, [setViewport]);
+
+  // 保存折叠状态到本地存储
+  useEffect(() => {
+    const collapsedArray = Array.from(collapsedModules);
+    console.log('[ModuleGraphView] 保存折叠模块到本地存储:', collapsedArray);
+    localStorageService.setCollapsedModules(collapsedArray);
+  }, [collapsedModules]);
+
+  // 清理无效的折叠模块ID（当模块列表变化时）
+  useEffect(() => {
+    if (modules.length > 0) {
+      const validModuleIds = modules.map(m => m.id);
+      const savedCollapsedIds = localStorageService.cleanupInvalidCollapsedModules(validModuleIds);
+      // 如果清理后的列表与当前状态不同，更新状态
+      const currentIds = Array.from(collapsedModules);
+      if (JSON.stringify(currentIds.sort()) !== JSON.stringify(savedCollapsedIds.sort())) {
+        setCollapsedModules(new Set(savedCollapsedIds));
+      }
+    }
+  }, [modules]);
+
+  // 保存显示设置到本地存储
+  useEffect(() => {
+    console.log('[ModuleGraphView] 保存显示设置到本地存储:', displaySettings);
+    localStorageService.setDisplaySettings(displaySettings);
+  }, [displaySettings]);
+
+  // 保存选中状态到本地存储
+  useEffect(() => {
+    const selectedArray = Array.from(selectedModuleIds);
+    console.log('[ModuleGraphView] 保存选中模块到本地存储:', selectedArray);
+    localStorageService.setSelectedModules(selectedArray);
+  }, [selectedModuleIds]);
+
+  // 清理无效的选中模块ID（当模块列表变化时）
+  useEffect(() => {
+    if (modules.length > 0) {
+      const validModuleIds = modules.map(m => m.id);
+      const savedSelectedIds = localStorageService.cleanupInvalidSelectedModules(validModuleIds);
+      // 如果清理后的列表与当前状态不同，更新状态
+      const currentIds = Array.from(selectedModuleIds);
+      if (JSON.stringify(currentIds.sort()) !== JSON.stringify(savedSelectedIds.sort())) {
+        setSelectedModuleIds(new Set(savedSelectedIds));
+      }
+    }
+  }, [modules]);
 
   // 更新显示设置
   const updateDisplaySettings = (key: keyof DisplaySettings, value: boolean | number) => {
     setDisplaySettings(prev => ({ ...prev, [key]: value }));
   };
+
+  // 保存视口位置的防抖函数
+  const saveViewportTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const saveViewportToStorage = useCallback(() => {
+    if (saveViewportTimeoutRef.current) {
+      clearTimeout(saveViewportTimeoutRef.current);
+    }
+    saveViewportTimeoutRef.current = setTimeout(() => {
+      const viewport = getViewport();
+      console.log('[ModuleGraphView] 保存视口位置:', viewport);
+      localStorageService.setGraphViewport(viewport);
+    }, 300);
+  }, [getViewport]);
+
+  // 监听视口变化
+  const onMoveEnd = useCallback(() => {
+    saveViewportToStorage();
+  }, [saveViewportToStorage]);
 
   // 防抖保存单个模块位置
   const debouncedSavePosition = useCallback(async (id: string, x: number, y: number) => {
@@ -241,6 +326,17 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
     return newPositions;
   }, [modules, tasks, taskDependencies]);
 
+  // 右键菜单处理
+  const handleContextMenu = useCallback((e: React.MouseEvent, moduleId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // 如果右键的模块未选中，则选中它
+    if (!selectedModuleIds.has(moduleId)) {
+      console.log('[ModuleGraphView] 右键选中模块:', moduleId);
+      setSelectedModuleIds(new Set([moduleId]));
+    }
+  }, [selectedModuleIds]);
+
   // 生成节点和边
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     const nodes: Node<ModuleNodeData>[] = [];
@@ -265,6 +361,7 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
     modules.forEach((module) => {
       const position = modulePositions.get(module.id) || { x: 0, y: 0 };
       const isCollapsed = collapsedModules.has(module.id);
+      const isSelected = selectedModuleIds.has(module.id);
       const moduleTasks = tasks.filter(t => t.moduleId === module.id);
 
       // 模块节点
@@ -292,16 +389,18 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
           taskDependencies,
           onTaskClick,
           displaySettings,
+          isSelected,
+          onContextMenu: handleContextMenu,
         },
         style: {
           width: isCollapsed ? 200 : 320,
           height: isCollapsed ? 50 : Math.max(150, 50 + moduleTasks.length * 36),
           background: 'transparent',
-          border: 'none',
+          border: isSelected ? '3px solid #00d9ff' : 'none',
           borderRadius: '12px',
           padding: '0',
         },
-        zIndex: 1,
+        zIndex: isSelected ? 10 : 1,
       });
     });
 
@@ -345,7 +444,7 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
     });
 
     return { nodes, edges };
-  }, [modules, tasks, taskDependencies, collapsedModules, onTaskClick, displaySettings]);
+  }, [modules, tasks, taskDependencies, collapsedModules, selectedModuleIds, onTaskClick, displaySettings, handleContextMenu]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -370,17 +469,26 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
       // 如果没有模块数据，不加载位置
       if (!modules || modules.length === 0) return;
       
-      // 从第一个模块获取 projectId
-      const projectId = modules[0].projectId || 'default';
+      // 收集所有不同的 projectId
+      const projectIds = [...new Set(modules.map(m => m.projectId).filter(Boolean))];
+      if (projectIds.length === 0) return;
       
       try {
-        const response = await modulePositionApi.getPositions(projectId);
-        if (response.data?.positions && response.data.positions.length > 0) {
-          const positions = response.data.positions;
+        // 为每个项目加载位置
+        const allPositions: Array<{ moduleId: string; positionX: number | null; positionY: number | null }> = [];
+        
+        for (const projectId of projectIds) {
+          const response = await modulePositionApi.getPositions(projectId);
+          if (response.data?.positions) {
+            allPositions.push(...response.data.positions);
+          }
+        }
+        
+        if (allPositions.length > 0) {
           setNodes(nodes => nodes.map(node => {
             // node.id 格式为 "module-xxx"
             const moduleId = node.id.replace('module-', '');
-            const pos = positions.find(p => p.moduleId === moduleId);
+            const pos = allPositions.find(p => p.moduleId === moduleId);
             // 只有当位置不为 null 时才更新
             if (pos && pos.positionX != null && pos.positionY != null) {
               return { ...node, position: { x: pos.positionX, y: pos.positionY } };
@@ -435,13 +543,58 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
   );
 
   const onNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
+    (event: React.MouseEvent, node: Node) => {
       if (node.id.startsWith('module-')) {
         const moduleId = node.id.replace('module-', '');
-        onModuleClick?.(moduleId);
+        
+        // 处理多选逻辑
+        if (event.shiftKey) {
+          // Shift+点击：加选
+          setSelectedModuleIds(prev => {
+            const next = new Set(prev);
+            if (next.has(moduleId)) {
+              next.delete(moduleId);
+            } else {
+              next.add(moduleId);
+            }
+            console.log('[ModuleGraphView] Shift+点击，切换选中:', moduleId, '当前选中:', Array.from(next));
+            return next;
+          });
+        } else if (event.ctrlKey || event.metaKey) {
+          // Ctrl+点击：减选（如果已选中则取消，未选中则选中）
+          setSelectedModuleIds(prev => {
+            const next = new Set(prev);
+            if (next.has(moduleId)) {
+              next.delete(moduleId);
+              console.log('[ModuleGraphView] Ctrl+点击，取消选中:', moduleId);
+            } else {
+              next.add(moduleId);
+              console.log('[ModuleGraphView] Ctrl+点击，加选:', moduleId);
+            }
+            return next;
+          });
+        } else {
+          // 普通点击：覆盖选择
+          console.log('[ModuleGraphView] 普通点击，覆盖选中:', moduleId);
+          setSelectedModuleIds(new Set([moduleId]));
+          onModuleClick?.(moduleId);
+        }
       }
     },
     [onModuleClick]
+  );
+
+  // 处理选择变化（框选完成时）
+  const onSelectionChange = useCallback(
+    (params: OnSelectionChangeParams) => {
+      const selectedNodes = params.nodes.filter(n => n.id.startsWith('module-'));
+      if (selectedNodes.length > 0) {
+        const selectedIds = selectedNodes.map(n => n.id.replace('module-', ''));
+        console.log('[ModuleGraphView] 框选完成，选中模块:', selectedIds);
+        setSelectedModuleIds(new Set(selectedIds));
+      }
+    },
+    []
   );
 
   // 自定义节点类型
@@ -575,7 +728,7 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
       <div style={{ borderTop: '1px solid #3d3d5c', paddingTop: 12 }}>
         <Button
           size="small"
-          onClick={() => setDisplaySettings(defaultDisplaySettings)}
+          onClick={() => setDisplaySettings(storageDefaultDisplaySettings)}
           style={{ width: '100%' }}
         >
           重置为默认
@@ -593,7 +746,8 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         onNodeDragStop={onNodeDragStop}
-        fitView
+        onMoveEnd={onMoveEnd}
+        onSelectionChange={onSelectionChange}
         attributionPosition="bottom-left"
         style={{ background: '#0f0f23' }}
         nodeTypes={nodeTypes}
@@ -603,6 +757,12 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
           style: { stroke: '#00d9ff', strokeWidth: 2 },
         }}
         elevateEdgesOnSelect={true}
+        selectionMode={SelectionMode.Partial}
+        selectionOnDrag={true}
+        panOnDrag={[1]}
+        zoomOnScroll={true}
+        panOnScroll={false}
+        preventScrolling={true}
       >
         <Background color="#2d2d44" gap={20} />
         <Controls
@@ -666,9 +826,37 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
   );
 };
 
+// 右键菜单配置 - 在组件外部定义避免重复创建
+const moduleContextMenuItems = [
+  {
+    key: 'compile',
+    icon: <PlayCircleOutlined />,
+    label: '编译',
+  },
+  {
+    key: 'analyze',
+    icon: <ApiOutlined />,
+    label: '分析',
+  },
+  {
+    key: 'refactor',
+    icon: <ReloadOutlined />,
+    label: '重构',
+  },
+  {
+    type: 'divider' as const,
+  },
+  {
+    key: 'delete',
+    icon: <DeleteOutlined />,
+    label: '删除',
+    danger: true,
+  },
+];
+
 // 模块节点组件 - 包含任务列表
-const ModuleNodeComponent = ({ data }: { data: ModuleNodeData }) => {
-  const { label, status, collapsed, onToggle, color, tasks, taskDependencies, onTaskClick, displaySettings } = data;
+const ModuleNodeComponent: React.FC<{ data: ModuleNodeData }> = ({ data }) => {
+  const { label, status, collapsed, onToggle, color, tasks, taskDependencies, onTaskClick, displaySettings, isSelected, onContextMenu } = data;
 
   // 获取任务的依赖信息
   const getTaskDependencyInfo = (taskId: string) => {
@@ -677,20 +865,59 @@ const ModuleNodeComponent = ({ data }: { data: ModuleNodeData }) => {
     return { upstreamDeps, downstreamDeps };
   };
 
+  // 右键菜单处理
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onContextMenu) {
+      // 从当前元素的最近父元素中找到data-id
+      const nodeElement = e.currentTarget.closest('[data-id]');
+      const id = nodeElement?.getAttribute('data-id')?.replace('module-', '') || '';
+      onContextMenu(e, id);
+    }
+  };
+
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      background: color,
-      border: '2px solid #3d3d5c',
-      borderRadius: '12px',
-      padding: '0',
-      color: '#ffffff',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-    }}>
+    <Dropdown
+      menu={{
+        items: moduleContextMenuItems,
+        onClick: ({ key }) => {
+          console.log('[ModuleNodeComponent] 菜单点击:', key);
+          switch (key) {
+            case 'compile':
+              message.info(`编译模块: ${label}`);
+              break;
+            case 'analyze':
+              message.info(`分析模块: ${label}`);
+              break;
+            case 'refactor':
+              message.info(`重构模块: ${label}`);
+              break;
+            case 'delete':
+              message.warning(`删除模块: ${label}`);
+              break;
+          }
+        },
+      }}
+      trigger={['contextMenu']}
+    >
+      <div
+        onContextMenu={handleContextMenu}
+        style={{
+          width: '100%',
+          height: '100%',
+          background: color,
+          border: isSelected ? '3px solid #00d9ff' : '2px solid #3d3d5c',
+          borderRadius: '12px',
+          padding: '0',
+          color: '#ffffff',
+          boxShadow: isSelected ? '0 0 20px rgba(0, 217, 255, 0.5)' : '0 4px 12px rgba(0, 0, 0, 0.4)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          cursor: 'pointer',
+        }}
+      >
       {/* 模块头部 */}
       <div
         onClick={onToggle}
@@ -758,7 +985,8 @@ const ModuleNodeComponent = ({ data }: { data: ModuleNodeData }) => {
           )}
         </div>
       )}
-    </div>
+      </div>
+    </Dropdown>
   );
 };
 
@@ -1458,4 +1686,13 @@ if (typeof document !== 'undefined') {
   }
 }
 
-export default ModuleGraphView;
+// 包装组件，提供 ReactFlowProvider
+const ModuleGraphViewWrapper: React.FC<ModuleGraphViewProps> = (props) => {
+  return (
+    <ReactFlowProvider>
+      <ModuleGraphView {...props} />
+    </ReactFlowProvider>
+  );
+};
+
+export default ModuleGraphViewWrapper;
