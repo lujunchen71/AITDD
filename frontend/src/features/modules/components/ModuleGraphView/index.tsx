@@ -714,6 +714,12 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
             📝 提示词
           </Checkbox>
           <Checkbox
+            checked={displaySettings.showTests}
+            onChange={(e) => updateDisplaySettings('showTests', e.target.checked)}
+          >
+            🧪 测试用例
+          </Checkbox>
+          <Checkbox
             checked={displaySettings.showError}
             onChange={(e) => updateDisplaySettings('showError', e.target.checked)}
           >
@@ -1190,6 +1196,17 @@ const TaskNode: React.FC<{
           tooltipScale={displaySettings.tooltipScale}
         />
       )}
+      {displaySettings.showTests && task.tests && (
+        <InfoBadge
+          icon="🧪"
+          title="测试用例"
+          content={task.tests}
+          type="tests"
+          fontSize={displaySettings.fontSize}
+          requireAltForTooltip={displaySettings.requireAltForTooltip}
+          tooltipScale={displaySettings.tooltipScale}
+        />
+      )}
       {displaySettings.showError && task.bugLog && (
         <InfoBadge
           icon="❌"
@@ -1280,7 +1297,7 @@ const InfoBadge: React.FC<{
   icon: string;
   title: string;
   content: string;
-  type?: 'default' | 'error' | 'warning' | 'success';
+  type?: 'default' | 'error' | 'warning' | 'success' | 'tests';
   subItems?: { label: string; value: string }[];
   fontSize?: number;
   requireAltForTooltip?: boolean;
@@ -1312,6 +1329,7 @@ const InfoBadge: React.FC<{
       case 'error': return '#ff6b6b';
       case 'warning': return '#f59e0b';
       case 'success': return '#10b981';
+      case 'tests': return '#a855f7';
       default: return '#00d9ff';
     }
   };
@@ -1319,6 +1337,76 @@ const InfoBadge: React.FC<{
   const color = getColor();
   const scaledFontSize = Math.round(fontSize * tooltipScale);
   const tooltipWidth = Math.round(350 * tooltipScale);
+
+  // 解析测试用例内容
+  const renderContent = () => {
+    if (type === 'tests') {
+      try {
+        const tests = JSON.parse(content);
+        if (Array.isArray(tests)) {
+          return (
+            <div style={{
+              background: `${color}15`,
+              padding: 10,
+              borderRadius: 4,
+              fontSize: scaledFontSize,
+              color: '#ccc',
+              lineHeight: 1.5,
+              maxHeight: 300,
+              overflowY: 'auto',
+            }}>
+              {tests.map((test, idx) => (
+                <div key={idx} style={{
+                  background: '#2d2d44',
+                  padding: 8,
+                  borderRadius: 4,
+                  marginBottom: idx < tests.length - 1 ? 8 : 0,
+                }}>
+                  <div style={{ color: '#fff', fontWeight: 600, marginBottom: 4 }}>🧪 {test.name}</div>
+                  {test.description && <div style={{ color: '#aaa', marginBottom: 4 }}>{test.description}</div>}
+                  {test.precondition && (
+                    <div style={{ color: '#888', fontSize: scaledFontSize - 1, marginBottom: 4 }}>
+                      <span style={{ color: '#f59e0b' }}>前置条件:</span> {test.precondition}
+                    </div>
+                  )}
+                  {test.steps && test.steps.length > 0 && (
+                    <div style={{ marginBottom: 4 }}>
+                      <div style={{ color: '#10b981', fontSize: scaledFontSize - 1 }}>步骤:</div>
+                      {test.steps.map((step: string, stepIdx: number) => (
+                        <div key={stepIdx} style={{ color: '#ccc', fontSize: scaledFontSize - 1, paddingLeft: 8 }}>
+                          {stepIdx + 1}. {step}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {test.expected && (
+                    <div style={{ color: color, fontSize: scaledFontSize - 1 }}>
+                      <span style={{ fontWeight: 500 }}>预期:</span> {test.expected}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        }
+      } catch {
+        // 如果解析失败，显示原始内容
+      }
+    }
+    return (
+      <div style={{
+        background: `${color}15`,
+        padding: 10,
+        borderRadius: 4,
+        fontSize: scaledFontSize,
+        color: '#ccc',
+        whiteSpace: 'pre-wrap',
+        lineHeight: 1.5,
+      }}>
+        {content}
+      </div>
+    );
+  };
 
   const tooltipContent = (
     <div style={{ width: tooltipWidth }}>
@@ -1332,17 +1420,7 @@ const InfoBadge: React.FC<{
       }}>
         {title}
       </div>
-      <div style={{
-        background: `${color}15`,
-        padding: 10,
-        borderRadius: 4,
-        fontSize: scaledFontSize,
-        color: '#ccc',
-        whiteSpace: 'pre-wrap',
-        lineHeight: 1.5,
-      }}>
-        {content}
-      </div>
+      {renderContent()}
       {subItems && subItems.length > 0 && (
         <div style={{ marginTop: 8 }}>
           <div style={{ fontSize: scaledFontSize, color: '#888', marginBottom: 4 }}>关联任务：</div>

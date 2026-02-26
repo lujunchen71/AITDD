@@ -135,6 +135,7 @@ func UpdateTask(c *gin.Context) {
 		Status                   *string `json:"status"`
 		Assignee                 *string `json:"assignee"`
 		Prompt                   *string `json:"prompt"`
+		ModuleID                 *string `json:"moduleId"`
 		UpstreamContractDetail   *string `json:"upstreamContractDetail"`
 		DownstreamContractDetail *string `json:"downstreamContractDetail"`
 		Tests                    *string `json:"tests"`
@@ -178,6 +179,9 @@ func UpdateTask(c *gin.Context) {
 	}
 	if req.Prompt != nil {
 		task.Prompt = *req.Prompt
+	}
+	if req.ModuleID != nil {
+		task.ModuleID = *req.ModuleID
 	}
 	if req.UpstreamContractDetail != nil {
 		task.UpstreamContractDetail = *req.UpstreamContractDetail

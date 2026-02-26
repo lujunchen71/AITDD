@@ -30,6 +30,7 @@ export interface DisplaySettings {
   showInternalEdges: boolean;
   showCrossModuleEdges: boolean;
   showPrompt: boolean;
+  showTests: boolean;
   showError: boolean;
   showNotification: boolean;
   showStatus: boolean;
@@ -50,6 +51,7 @@ export const defaultDisplaySettings: DisplaySettings = {
   showInternalEdges: true,
   showCrossModuleEdges: true,
   showPrompt: true,
+  showTests: true,
   showError: true,
   showNotification: true,
   showStatus: true,

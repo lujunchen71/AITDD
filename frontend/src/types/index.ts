@@ -100,21 +100,13 @@ export interface ContractDetail {
   list: ContractInterfaceItem[];
 }
 
-/** 测试项 - 新格式 */
+/** 测试用例 - 实际数据格式 */
 export interface TestItem {
-  target: string;
-  api: string;
-}
-
-/** 测试用例 - 旧格式保留兼容 */
-export interface TestCase {
-  id: string;
   name: string;
-  command: string;
+  description: string;
+  precondition: string;
+  steps: string[];
   expected: string;
-  actual?: string;
-  status: 'passed' | 'failed' | 'pending';
-  ranAt?: number;
 }
 
 /** 日志条目 */

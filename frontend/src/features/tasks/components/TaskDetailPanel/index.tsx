@@ -119,12 +119,26 @@ const TestsList: React.FC<{ tests: TestItem[] }> = ({ tests }) => {
       dataSource={tests}
       renderItem={(item, index) => (
         <List.Item>
-          <Card size="small" className="w-full" title={<><Tag color="green">测试 {index + 1}</Tag></>}>
+          <Card size="small" className="w-full" title={<><Tag color="green">测试 {index + 1}</Tag> {item.name}</>}>
             <Descriptions column={1} size="small">
-              <Descriptions.Item label="测试目标">{item.target}</Descriptions.Item>
-              <Descriptions.Item label="API">
-                <Text code>{item.api}</Text>
-              </Descriptions.Item>
+              {item.description && (
+                <Descriptions.Item label="描述">{item.description}</Descriptions.Item>
+              )}
+              {item.precondition && (
+                <Descriptions.Item label="前置条件">{item.precondition}</Descriptions.Item>
+              )}
+              {item.steps && item.steps.length > 0 && (
+                <Descriptions.Item label="步骤">
+                  <ol style={{ margin: 0, paddingLeft: 20 }}>
+                    {item.steps.map((step, idx) => (
+                      <li key={idx}>{step}</li>
+                    ))}
+                  </ol>
+                </Descriptions.Item>
+              )}
+              {item.expected && (
+                <Descriptions.Item label="预期结果">{item.expected}</Descriptions.Item>
+              )}
             </Descriptions>
           </Card>
         </List.Item>

@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "aitdd": {
+      "command": "X:/AITDD/backend/mcp_server.exe",
+      "args": [],
+      "cwd": "X:/AITDD",
+      "enabled": true
+    }
+  }
+}
