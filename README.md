@@ -310,22 +310,40 @@ AITDD 提供 MCP (Model Context Protocol) 服务器，可与支持 MCP 的 AI �
    go build -o aitdd ./cmd/aitdd
    ```
 
-2. **配置 MCP 客户端**
+2. **启动后端服务**
+   ```bash
+   cd backend
+   go run ./cmd/aitdd serve
+   ```
+
+3. **配置 MCP 客户端**
    
-   在你的 AI 编程工具的 MCP 配置文件中添加：
+   在你的 AI 编程工具的 MCP 配置文件中添加（使用 SSE 传输方式）：
    ```json
    {
      "mcpServers": {
        "aitdd": {
-         "command": "X:/AITDD/backend/aitdd",
-         "args": ["mcp"],
-         "cwd": "X:/AITDD"
+         "url": "http://localhost:34567/mcp/sse",
+         "transport": "sse",
+         "enabled": true,
+         "alwaysAllow": [
+           "get_config",
+           "get_project_info",
+           "get_constitution",
+           "get_module_overview",
+           "get_module_tasks",
+           "get_task_detail",
+           "get_all_modules",
+           "get_all_task_status",
+           "update_module",
+           "update_task"
+         ]
        }
      }
    }
    ```
 
-3. **初始化项目**
+4. **初始化项目**
    
    首次使用时，通过 MCP 工具 `init_project` 选择或创建项目。
 
