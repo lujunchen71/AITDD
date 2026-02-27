@@ -298,6 +298,52 @@ Project (项目)
 
 ## 🔧 配置
 
+### MCP Server 安装
+
+AITDD 提供 MCP (Model Context Protocol) 服务器，可与支持 MCP 的 AI 编程工具（如 Kilo Code、Cursor等）集成。
+
+#### 安装步骤
+
+1. **编译后端**
+   ```bash
+   cd backend
+   go build -o aitdd ./cmd/aitdd
+   ```
+
+2. **配置 MCP 客户端**
+   
+   在你的 AI 编程工具的 MCP 配置文件中添加：
+   ```json
+   {
+     "mcpServers": {
+       "aitdd": {
+         "command": "X:/AITDD/backend/aitdd",
+         "args": ["mcp"],
+         "cwd": "X:/AITDD"
+       }
+     }
+   }
+   ```
+
+3. **初始化项目**
+   
+   首次使用时，通过 MCP 工具 `init_project` 选择或创建项目。
+
+#### 核心 MCP 工具
+
+| 工具 | 说明 |
+|------|------|
+| `init_project` | 初始化项目配置 |
+| `get_project_info` | 获取项目信息 |
+| `get_all_modules` | 获取所有模块 |
+| `get_module_tasks` | 获取模块任务列表 |
+| `get_task_detail` | 获取任务详情 |
+| `create_task` | 创建任务 |
+| `update_task` | 更新任务 |
+| `lock_resource` | 锁定资源 |
+
+> 详细 MCP 工具文档请参考 [`docs/mcp-tools-reference.md`](docs/mcp-tools-reference.md)
+
 ### 环境变量
 
 | 变量 | 默认值 | 描述 |
@@ -350,180 +396,35 @@ MIT License
 
 ```
 AITDD/
-├── backend/                       # Go 后端
-│   ├── cmd/                       # CLI 命令
-│   │   ├── aitdd/                # 主入口
-│   │   │   └── main.go
-│   │   ├── mcp/                  # MCP 服务
-│   │   │   └── main.go
-│   │   ├── init.go
-│   │   ├── root.go
-│   │   └── serve.go
-│   ├── docs/                     # 后端文档
-│   │   └── api.md
+├── backend/                # Go 后端服务
+│   ├── cmd/aitdd/         # 主入口
 │   ├── internal/
-│   │   ├── api/                  # API 层
-│   │   │   ├── handlers/         # 请求处理器
-│   │   │   │   ├── dependency.go
-│   │   │   │   ├── graph.go
-│   │   │   │   ├── lock.go
-│   │   │   │   ├── module.go
-│   │   │   │   ├── module_position.go
-│   │   │   │   ├── notification.go
-│   │   │   │   ├── project.go
-│   │   │   │   ├── prompt_version.go
-│   │   │   │   ├── response.go
-│   │   │   │   ├── task.go
-│   │   │   │   └── tools.go
-│   │   │   ├── middleware/       # 中间件
-│   │   │   │   ├── cors.go
-│   │   │   │   ├── error.go
-│   │   │   │   └── logger.go
-│   │   │   └── routes.go
-│   │   ├── database/             # 数据库初始化
-│   │   │   └── init.go
-│   │   ├── models/               # 数据模型
-│   │   │   ├── change_history.go
-│   │   │   ├── config.go
-│   │   │   ├── dependency.go
-│   │   │   ├── module.go
-│   │   │   ├── module_dependency.go
-│   │   │   ├── notification.go
-│   │   │   ├── project.go
-│   │   │   ├── prompt_version.go
-│   │   │   └── task.go
-│   │   ├── server/               # HTTP 服务器
-│   │   │   ├── http.go
-│   │   │   └── static.go
-│   │   ├── services/             # 业务逻辑
-│   │   │   ├── change_tracker.go
-│   │   │   ├── config_service.go
-│   │   │   ├── conflict_resolver.go
-│   │   │   ├── database_service.go
-│   │   │   ├── dependency_service.go
-│   │   │   ├── init_service.go
-│   │   │   ├── module_service.go
-│   │   │   ├── prompt_version_service.go
-│   │   │   ├── sync_service.go
-│   │   │   ├── task_service.go
-│   │   │   └── template_service.go
-│   │   └── websocket/            # WebSocket 支持
-│   │       ├── connection.go
-│   │       └── hub.go
-│   ├── migrations/               # 数据库迁移
-│   │   ├── 001_init.sql
-│   │   ├── 002_module_dependencies.sql
-│   │   ├── 003_prompt_versions.sql
-│   │   ├── 004_add_test_result.sql
-│   │   ├── 005_add_issue_details_rename_logs.sql
-│   │   └── 006_add_module_position.sql
-│   ├── static/                   # 静态文件
-│   ├── go.mod
-│   └── go.sum
+│   │   ├── api/           # REST API 处理器
+│   │   ├── mcp/           # MCP 服务器实现
+│   │   ├── models/        # 数据模型
+│   │   ├── services/      # 业务逻辑层
+│   │   └── database/      # 数据库初始化
+│   └── migrations/        # SQL 迁移脚本
 │
-├── debug/                        # 调试数据文件
-│   ├── aitdd_data.md
-│   ├── aitdd_example.json
-│   └── aitdd_paint.json
+├── frontend/               # React 前端
+│   └── src/
+│       ├── components/    # 通用组件
+│       ├── features/      # 功能模块
+│       ├── stores/        # Zustand 状态管理
+│       └── services/      # API 服务
 │
-├── docs/                         # 项目文档
-│   ├── development.md
-│   └── user-guide.md
-│
-├── frontend/                     # React 前端
-│   ├── src/
-│   │   ├── components/           # 通用组件
-│   │   │   ├── feedback/
-│   │   │   │   └── NotificationDropdown/
-│   │   │   └── layout/
-│   │   │       ├── Header/
-│   │   │       ├── MainLayout/
-│   │   │       └── Sidebar/
-│   │   ├── features/             # 功能模块
-│   │   │   ├── dashboard/        # 仪表盘
-│   │   │   ├── modules/          # 模块管理
-│   │   │   │   └── components/
-│   │   │   │       ├── DependencyGraph/
-│   │   │   │       ├── ModuleDetail/
-│   │   │   │       ├── ModuleForm/
-│   │   │   │       ├── ModuleGraphView/
-│   │   │   │       ├── ModuleTree/
-│   │   │   │       └── ViewSwitcher/
-│   │   │   ├── notifications/    # 通知管理
-│   │   │   ├── settings/         # 设置
-│   │   │   ├── setup/            # 初始化设置
-│   │   │   └── tasks/            # 任务管理
-│   │   │       └── components/
-│   │   │           ├── ContractEditor/
-│   │   │           ├── DependencyList/
-│   │   │           ├── LockButton/
-│   │   │           ├── LockStatus/
-│   │   │           ├── TaskDetailPanel/
-│   │   │           ├── TaskForm/
-│   │   │           ├── TaskGraph/
-│   │   │           └── TaskList/
-│   │   ├── hooks/                # 自定义 Hooks
-│   │   │   └── useWebSocket.ts
-│   │   ├── services/             # API 服务
-│   │   │   └── api.ts
-│   │   ├── stores/               # 状态管理
-│   │   │   ├── useProjectStore.ts
-│   │   │   └── useUIStore.ts
-│   │   ├── types/                # TypeScript 类型
-│   │   │   ├── api.ts
-│   │   │   ├── common.ts
-│   │   │   └── index.ts
-│   │   ├── App.tsx
-│   │   ├── App.css
-│   │   ├── main.tsx
-│   │   ├── index.css
-│   │   └── vite-env.d.ts
-│   ├── index.html
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── vite.config.ts
-│   └── tailwind.config.js
-│
-├── plans/                        # 设计方案
-│   ├── module-position-persistence-design.md
-│   └── module-task-architecture-analysis.md
-│
-├── scripts/                      # 脚本工具
-│   ├── build.sh
-│   ├── create-demo-data.js
-│   ├── import-aitdd-data.js
-│   ├── release.sh
-│   └── verify-db.js
-│
-├── specs/                        # 规格文档
-│   ├── 001-visual-task-governance/
-│   │   ├── spec.md
-│   │   ├── plan.md
-│   │   ├── data-model.md
-│   │   ├── frontend-architecture.md
-│   │   ├── installation-guide.md
-│   │   ├── tasks.md
-│   │   ├── checklists/
-│   │   │   ├── api.md
-│   │   │   └── requirements.md
-│   │   └── contracts/
-│   │       └── api-contracts.md
-│   ├── 002-ai-integration-architecture/
-│   │   ├── plan.md
-│   │   └── refactor-plan.md
-│   ├── 003-visual-dependency-graph/
-│   │   └── architecture.md
-│   └── 004-task-handoff-summary.md
-│
-├── .gitignore
-├── clear-database.bat            # 清理数据库脚本
-├── start-backend.bat             # Windows 后端启动脚本
-├── start-frontend.bat            # Windows 前端启动脚本
-├── package.json
-├── package-lock.json
-└── README.md
+├── docs/                   # 项目文档
+├── scripts/                # 工具脚本
+└── specs/                  # 规格文档
 ```
 
----
+### 重点目录说明
 
-**Built with ❤️ using Go, React, and SQLite**
+| 目录 | 说明 |
+|------|------|
+| `backend/internal/mcp/` | MCP 服务器核心实现，包含所有工具定义 |
+| `backend/internal/api/handlers/` | REST API 处理器 |
+| `backend/internal/services/` | 业务逻辑层，处理 pathName 级联更新等 |
+| `frontend/src/features/` | 前端功能模块（模块树、任务图等） |
+
+---
