@@ -1,8 +1,63 @@
 # AITDD MCP 完整实现方案设计文档
 
+## 概述
+
+本文档描述 AITDD MCP（Model Context Protocol）的实现方案。MCP 服务已从独立的可执行文件重构为 SSE（Server-Sent Events）模式，集成到后端 HTTP 服务中。
+
+### 架构演进
+
+| 版本 | 架构模式 | 启动方式 | 端点 |
+|------|---------|---------|------|
+| 旧版 | Stdio 模式 | 独立的 `mcp.exe` | 本地可执行文件 |
+| 新版 | SSE 模式 | 集成到后端服务 | `http://localhost:34567/mcp/sse` |
+
+---
+
 ## 一、整体架构
 
-### 1.1 系统架构图
+### 1.1 新架构（SSE 模式）
+
+```mermaid
+graph TB
+    subgraph "AI Agent"
+        Agent[AI 编码代理]
+    end
+    
+    subgraph "Backend HTTP Server :34567"
+        subgraph "MCP Layer"
+            MCP[MCP SSE Server]
+            Config[.aitdd/config.json]
+            Rule[.aitdd/rule.json]
+        end
+        API[REST API /api/v1]
+        WS[WebSocket]
+    end
+    
+    subgraph "Storage"
+        DB[(SQLite Database)]
+    end
+    
+    subgraph "Frontend"
+        UI[Web UI]
+    end
+    
+    Agent -->|SSE /mcp/sse| MCP
+    MCP -->|Read| Config
+    MCP -->|Read| Rule
+    MCP -->|Internal Call| API
+    Agent -->|HTTP| API
+    API -->|CRUD| DB
+    WS -->|Real-time| UI
+    API -->|Serve Static| UI
+```
+
+**关键特点：**
+- MCP 服务通过 SSE 协议集成到后端 HTTP 服务
+- 只需启动一个后端服务（`aitdd serve`），MCP 自动可用
+- MCP 端点：`http://localhost:34567/mcp/sse`
+- 无需单独的 MCP 可执行文件
+
+### 1.2 旧架构（Stdio 模式 - 已废弃）
 
 ```mermaid
 graph TB
@@ -11,7 +66,7 @@ graph TB
     end
     
     subgraph MCP Layer
-        MCP[MCP Server]
+        MCP[mcp.exe]
         Config[.aitdd/config.json]
         Rule[.aitdd/rule.json]
     end
@@ -26,7 +81,7 @@ graph TB
         UI[Web UI :5173]
     end
     
-    Agent -->|MCP Protocol| MCP
+    Agent -->|Stdio Protocol| MCP
     MCP -->|Read| Config
     MCP -->|Read| Rule
     MCP -->|HTTP Request| API
@@ -35,7 +90,19 @@ graph TB
     API -->|Serve| UI
 ```
 
-### 1.2 数据流架构
+### 1.3 架构对比
+
+| 特性 | SSE 模式（当前） | Stdio 模式（旧版） |
+|------|-----------------|-------------------|
+| 启动方式 | 后端服务自动启动 | 需要单独的 mcp.exe |
+| 端点 | `http://localhost:34567/mcp/sse` | 本地可执行文件 |
+| 配置格式 | 使用 `url` 字段 | 使用 `command` 字段 |
+| 进程管理 | 由后端服务统一管理 | 需要独立管理进程 |
+| 资源占用 | 共享后端服务资源 | 独立进程资源 |
+| 调试 | 与后端日志统一 | 独立日志输出 |
+| 网络通信 | SSE over HTTP | 标准输入/输出 |
+
+### 1.4 数据流架构（SSE 模式）
 
 ```mermaid
 sequenceDiagram
@@ -1793,14 +1860,145 @@ flowchart TD
 
 ---
 
-## 九、总结
+## 九、SSE 模式实现细节
+
+### 9.1 SSE 服务端实现
+
+MCP SSE 服务集成在后端 HTTP 服务器中，通过 `/mcp/sse` 端点提供服务。
+
+**核心代码结构：**
+
+```go
+// HTTPServer HTTP服务器
+type HTTPServer struct {
+    port      int
+    server    *http.Server
+    mcpServer *mcp.MCPServer
+}
+
+// Start 启动服务器
+func (s *HTTPServer) Start() error {
+    // 设置路由
+    router := api.SetupRouter()
+
+    // 配置静态文件服务
+    s.setupStaticFiles(router)
+
+    // 创建 ServeMux 用于组合 Gin 路由和 MCP SSE 路由
+    mux := http.NewServeMux()
+
+    // 注册 MCP SSE 端点到 /mcp 路径
+    s.mcpServer.RegisterSSERoutes(mux, "/mcp")
+
+    // 将 Gin 路由作为默认处理器
+    mux.Handle("/", router)
+
+    // 创建HTTP服务器
+    s.server = &http.Server{
+        Addr:         fmt.Sprintf(":%d", s.port),
+        Handler:      mux,
+        ReadTimeout:  10 * time.Second,
+        WriteTimeout: 10 * time.Second,
+        IdleTimeout:  60 * time.Second,
+    }
+
+    // 启动服务器
+    return s.server.ListenAndServe()
+}
+```
+
+### 9.2 SSE 端点说明
+
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/mcp/sse` | GET | SSE 连接端点，用于建立长连接 |
+| `/mcp/message` | POST | 发送消息到 MCP 服务器 |
+
+### 9.3 客户端配置示例
+
+**KiloCode 配置（`.kilocode/mcp.json`）：**
+
+```json
+{
+  "mcpServers": {
+    "aitdd": {
+      "url": "http://localhost:34567/mcp/sse",
+      "enabled": true
+    }
+  }
+}
+```
+
+**VS Code / Cursor 配置：**
+
+```json
+{
+  "mcp.servers": {
+    "aitdd": {
+      "url": "http://localhost:34567/mcp/sse"
+    }
+  }
+}
+```
+
+**Claude Desktop 配置：**
+
+```json
+{
+  "mcpServers": {
+    "aitdd": {
+      "url": "http://localhost:34567/mcp/sse"
+    }
+  }
+}
+```
+
+### 9.4 SSE 模式优势
+
+1. **简化部署**：只需启动一个后端服务，MCP 自动可用
+2. **统一管理**：MCP 与 REST API 共享同一服务进程
+3. **资源效率**：共享数据库连接和配置
+4. **调试便利**：统一的日志输出
+5. **网络友好**：支持远程连接（不同于 Stdio 模式）
+
+### 9.5 启动步骤
+
+```bash
+# 1. 进入后端目录
+cd backend
+
+# 2. 编译后端服务（可选，如果已有可执行文件）
+go build -o aitdd.exe ./cmd/aitdd
+
+# 3. 启动后端服务
+aitdd.exe serve
+
+# 服务启动后：
+# - REST API: http://localhost:34567/api/v1
+# - MCP SSE: http://localhost:34567/mcp/sse
+# - Web UI: http://localhost:34567/
+```
+
+---
+
+## 十、总结
 
 本设计文档定义了 AITDD MCP 的完整实现方案，包括：
 
-1. **配置文件结构** - `.aitdd/config.json` 和 `.aitdd/rule.json`
-2. **17 个 MCP 工具** - 覆盖获取、修改、错误处理、状态和检查五大类
-3. **26 条检查规则** - 11 条静态规则 + 15 条动态规则
-4. **与后端 API 的完整映射** - 确保与现有系统的兼容性
-5. **检查报告格式** - Markdown 和 JSON 两种格式
+1. **SSE 模式架构** - 集成到后端 HTTP 服务，通过 `/mcp/sse` 端点提供服务
+2. **配置文件结构** - `.aitdd/config.json` 和 `.aitdd/rule.json`
+3. **17 个 MCP 工具** - 覆盖获取、修改、错误处理、状态和检查五大类
+4. **26 条检查规则** - 11 条静态规则 + 15 条动态规则
+5. **与后端 API 的完整映射** - 确保与现有系统的兼容性
+6. **检查报告格式** - Markdown 和 JSON 两种格式
+
+### 架构演进总结
+
+| 项目 | 旧版（Stdio） | 新版（SSE） |
+|------|-------------|------------|
+| 启动命令 | `mcp.exe` | `aitdd serve`（自动包含 MCP） |
+| 配置字段 | `command` | `url` |
+| 进程数 | 2（后端 + MCP） | 1（统一后端） |
+| 端点 | 本地可执行文件 | `http://localhost:34567/mcp/sse` |
 
 该方案遵循 MCP 协议规范，与现有后端 API 无缝集成，为 AI 编码代理提供完整的项目管理和检查能力。

@@ -1,10 +1,16 @@
 package api
 
 import (
+	"net/http"
+
 	"github.com/aitdd/backend/internal/api/handlers"
 	"github.com/aitdd/backend/internal/api/middleware"
+	"github.com/aitdd/backend/internal/mcp"
 	"github.com/gin-gonic/gin"
 )
+
+// 全局 MCP 服务器实例
+var mcpServer = mcp.NewMCPServer()
 
 // SetupRouter 设置路由
 func SetupRouter() *gin.Engine {
@@ -14,6 +20,9 @@ func SetupRouter() *gin.Engine {
 	r.Use(middleware.Logger())
 	r.Use(middleware.ErrorHandler())
 	r.Use(middleware.CORS())
+
+	// 注册 MCP SSE 路由
+	registerMCPRoutes(r)
 
 	// API v1
 	v1 := r.Group("/api/v1")
@@ -123,4 +132,24 @@ func SetupRouter() *gin.Engine {
 	})
 
 	return r
+}
+
+// registerMCPRoutes 注册 MCP SSE 路由
+func registerMCPRoutes(r *gin.Engine) {
+	sseServer := mcpServer.NewSSEServer("/mcp")
+
+	// 注册 SSE 端点
+	r.GET("/mcp/sse", func(c *gin.Context) {
+		sseServer.SSEHandler().ServeHTTP(c.Writer, c.Request)
+	})
+	r.POST("/mcp/message", func(c *gin.Context) {
+		sseServer.MessageHandler().ServeHTTP(c.Writer, c.Request)
+	})
+}
+
+// wrapHandler 将 http.Handler 包装为 Gin 处理函数
+func wrapHandler(h http.Handler) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		h.ServeHTTP(c.Writer, c.Request)
+	}
 }

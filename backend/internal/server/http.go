@@ -24,11 +24,8 @@ func NewHTTPServer(port int) *HTTPServer {
 
 // Start 启动服务器
 func (s *HTTPServer) Start() error {
-	// 设置路由
+	// 设置路由（MCP SSE 路由已在 routes.go 中注册）
 	router := api.SetupRouter()
-
-	// 配置静态文件服务
-	s.setupStaticFiles(router)
 
 	// 创建HTTP服务器
 	s.server = &http.Server{
@@ -53,9 +50,4 @@ func (s *HTTPServer) Stop() error {
 	defer cancel()
 
 	return s.server.Shutdown(ctx)
-}
-
-// setupStaticFiles 设置静态文件服务
-func (s *HTTPServer) setupStaticFiles(router http.Handler) {
-	// 静态文件服务在 routes.go 中处理
 }

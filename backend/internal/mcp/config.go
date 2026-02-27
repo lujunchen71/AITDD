@@ -1,4 +1,6 @@
-package main
+// Package mcp 提供 MCP (Model Context Protocol) 服务器功能
+// 支持通过 SSE 模式集成到 HTTP 服务器中
+package mcp
 
 import (
 	"encoding/json"
@@ -37,10 +39,47 @@ type ConfigManager struct {
 var globalConfigManager *ConfigManager
 var configOnce sync.Once
 
+// findProjectConfigPath 从当前目录向上查找项目配置文件路径
+func findProjectConfigPath() string {
+	// 首先检查环境变量
+	if envPath := os.Getenv("AITDD_CONFIG_PATH"); envPath != "" {
+		return envPath
+	}
+
+	// 获取当前工作目录
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ".aitdd/project.json"
+	}
+
+	// 从当前目录向上查找.aitdd目录
+	dir := cwd
+	for {
+		configPath := filepath.Join(dir, ".aitdd", "project.json")
+		if _, err := os.Stat(configPath); err == nil {
+			return configPath
+		}
+
+		// 检查.aitdd目录是否存在
+		aitddDir := filepath.Join(dir, ".aitdd")
+		if _, err := os.Stat(aitddDir); err == nil {
+			return configPath
+		}
+
+		// 向上一级目录
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// 已经到达根目录，使用当前工作目录
+			return filepath.Join(cwd, ".aitdd", "project.json")
+		}
+		dir = parent
+	}
+}
+
 // GetConfigManager 获取配置管理器单例
 func GetConfigManager() *ConfigManager {
 	configOnce.Do(func() {
-		configPath := ".aitdd/config.json"
+		configPath := findProjectConfigPath()
 		globalConfigManager = &ConfigManager{
 			configPath: configPath,
 		}
@@ -48,6 +87,15 @@ func GetConfigManager() *ConfigManager {
 		_ = globalConfigManager.Load()
 	})
 	return globalConfigManager
+}
+
+// NewConfigManager 创建新的配置管理器（用于测试或自定义路径）
+func NewConfigManager(configPath string) *ConfigManager {
+	cm := &ConfigManager{
+		configPath: configPath,
+	}
+	_ = cm.Load()
+	return cm
 }
 
 // Load 加载配置文件

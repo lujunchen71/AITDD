@@ -1,10 +1,1 @@
-{
-  "servers": {
-    "aitdd": {
-      "command": "X:/AITDD/backend/mcp_server.exe",
-      "args": [],
-      "cwd": "X:/AITDD",
-      "enabled": true
-    }
-  }
-}
+{"mcpServers":{"aitdd":{"url":"http://localhost:34567/mcp/sse","transport":"sse","enabled":true,"alwaysAllow":["get_config","get_project_info","get_all_modules","set_project","init_project","get_constitution","get_module_overview","create_module_dependency","get_module_tasks","create_task_dependency"],"disabled":false}}}

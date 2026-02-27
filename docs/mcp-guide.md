@@ -16,7 +16,7 @@
 
 ### 1.1 AITDD MCP 简介
 
-AITDD MCP（Model Context Protocol）是一个为 AI 编码代理（如 Claude、Cursor 等）提供的工具服务，用于与 AITDD 项目管理系统进行交互。通过 MCP 协议，AI 代理可以：
+AITDD MCP（Model Context Protocol）是一个为 AI 编码代理（如 Claude、Cursor、KiloCode 等）提供的工具服务，用于与 AITDD 项目管理系统进行交互。通过 MCP 协议，AI 代理可以：
 
 - 获取项目和模块信息
 - 管理任务和模块
@@ -34,44 +34,48 @@ AITDD MCP（Model Context Protocol）是一个为 AI 编码代理（如 Claude�
 
 ### 1.3 架构图
 
+**新架构（SSE 模式）**：
+
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   AI Agent      │────▶│   MCP Server    │────▶│   Backend API   │
-│ (Claude/Cursor) │     │   (aitdd-mcp)   │     │   (:34567)      │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │                        │
-                               ▼                        ▼
-                        ┌─────────────────┐     ┌─────────────────┐
-                        │ .aitdd/config   │     │    Database     │
-                        │ .aitdd/rule     │     │    (SQLite)     │
-                        └─────────────────┘     └─────────────────┘
+┌─────────────────┐     SSE      ┌─────────────────────────────────────┐
+│   AI Agent      │◀────────────▶│        Backend HTTP Server          │
+│ (Claude/Cursor) │              │           (:34567)                  │
+└─────────────────┘              │  ┌─────────────┐ ┌───────────────┐  │
+                                 │  │ REST API    │ │ MCP SSE       │  │
+                                 │  │ /api/v1/*   │ │ /mcp/sse      │  │
+                                 │  └─────────────┘ └───────────────┘  │
+                                 └──────────────────┬──────────────────┘
+                                                    │
+                         ┌─────────────────┐        ▼        ┌─────────────────┐
+                         │ .aitdd/config   │◀───────────────▶│    Database     │
+                         │ .aitdd/rule     │                 │    (SQLite)     │
+                         └─────────────────┘                 └─────────────────┘
 ```
+
+**关键特点**：
+- MCP 服务通过 SSE（Server-Sent Events）协议集成到后端 HTTP 服务
+- 只需启动一个后端服务，MCP 自动可用
+- MCP 端点：`http://localhost:34567/mcp/sse`
+- 无需单独的 MCP 可执行文件
 
 ---
 
 ## 2. 安装配置
 
-### 2.1 编译 MCP 服务器
+### 2.1 前置条件
 
-AITDD MCP 服务器使用 Go 语言编写，需要先编译后使用。
+在配置 MCP 之前，请确保：
 
-```bash
-# 进入后端目录
-cd backend
+1. **后端服务已启动**：MCP 服务集成在后端 HTTP 服务中
+   ```bash
+   cd backend
+   aitdd.exe serve
+   # 后端服务启动后，MCP 端点自动可用
+   ```
 
-# 编译 MCP 服务器
-go build -o aitdd-mcp ./cmd/mcp
-
-# 将可执行文件移动到 PATH 中或项目根目录
-mv aitdd-mcp ../
-```
-
-或者使用提供的构建脚本：
-
-```bash
-# 使用构建脚本
-bash scripts/build.sh
-```
+2. **服务端点**：
+   - REST API: `http://localhost:34567/api/v1`
+   - MCP SSE: `http://localhost:34567/mcp/sse`
 
 ### 2.2 配置文件说明（`.aitdd/config.json`）
 
@@ -95,15 +99,15 @@ bash scripts/build.sh
 **字段说明：**
 
 | 字段路径 | 类型 | 必填 | 说明 |
-|---------|------|------|------|
-| `projectId` | string | 是 | 项目唯一标识符 |
-| `projectName` | string | 是 | 项目名称 |
-| `apiBaseUrl` | string | 是 | 后端 API 基础地址 |
-| `mcp.serverName` | string | 是 | MCP 服务器名称 |
-| `mcp.version` | string | 是 | MCP 服务器版本 |
-| `mcp.description` | string | 否 | MCP 服务描述 |
-| `createdAt` | string | 否 | 创建时间（RFC3339格式） |
-| `updatedAt` | string | 否 | 更新时间（RFC3339格式） |
+| |---------|------|------|------|
+| | `projectId` | string | 是 | 项目唯一标识符 |
+| | `projectName` | string | 是 | 项目名称 |
+| | `apiBaseUrl` | string | 是 | 后端 API 基础地址 |
+| | `mcp.serverName` | string | 是 | MCP 服务器名称 |
+| | `mcp.version` | string | 是 | MCP 服务器版本 |
+| | `mcp.description` | string | 否 | MCP 服务描述 |
+| | `createdAt` | string | 否 | 创建时间（RFC3339格式） |
+| | `updatedAt` | string | 否 | 更新时间（RFC3339格式） |
 
 ### 2.3 规则文件说明（`.aitdd/rule.json`）
 
@@ -156,11 +160,43 @@ bash scripts/build.sh
 
 ## 3. 在不同IDE中集成
 
-### 3.1 VS Code / Cursor 配置
+### 3.1 KiloCode 配置（推荐）
+
+KiloCode 使用项目根目录下的 `.kilocode/mcp.json` 文件配置 MCP 服务器。
+
+**配置步骤：**
+
+1. 在项目根目录创建 `.kilocode` 目录（如果不存在）
+2. 创建或编辑 `.kilocode/mcp.json` 文件
+
+**配置示例（SSE 模式）：**
+
+```json
+{
+  "mcpServers": {
+    "aitdd": {
+      "url": "http://localhost:34567/mcp/sse",
+      "enabled": true
+    }
+  }
+}
+```
+
+**重要说明：**
+- `mcpServers`: **必需** - KiloCode 要求使用此字段名（不是 `servers`）
+- `url`: MCP SSE 端点地址（后端服务启动后自动可用）
+- `enabled`: 设置为 `true` 启用服务器
+
+**配置完成后：**
+1. 确保后端服务已启动（`aitdd serve`）
+2. 重启 KiloCode 或重新加载窗口
+3. MCP 服务器会自动连接
+
+### 3.2 VS Code / Cursor 配置
 
 在 VS Code 或 Cursor 中，需要编辑 `settings.json` 文件来配置 MCP 服务器。
 
-**方式一：使用本地可执行文件**
+**SSE 模式配置：**
 
 打开 VS Code 设置（`Ctrl + Shift + P` -> "Open User Settings (JSON)"），添加以下配置：
 
@@ -168,46 +204,13 @@ bash scripts/build.sh
 {
   "mcp.servers": {
     "aitdd": {
-      "command": "/path/to/aitdd-mcp",
-      "args": [],
-      "cwd": "${workspaceFolder}"
+      "url": "http://localhost:34567/mcp/sse"
     }
   }
 }
 ```
 
-**方式二：使用 npx 运行**
-
-```json
-{
-  "mcp.servers": {
-    "aitdd": {
-      "command": "npx",
-      "args": ["-y", "aitdd-mcp"],
-      "cwd": "${workspaceFolder}"
-    }
-  }
-}
-```
-
-**完整配置示例：**
-
-```json
-{
-  "mcp.servers": {
-    "aitdd": {
-      "command": "X:/AITDD/aitdd-mcp.exe",
-      "args": [],
-      "cwd": "X:/AITDD",
-      "env": {
-        "AITDD_API_URL": "http://localhost:34567/api/v1"
-      }
-    }
-  }
-}
-```
-
-### 3.2 Claude Desktop 配置
+### 3.3 Claude Desktop 配置
 
 在 Claude Desktop 中配置 MCP 服务器，需要编辑 `claude_desktop_config.json` 文件。
 
@@ -221,55 +224,46 @@ bash scripts/build.sh
 ~/Library/Application Support/Claude/claude_desktop_config.json
 ```
 
-**配置示例：**
+**配置示例（SSE 模式）：**
 
 ```json
 {
   "mcpServers": {
     "aitdd": {
-      "command": "X:/AITDD/aitdd-mcp.exe",
-      "args": [],
-      "cwd": "X:/AITDD"
+      "url": "http://localhost:34567/mcp/sse"
     }
   }
 }
 ```
 
-**使用 npx 运行：**
-
-```json
-{
-  "mcpServers": {
-    "aitdd": {
-      "command": "npx",
-      "args": ["-y", "aitdd-mcp"],
-      "cwd": "X:/AITDD"
-    }
-  }
-}
-```
-
-### 3.3 其他支持MCP的IDE
+### 3.4 其他支持MCP的IDE
 
 对于其他支持 MCP 协议的 IDE 或工具，配置方式类似：
 
 1. **找到 MCP 服务器配置文件位置**
 2. **添加 AITDD MCP 服务器配置**
-3. **指定可执行文件路径和工作目录**
+3. **指定 SSE 端点 URL**
 
-**通用配置格式：**
+**通用配置格式（SSE 模式）：**
 
 ```json
 {
   "mcpServers": {
     "aitdd": {
-      "command": "/path/to/aitdd-mcp",
-      "args": [],
-      "cwd": "/path/to/project"
+      "url": "http://localhost:34567/mcp/sse"
     }
   }
 }
 ```
+
+### 3.5 配置验证
+
+配置完成后，可以通过以下方式验证 MCP 服务器是否正常工作：
+
+1. **确保后端服务运行**：访问 `http://localhost:34567/api/v1/projects` 确认服务正常
+2. **检查 MCP 服务器状态**：在 IDE 的 MCP 面板中查看 aitdd 服务器是否显示为已连接
+3. **调用 `get_config` 工具**：如果能成功返回配置信息，说明 MCP 服务器正常工作
+4. **检查后端连接**：调用 `init_project` 工具，如果能返回项目列表，说明后端 API 连接正常
 
 ---
 
@@ -324,9 +318,9 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| projectId | string | 是 | 项目 ID |
-| projectName | string | 是 | 项目名称 |
+| |--------|------|------|------|
+| | projectId | string | 是 | 项目 ID |
+| | projectName | string | 是 | 项目名称 |
 
 **返回示例：**
 ```json
@@ -347,8 +341,8 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| projectId | string | 否 | 项目ID，不传则使用配置文件中的项目ID |
+| |--------|------|------|------|
+| | projectId | string | 否 | 项目ID，不传则使用配置文件中的项目ID |
 
 **返回示例：**
 ```json
@@ -376,8 +370,8 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| projectId | string | 否 | 项目ID，不传则使用配置文件中的项目ID |
+| |--------|------|------|------|
+| | projectId | string | 否 | 项目ID，不传则使用配置文件中的项目ID |
 
 **返回示例：**
 ```json
@@ -401,9 +395,9 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| projectId | string | 否 | 项目ID，不传则使用配置文件中的项目ID |
-| includeStats | boolean | 否 | 是否包含统计信息 |
+| |--------|------|------|------|
+| | projectId | string | 否 | 项目ID，不传则使用配置文件中的项目ID |
+| | includeStats | boolean | 否 | 是否包含统计信息 |
 
 **返回示例：**
 ```json
@@ -430,9 +424,9 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| moduleId | string | 是 | 模块 ID |
-| includeContracts | boolean | 否 | 是否包含契约信息 |
+| |--------|------|------|------|
+| | moduleId | string | 是 | 模块 ID |
+| | includeContracts | boolean | 否 | 是否包含契约信息 |
 
 **返回示例：**
 ```json
@@ -458,8 +452,8 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| taskId | string | 是 | 任务 ID |
+| |--------|------|------|------|
+| | taskId | string | 是 | 任务 ID |
 
 **返回示例：**
 ```json
@@ -488,9 +482,9 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| taskId | string | 是 | 任务 ID |
-| direction | string | 否 | 方向：upstream/downstream/both，默认 both |
+| |--------|------|------|------|
+| | taskId | string | 是 | 任务 ID |
+| | direction | string | 否 | 方向：upstream/downstream/both，默认 both |
 
 **返回示例：**
 ```json
@@ -524,9 +518,9 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| moduleId | string | 是 | 模块 ID |
-| force | boolean | 否 | 是否强制删除（即使有依赖） |
+| |--------|------|------|------|
+| | moduleId | string | 是 | 模块 ID |
+| | force | boolean | 否 | 是否强制删除（即使有依赖） |
 
 **返回示例：**
 ```json
@@ -545,12 +539,12 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| name | string | 是 | 模块名称 |
-| description | string | 否 | 模块描述 |
-| prompt | string | 否 | 模块提示词 |
-| parentId | string | 否 | 父模块ID |
-| projectId | string | 否 | 项目ID，不传则使用配置文件中的项目ID |
+| |--------|------|------|------|
+| | name | string | 是 | 模块名称 |
+| | description | string | 否 | 模块描述 |
+| | prompt | string | 否 | 模块提示词 |
+| | parentId | string | 否 | 父模块ID |
+| | projectId | string | 否 | 项目ID，不传则使用配置文件中的项目ID |
 
 **返回示例：**
 ```json
@@ -571,13 +565,13 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| moduleId | string | 是 | 模块 ID |
-| name | string | 否 | 模块名称 |
-| description | string | 否 | 模块描述 |
-| prompt | string | 否 | 模块提示词 |
-| status | string | 否 | 模块状态 |
-| version | number | 是 | 当前版本号（用于乐观锁） |
+| |--------|------|------|------|
+| | moduleId | string | 是 | 模块 ID |
+| | name | string | 否 | 模块名称 |
+| | description | string | 否 | 模块描述 |
+| | prompt | string | 否 | 模块提示词 |
+| | status | string | 否 | 模块状态 |
+| | version | number | 是 | 当前版本号（用于乐观锁） |
 
 **返回示例：**
 ```json
@@ -597,9 +591,9 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| moduleId | string | 是 | 模块 ID |
-| force | boolean | 否 | 是否强制删除（即使有依赖） |
+| |--------|------|------|------|
+| | moduleId | string | 是 | 模块 ID |
+| | force | boolean | 否 | 是否强制删除（即使有依赖） |
 
 **返回示例：**
 ```json
@@ -619,15 +613,15 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| moduleId | string | 是 | 模块 ID |
-| name | string | 是 | 任务名称 |
-| description | string | 否 | 任务描述 |
-| prompt | string | 否 | 任务提示词 |
-| upstreamContractDetail | string | 否 | 上游契约详情JSON |
-| downstreamContractDetail | string | 否 | 下游契约详情JSON |
-| tests | string | 否 | 测试用例JSON数组 |
-| codePaths | string | 否 | 代码路径JSON数组 |
+| |--------|------|------|------|
+| | moduleId | string | 是 | 模块 ID |
+| | name | string | 是 | 任务名称 |
+| | description | string | 否 | 任务描述 |
+| | prompt | string | 否 | 任务提示词 |
+| | upstreamContractDetail | string | 否 | 上游契约详情JSON |
+| | downstreamContractDetail | string | 否 | 下游契约详情JSON |
+| | tests | string | 否 | 测试用例JSON数组 |
+| | codePaths | string | 否 | 代码路径JSON数组 |
 
 **返回示例：**
 ```json
@@ -647,9 +641,9 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| moduleId | string | 是 | 模块 ID |
-| moduleJson | string | 是 | 完整的模块JSON数据 |
+| |--------|------|------|------|
+| | moduleId | string | 是 | 模块 ID |
+| | moduleJson | string | 是 | 完整的模块JSON数据 |
 
 **返回示例：**
 ```json
@@ -668,9 +662,9 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| taskId | string | 是 | 任务 ID |
-| taskJson | string | 是 | 完整的任务JSON数据 |
+| |--------|------|------|------|
+| | taskId | string | 是 | 任务 ID |
+| | taskJson | string | 是 | 完整的任务JSON数据 |
 
 **返回示例：**
 ```json
@@ -691,10 +685,10 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| projectId | string | 否 | 项目ID，不传则使用配置文件中的项目ID |
-| status | string | 否 | 状态过滤 |
-| includeLockInfo | boolean | 否 | 是否包含锁定信息 |
+| |--------|------|------|------|
+| | projectId | string | 否 | 项目ID，不传则使用配置文件中的项目ID |
+| | status | string | 否 | 状态过滤 |
+| | includeLockInfo | boolean | 否 | 是否包含锁定信息 |
 
 **返回示例：**
 ```json
@@ -725,9 +719,9 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| moduleId | string | 是 | 模块 ID |
-| includeLockInfo | boolean | 否 | 是否包含锁定信息 |
+| |--------|------|------|------|
+| | moduleId | string | 是 | 模块 ID |
+| | includeLockInfo | boolean | 否 | 是否包含锁定信息 |
 
 **返回示例：**
 ```json
@@ -761,10 +755,10 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| projectId | string | 否 | 项目ID，不传则使用配置文件中的项目ID |
-| severity | string | 否 | 严重级别过滤：error/warning/info |
-| includeDetails | boolean | 否 | 是否包含详细信息 |
+| |--------|------|------|------|
+| | projectId | string | 否 | 项目ID，不传则使用配置文件中的项目ID |
+| | severity | string | 否 | 严重级别过滤：error/warning/info |
+| | includeDetails | boolean | 否 | 是否包含详细信息 |
 
 **返回示例：**
 ```json
@@ -796,10 +790,10 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| moduleId | string | 是 | 模块 ID |
-| severity | string | 否 | 严重级别过滤 |
-| includeDetails | boolean | 否 | 是否包含详细信息 |
+| |--------|------|------|------|
+| | moduleId | string | 是 | 模块 ID |
+| | severity | string | 否 | 严重级别过滤 |
+| | includeDetails | boolean | 否 | 是否包含详细信息 |
 
 **返回示例：**
 ```json
@@ -828,11 +822,11 @@ bash scripts/build.sh
 **参数：**
 
 | 参数名 | 类型 | 必填 | 描述 |
-|--------|------|------|------|
-| moduleId | string | 是 | 模块 ID |
-| rules | array | 否 | 指定检查规则ID列表，不传则检查所有 |
-| includeDynamic | boolean | 否 | 是否包含动态检查，默认 true |
-| format | string | 否 | 输出格式：json/markdown，默认 json |
+| |--------|------|------|------|
+| | moduleId | string | 是 | 模块 ID |
+| | rules | array | 否 | 指定检查规则ID列表，不传则检查所有 |
+| | includeDynamic | boolean | 否 | 是否包含动态检查，默认 true |
+| | format | string | 否 | 输出格式：json/markdown，默认 json |
 
 **返回示例：**
 ```json
@@ -948,52 +942,52 @@ AI: 我来检查用户模块。
 静态检查规则用于检查模块和任务的数据完整性和格式正确性。
 
 | 规则ID | 名称 | 严重级别 | 描述 |
-|--------|------|----------|------|
-| S-01 | 根对象结构检查 | error | 根对象必须包含 project、modules、tasks、taskDependencies 四个顶级字段 |
-| S-02 | 项目对象检查 | error | project 对象必须包含 name 和 description 字段 |
-| S-03 | 模块数组检查 | error | modules 数组至少包含一个模块 |
-| S-04 | 模块对象字段检查 | error | 每个模块对象必须包含 id、name、description、status、file_path |
-| S-05 | 模块ID格式检查 | error | 模块 id 必须符合格式 mod-{模块名缩写} |
-| S-06 | 模块状态检查 | error | 模块 status 必须是 designing/developing/completed/deprecated 之一 |
-| S-07 | 模块路径检查 | error | 模块 file_path 不能为空字符串 |
+| |--------|------|----------|------|
+| | S-01 | 根对象结构检查 | error | 根对象必须包含 project、modules、tasks、taskDependencies 四个顶级字段 |
+| | S-02 | 项目对象检查 | error | project 对象必须包含 name 和 description 字段 |
+| | S-03 | 模块数组检查 | error | modules 数组至少包含一个模块 |
+| | S-04 | 模块对象字段检查 | error | 每个模块对象必须包含 id、name、description、status、file_path |
+| | S-05 | 模块ID格式检查 | error | 模块 id 必须符合格式 mod-{模块名缩写} |
+| | S-06 | 模块状态检查 | error | 模块 status 必须是 designing/developing/completed/deprecated 之一 |
+| | S-07 | 模块路径检查 | error | 模块 file_path 不能为空字符串 |
 
 ### 6.2 任务检查规则
 
 | 规则ID | 名称 | 严重级别 | 描述 |
-|--------|------|----------|------|
-| T-01 | 任务对象字段检查 | error | 每个任务对象必须包含 id、title、description、status、moduleId |
-| T-02 | 任务ID格式检查 | error | 任务 id 必须符合格式 task-{模块名缩写}-{序号} |
-| T-03 | 任务状态检查 | error | 任务 status 必须是 pending/in-progress/completed/blocked/cancelled 之一 |
-| T-04 | 任务模块关联检查 | error | 任务 moduleId 必须引用存在的模块 id |
-| T-05 | 任务标题检查 | error | 任务 title 不能为空字符串 |
-| T-06 | 任务描述检查 | warning | 任务 description 不能为空字符串 |
-| T-13 | 任务契约字段检查 | error | 契约项必须包含 name、type、description 字段 |
-| T-14 | 任务契约类型检查 | error | 契约项 type 必须是有效类型 |
-| T-17 | 任务测试结果检查 | warning | 任务 testResult 必须是有效值 |
+| |--------|------|----------|------|
+| | T-01 | 任务对象字段检查 | error | 每个任务对象必须包含 id、title、description、status、moduleId |
+| | T-02 | 任务ID格式检查 | error | 任务 id 必须符合格式 task-{模块名缩写}-{序号} |
+| | T-03 | 任务状态检查 | error | 任务 status 必须是 pending/in-progress/completed/blocked/cancelled 之一 |
+| | T-04 | 任务模块关联检查 | error | 任务 moduleId 必须引用存在的模块 id |
+| | T-05 | 任务标题检查 | error | 任务 title 不能为空字符串 |
+| | T-06 | 任务描述检查 | warning | 任务 description 不能为空字符串 |
+| | T-13 | 任务契约字段检查 | error | 契约项必须包含 name、type、description 字段 |
+| | T-14 | 任务契约类型检查 | error | 契约项 type 必须是有效类型 |
+| | T-17 | 任务测试结果检查 | warning | 任务 testResult 必须是有效值 |
 
 ### 6.3 依赖关系检查规则
 
 | 规则ID | 名称 | 严重级别 | 描述 |
-|--------|------|----------|------|
-| D-01 | 依赖对象字段检查 | error | 每个依赖对象必须包含 id、sourceTaskId、targetTaskId、type |
-| D-06 | 自依赖检查 | error | 依赖 sourceTaskId 和 targetTaskId 不能相同 |
-| D-07 | 重复依赖检查 | error | 不能存在相同的依赖关系 |
-| D-08 | 循环依赖检查 | error | 不能存在循环依赖 |
+| |--------|------|----------|------|
+| | D-01 | 依赖对象字段检查 | error | 每个依赖对象必须包含 id、sourceTaskId、targetTaskId、type |
+| | D-06 | 自依赖检查 | error | 依赖 sourceTaskId 和 targetTaskId 不能相同 |
+| | D-07 | 重复依赖检查 | error | 不能存在相同的依赖关系 |
+| | D-08 | 循环依赖检查 | error | 不能存在循环依赖 |
 
 ### 6.4 动态检查规则
 
 动态检查规则用于运行时状态和一致性检查。
 
 | 规则ID | 名称 | 严重级别 | 描述 |
-|--------|------|----------|------|
-| DYN-01 | 契约一致性检查 | warning | 下游任务的输入契约应与上游任务的输出契约匹配 |
-| DYN-02 | 模块设计合理性检查 | warning | 模块的任务数量应合理（建议1-10个） |
-| DYN-04 | 任务完成度检查 | info | 检查模块内任务的完成进度 |
-| DYN-05 | 阻塞任务检查 | warning | 检查是否有任务长期处于阻塞状态 |
-| DYN-06 | 依赖链完整性检查 | error | 检查依赖链是否完整，无断裂 |
-| DYN-07 | 关键路径分析 | info | 分析项目的关键路径 |
-| DYN-13 | 问题跟踪检查 | warning | 检查任务的问题状态 |
-| DYN-14 | 文档完整性检查 | info | 检查模块和任务的文档完整性 |
+| |--------|------|----------|------|
+| | DYN-01 | 契约一致性检查 | warning | 下游任务的输入契约应与上游任务的输出契约匹配 |
+| | DYN-02 | 模块设计合理性检查 | warning | 模块的任务数量应合理（建议1-10个） |
+| | DYN-04 | 任务完成度检查 | info | 检查模块内任务的完成进度 |
+| | DYN-05 | 阻塞任务检查 | warning | 检查是否有任务长期处于阻塞状态 |
+| | DYN-06 | 依赖链完整性检查 | error | 检查依赖链是否完整，无断裂 |
+| | DYN-07 | 关键路径分析 | info | 分析项目的关键路径 |
+| | DYN-13 | 问题跟踪检查 | warning | 检查任务的问题状态 |
+| | DYN-14 | 文档完整性检查 | info | 检查模块和任务的文档完整性 |
 
 ### 6.5 检查报告格式
 
@@ -1062,21 +1056,22 @@ AI: 我来检查用户模块。
 
 ### 7.1 常见问题
 
-#### 问题1: MCP 服务器无法启动
+#### 问题1: MCP 服务器无法连接
 
-**症状：** 配置完成后，MCP 服务器无法启动或连接失败
+**症状：** 配置完成后，MCP 服务器显示连接失败
 
 **解决方案：**
-1. 检查可执行文件路径是否正确
-2. 确保工作目录（cwd）设置正确
-3. 检查后端 API 服务是否正在运行
-4. 查看终端错误日志
-
-```bash
-# 手动测试 MCP 服务器
-cd /path/to/project
-./aitdd-mcp
-```
+1. 确保后端服务正在运行：
+   ```bash
+   # 检查服务是否运行
+   curl http://localhost:34567/api/v1/projects
+   ```
+2. 检查 MCP SSE 端点是否可访问：
+   ```bash
+   curl http://localhost:34567/mcp/sse
+   ```
+3. 检查防火墙设置
+4. 检查端口是否被占用
 
 #### 问题2: 配置文件未找到
 
@@ -1100,7 +1095,31 @@ echo '{
 }' > .aitdd/config.json
 ```
 
-#### 问题3: API 连接失败
+#### 问题3: MCP 服务器不显示在 IDE 中
+
+**症状：** 配置完成后，在 IDE 的 MCP 面板中看不到 aitdd 服务器
+
+**解决方案：**
+1. **检查配置文件格式**：确保 JSON 格式正确，没有语法错误
+2. **检查 URL 是否正确**：
+   - SSE 端点：`http://localhost:34567/mcp/sse`
+3. **确保后端服务已启动**：MCP 服务集成在后端服务中
+4. **重启 IDE**：配置更改后需要重启 IDE 或重新加载窗口
+5. **检查 enabled 字段**：确保 `enabled: true`
+
+**KiloCode 配置示例（SSE 模式）：**
+```json
+{
+  "mcpServers": {
+    "aitdd": {
+      "url": "http://localhost:34567/mcp/sse",
+      "enabled": true
+    }
+  }
+}
+```
+
+#### 问题4: API 连接失败
 
 **症状：** 工具调用返回连接错误
 
@@ -1113,7 +1132,7 @@ echo '{
 3. 检查防火墙设置
 4. 检查端口是否被占用
 
-#### 问题4: 项目ID未配置
+#### 问题5: 项目ID未配置
 
 **症状：** 工具调用提示"项目未配置"
 
@@ -1129,7 +1148,7 @@ echo '{
 }
 ```
 
-#### 问题5: 版本冲突
+#### 问题6: 版本冲突
 
 **症状：** 更新操作返回版本冲突错误
 
@@ -1143,9 +1162,10 @@ echo '{
 启用详细日志可以帮助诊断问题：
 
 ```bash
-# 设置环境变量启用调试日志
-export AITDD_DEBUG=true
-./aitdd-mcp
+# 查看后端服务日志
+cd backend
+aitdd.exe serve
+# 日志会输出到控制台
 ```
 
 ### 7.3 重置配置
@@ -1177,28 +1197,28 @@ rm .aitdd/config.json
 ### A. 工具快速参考
 
 | 工具名称 | 类别 | 描述 |
-|---------|------|------|
-| `init_project` | 配置 | 初始化项目配置 |
-| `get_config` | 配置 | 获取当前配置 |
-| `set_project` | 配置 | 设置当前项目 |
-| `get_project_info` | 获取 | 获取项目简介 |
-| `get_all_task_code_paths` | 获取 | 获取所有任务代码路径 |
-| `get_all_modules` | 获取 | 获取所有模块概要 |
-| `get_module_tasks` | 获取 | 获取模块任务列表 |
-| `get_task_detail` | 获取 | 获取任务详情 |
-| `get_task_contracts` | 获取 | 获取任务上下游契约 |
-| `delete_module` | 修改 | 删除模块 |
-| `create_module` | 修改 | 创建模块 |
-| `update_module` | 修改 | 更新模块 |
-| `delete_module_tasks` | 修改 | 删除模块所有任务 |
-| `create_task` | 修改 | 创建任务 |
-| `update_module_full` | 修改 | 完整更新模块 |
-| `update_task_full` | 修改 | 完整更新任务 |
-| `get_all_task_status` | 状态 | 获取所有任务状态 |
-| `get_module_task_status` | 状态 | 获取模块任务状态 |
-| `get_project_errors` | 错误 | 获取项目错误列表 |
-| `get_module_errors` | 错误 | 获取模块错误列表 |
-| `check_module` | 检查 | 检查模块并生成报告 |
+| |---------|------|------|
+| | `init_project` | 配置 | 初始化项目配置 |
+| | `get_config` | 配置 | 获取当前配置 |
+| | `set_project` | 配置 | 设置当前项目 |
+| | `get_project_info` | 获取 | 获取项目简介 |
+| | `get_all_task_code_paths` | 获取 | 获取所有任务代码路径 |
+| | `get_all_modules` | 获取 | 获取所有模块概要 |
+| | `get_module_tasks` | 获取 | 获取模块任务列表 |
+| | `get_task_detail` | 获取 | 获取任务详情 |
+| | `get_task_contracts` | 获取 | 获取任务上下游契约 |
+| | `delete_module` | 修改 | 删除模块 |
+| | `create_module` | 修改 | 创建模块 |
+| | `update_module` | 修改 | 更新模块 |
+| | `delete_module_tasks` | 修改 | 删除模块所有任务 |
+| | `create_task` | 修改 | 创建任务 |
+| | `update_module_full` | 修改 | 完整更新模块 |
+| | `update_task_full` | 修改 | 完整更新任务 |
+| | `get_all_task_status` | 状态 | 获取所有任务状态 |
+| | `get_module_task_status` | 状态 | 获取模块任务状态 |
+| | `get_project_errors` | 错误 | 获取项目错误列表 |
+| | `get_module_errors` | 错误 | 获取模块错误列表 |
+| | `check_module` | 检查 | 检查模块并生成报告 |
 
 ### B. 状态值参考
 
@@ -1225,3 +1245,14 @@ rm .aitdd/config.json
 - `error` - 错误（必须修复）
 - `warning` - 警告（建议修复）
 - `info` - 信息（仅供参考）
+
+### C. SSE 模式 vs Stdio 模式
+
+| 特性 | SSE 模式（当前） | Stdio 模式（旧版） |
+| |---------|---------|---------|
+| | 启动方式 | 后端服务自动启动 | 需要单独的 mcp.exe |
+| | 端点 | `http://localhost:34567/mcp/sse` | 本地可执行文件 |
+| | 配置 | 使用 `url` 字段 | 使用 `command` 字段 |
+| | 进程管理 | 由后端服务统一管理 | 需要独立管理进程 |
+| | 资源占用 | 共享后端服务资源 | 独立进程资源 |
+| | 调试 | 与后端日志统一 | 独立日志输出 |

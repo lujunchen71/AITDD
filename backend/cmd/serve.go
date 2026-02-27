@@ -31,7 +31,7 @@ func init() {
 
 func runServe(cmd *cobra.Command, args []string) {
 	// 加载配置
-	configService := services.NewConfigService(".aitdd/config.json")
+	configService := services.NewConfigService(".aitdd/project.json")
 	config, err := configService.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "加载配置失败: %v\n", err)

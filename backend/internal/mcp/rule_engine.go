@@ -1,4 +1,4 @@
-package main
+package mcp
 
 import (
 	"encoding/json"
@@ -25,8 +25,8 @@ type RuleCategory struct {
 
 // RuleConfig 规则配置
 type RuleConfig struct {
-	Version     string            `json:"version"`
-	Description string            `json:"description"`
+	Version     string                   `json:"version"`
+	Description string                   `json:"description"`
 	Rules       map[string]RuleCategory `json:"rules"`
 }
 
@@ -47,21 +47,21 @@ type CheckResult struct {
 
 // CheckReport 检查报告
 type CheckReport struct {
-	ModuleID    string        `json:"moduleId"`
-	ModuleName  string        `json:"moduleName"`
-	ModuleStatus string       `json:"moduleStatus"`
-	CheckTime   string        `json:"checkTime"`
-	Summary     CheckSummary  `json:"summary"`
-	Errors      []CheckResult `json:"errors"`
-	Warnings    []CheckResult `json:"warnings"`
-	Suggestions []CheckResult `json:"suggestions"`
+	ModuleID     string        `json:"moduleId"`
+	ModuleName   string        `json:"moduleName"`
+	ModuleStatus string        `json:"moduleStatus"`
+	CheckTime    string        `json:"checkTime"`
+	Summary      CheckSummary  `json:"summary"`
+	Errors       []CheckResult `json:"errors"`
+	Warnings     []CheckResult `json:"warnings"`
+	Suggestions  []CheckResult `json:"suggestions"`
 }
 
 // CheckSummary 检查摘要
 type CheckSummary struct {
-	Total      int `json:"total"`
-	Errors     int `json:"errorCount"`
-	Warnings   int `json:"warningCount"`
+	Total       int `json:"total"`
+	Errors      int `json:"errorCount"`
+	Warnings    int `json:"warningCount"`
 	Suggestions int `json:"suggestionCount"`
 }
 
@@ -86,6 +86,15 @@ func GetRuleEngine() *RuleEngine {
 		_ = globalRuleEngine.Load()
 	})
 	return globalRuleEngine
+}
+
+// NewRuleEngine 创建新的规则引擎（用于测试或自定义路径）
+func NewRuleEngine(configPath string) *RuleEngine {
+	e := &RuleEngine{
+		configPath: configPath,
+	}
+	_ = e.Load()
+	return e
 }
 
 // Load 加载规则配置
@@ -179,14 +188,14 @@ func (e *RuleEngine) GetEnabledRules(category string) []Rule {
 // CheckModule 检查模块
 func (e *RuleEngine) CheckModule(module map[string]interface{}, tasks []map[string]interface{}) *CheckReport {
 	report := &CheckReport{
-		ModuleID:    getString(module, "id"),
-		ModuleName:  getString(module, "name"),
+		ModuleID:     getString(module, "id"),
+		ModuleName:   getString(module, "name"),
 		ModuleStatus: getString(module, "status"),
-		CheckTime:   time.Now().Format(time.RFC3339),
-		Summary:     CheckSummary{},
-		Errors:      []CheckResult{},
-		Warnings:    []CheckResult{},
-		Suggestions: []CheckResult{},
+		CheckTime:    time.Now().Format(time.RFC3339),
+		Summary:      CheckSummary{},
+		Errors:       []CheckResult{},
+		Warnings:     []CheckResult{},
+		Suggestions:  []CheckResult{},
 	}
 
 	// 执行静态检查

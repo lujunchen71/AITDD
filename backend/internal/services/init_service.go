@@ -78,7 +78,7 @@ func (s *InitService) createDirectories() error {
 
 // createConfigFiles 创建配置文件
 func (s *InitService) createConfigFiles() error {
-	// 创建 .aitdd/config.json
+	// 创建 .aitdd/project.json
 	configContent := fmt.Sprintf(`{
   "projectName": "%s",
   "pluginType": "%s",
@@ -93,7 +93,7 @@ func (s *InitService) createConfigFiles() error {
   }
 }`, s.projectName, s.pluginType)
 
-	configPath := filepath.Join(s.projectDir, ".aitdd", "config.json")
+	configPath := filepath.Join(s.projectDir, ".aitdd", "project.json")
 	return os.WriteFile(configPath, []byte(configContent), 0644)
 }
 
