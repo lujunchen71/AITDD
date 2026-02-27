@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aitdd/backend/internal/database"
@@ -42,10 +44,24 @@ func CreateProject(c *gin.Context) {
 		return
 	}
 
+	// 生成唯一的 path_name
+	pathName := req.Name
+	suffix := 1
+	for {
+		var count int64
+		database.DB.Model(&models.Project{}).Where("path_name = ?", pathName).Count(&count)
+		if count == 0 {
+			break
+		}
+		pathName = fmt.Sprintf("%s-%d", req.Name, suffix)
+		suffix++
+	}
+
 	// 创建新项目
 	project := models.Project{
 		ID:           uuid.New().String(),
 		Name:         req.Name,
+		PathName:     pathName,
 		Constitution: req.Description,
 		CreatedAt:    time.Now().UnixMilli(),
 		UpdatedAt:    time.Now().UnixMilli(),
@@ -147,6 +163,123 @@ func UpdateConstitution(c *gin.Context) {
 	})
 }
 
+// UpdateProject 更新项目
+func UpdateProject(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		ValidationError(c, "项目ID不能为空", nil)
+		return
+	}
+
+	var project models.Project
+	if err := database.DB.First(&project, "id = ?", id).Error; err != nil {
+		NotFound(c, "项目不存在")
+		return
+	}
+
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ValidationError(c, "无效的请求数据", nil)
+		return
+	}
+
+	updates := make(map[string]interface{})
+	updates["updated_at"] = time.Now().UnixMilli()
+
+	if req.Description != "" {
+		updates["constitution"] = req.Description
+	}
+
+	nameChanged := false
+	if req.Name != "" && req.Name != project.Name {
+		updates["name"] = req.Name
+		
+		// 生成新的唯一 path_name
+		pathName := req.Name
+		suffix := 1
+		for {
+			var count int64
+			database.DB.Model(&models.Project{}).Where("path_name = ? AND id != ?", pathName, id).Count(&count)
+			if count == 0 {
+				break
+			}
+			pathName = fmt.Sprintf("%s-%d", req.Name, suffix)
+			suffix++
+		}
+		updates["path_name"] = pathName
+		nameChanged = true
+	}
+
+	if err := database.DB.Model(&project).Updates(updates).Error; err != nil {
+		InternalError(c, "更新项目失败")
+		return
+	}
+
+	// 如果名称改变，级联更新模块和任务的 path_name（同步执行确保数据一致性）
+	if nameChanged {
+		newPathName := updates["path_name"].(string)
+		cascadeUpdateProjectPathName(id, newPathName)
+	}
+
+	// 重新获取
+	database.DB.First(&project, "id = ?", id)
+
+	Success(c, gin.H{
+		"project": project,
+	})
+}
+
+func cascadeUpdateProjectPathName(projectID string, projectPathName string) {
+	var modules []models.Module
+	database.DB.Where("project_id = ?", projectID).Find(&modules)
+
+	for _, mod := range modules {
+		basePathName := fmt.Sprintf("%s/%s", projectPathName, mod.Name)
+		pathName := basePathName
+		suffix := 1
+		for {
+			var count int64
+			database.DB.Model(&models.Module{}).Where("path_name = ? AND id != ?", pathName, mod.ID).Count(&count)
+			if count == 0 {
+				break
+			}
+			pathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+			suffix++
+		}
+		
+		database.DB.Model(&mod).Update("path_name", pathName)
+		
+		// 级联更新任务
+		cascadeUpdateModulePathName(mod.ID, pathName)
+	}
+}
+
+func cascadeUpdateModulePathName(moduleID string, modulePathName string) {
+	var tasks []models.Task
+	database.DB.Where("module_id = ?", moduleID).Find(&tasks)
+
+	for _, task := range tasks {
+		basePathName := fmt.Sprintf("%s/%s", modulePathName, task.Name)
+		pathName := basePathName
+		suffix := 1
+		for {
+			var count int64
+			database.DB.Model(&models.Task{}).Where("path_name = ? AND id != ?", pathName, task.ID).Count(&count)
+			if count == 0 {
+				break
+			}
+			pathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+			suffix++
+		}
+		
+		database.DB.Model(&task).Update("path_name", pathName)
+	}
+}
+
 // DeleteProject 删除项目
 func DeleteProject(c *gin.Context) {
 	id := c.Param("id")
@@ -187,5 +320,20 @@ func DeleteProject(c *gin.Context) {
 
 	Success(c, gin.H{
 		"message": "项目已删除",
+	})
+}
+
+// GetProjectByPathName 通过 pathName 获取项目
+func GetProjectByPathName(c *gin.Context) {
+	pathName := strings.TrimPrefix(c.Param("pathName"), "/")
+
+	var project models.Project
+	if err := database.DB.First(&project, "path_name = ?", pathName).Error; err != nil {
+		NotFound(c, "项目不存在: "+pathName)
+		return
+	}
+
+	Success(c, gin.H{
+		"project": project,
 	})
 }

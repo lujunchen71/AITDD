@@ -10,6 +10,7 @@ import (
 type Project struct {
 	ID           string `json:"id" gorm:"primaryKey;type:text"`
 	Name         string `json:"name" gorm:"not null;type:text"`
+	PathName     string `json:"pathName" gorm:"unique;type:text"`
 	Constitution string `json:"constitution" gorm:"type:text"`
 	CreatedAt    int64  `json:"createdAt" gorm:"not null"`
 	UpdatedAt    int64  `json:"updatedAt" gorm:"not null"`

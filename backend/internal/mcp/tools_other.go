@@ -11,15 +11,15 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// handleCheckModule 检查模块并生成报告
-func (s *MCPServer) handleCheckModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	moduleID, ok := getParam(request, "moduleId")
-	if !ok {
-		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
+// handleCheckModuleImpl 检查模块并生成报告
+func (s *MCPServer) handleCheckModuleImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("缺少 pathName 参数"), nil
 	}
 
 	// 获取模块信息
-	moduleResp, err := http.Get(fmt.Sprintf("%s/modules/%s", s.getApiURL(), moduleID))
+	moduleResp, err := http.Get(fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), pathName))
 	if err != nil {
 		return mcp.NewToolResultText("获取模块信息失败：" + err.Error()), nil
 	}
@@ -29,6 +29,9 @@ func (s *MCPServer) handleCheckModule(ctx context.Context, request mcp.CallToolR
 	if err := json.NewDecoder(moduleResp.Body).Decode(&module); err != nil {
 		return mcp.NewToolResultText("解析模块信息失败：" + err.Error()), nil
 	}
+
+	// 获取模块ID用于查询任务
+	moduleID, _ := module["id"].(string)
 
 	// 获取模块下的任务
 	tasksResp, err := http.Get(fmt.Sprintf("%s/tasks?moduleId=%s", s.getApiURL(), moduleID))
@@ -65,8 +68,8 @@ func (s *MCPServer) handleCheckModule(ctx context.Context, request mcp.CallToolR
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleOpenFrontend 打开前端网页
-func (s *MCPServer) handleOpenFrontend(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// handleOpenFrontendImpl 打开前端网页
+func (s *MCPServer) handleOpenFrontendImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	// 尝试打开浏览器
 	url := "http://localhost:5173"
 
@@ -96,11 +99,28 @@ func isMacOS() bool {
 	return false
 }
 
-// handleSendNotification 发送通知
-func (s *MCPServer) handleSendNotification(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	toTaskID, ok := getParam(request, "toTaskId")
+// handleSendNotificationImpl 发送通知
+func (s *MCPServer) handleSendNotificationImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("缺少 pathName 参数（目标任务路径名称）"), nil
+	}
+
+	// 先通过 pathName 获取任务 ID
+	taskResp, err := http.Get(fmt.Sprintf("%s/tasks/by-path/%s", s.getApiURL(), pathName))
+	if err != nil {
+		return mcp.NewToolResultText("获取任务信息失败：" + err.Error()), nil
+	}
+	defer taskResp.Body.Close()
+
+	var taskResult map[string]interface{}
+	if err := json.NewDecoder(taskResp.Body).Decode(&taskResult); err != nil {
+		return mcp.NewToolResultText("解析任务信息失败：" + err.Error()), nil
+	}
+
+	toTaskID, ok := taskResult["id"].(string)
 	if !ok {
-		return mcp.NewToolResultText("缺少 toTaskId 参数"), nil
+		return mcp.NewToolResultText("无法获取任务ID"), nil
 	}
 
 	// 构建通知数据
@@ -136,13 +156,23 @@ func (s *MCPServer) handleSendNotification(ctx context.Context, request mcp.Call
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleReadNotifications 读取未读通知
-func (s *MCPServer) handleReadNotifications(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	toTaskID, _ := getParam(request, "toTaskId")
+// handleReadNotificationsImpl 读取未读通知
+func (s *MCPServer) handleReadNotificationsImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, _ := getParam(request, "pathName")
 
 	url := fmt.Sprintf("%s/notifications?read=false", s.getApiURL())
-	if toTaskID != "" {
-		url += fmt.Sprintf("&toTaskId=%s", toTaskID)
+	if pathName != "" {
+		// 先通过 pathName 获取任务 ID
+		taskResp, err := http.Get(fmt.Sprintf("%s/tasks/by-path/%s", s.getApiURL(), pathName))
+		if err == nil {
+			defer taskResp.Body.Close()
+			var taskResult map[string]interface{}
+			if json.NewDecoder(taskResp.Body).Decode(&taskResult) == nil {
+				if toTaskID, ok := taskResult["id"].(string); ok {
+					url += fmt.Sprintf("&toTaskId=%s", toTaskID)
+				}
+			}
+		}
 	}
 
 	resp, err := http.Get(url)
@@ -160,22 +190,22 @@ func (s *MCPServer) handleReadNotifications(ctx context.Context, request mcp.Cal
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleLockResource 锁定资源
-func (s *MCPServer) handleLockResource(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// handleLockResourceImpl 锁定资源
+func (s *MCPServer) handleLockResourceImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	resourceType, ok1 := getParam(request, "resourceType")
-	resourceID, ok2 := getParam(request, "resourceId")
+	pathName, ok2 := getParam(request, "pathName")
 
 	if !ok1 || !ok2 {
 		return mcp.NewToolResultText("缺少必要参数"), nil
 	}
 
+	// 使用 by-path API 锁定资源
 	lockData := map[string]interface{}{
 		"resourceType": resourceType,
-		"resourceId":   resourceID,
 	}
 
 	jsonData, _ := json.Marshal(lockData)
-	resp, err := http.Post(fmt.Sprintf("%s/lock", s.getApiURL()), "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post(fmt.Sprintf("%s/lock/by-path/%s", s.getApiURL(), pathName), "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
@@ -190,10 +220,10 @@ func (s *MCPServer) handleLockResource(ctx context.Context, request mcp.CallTool
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleUnlockResource 解锁资源
-func (s *MCPServer) handleUnlockResource(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// handleUnlockResourceImpl 解锁资源
+func (s *MCPServer) handleUnlockResourceImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	resourceType, ok1 := getParam(request, "resourceType")
-	resourceID, ok2 := getParam(request, "resourceId")
+	pathName, ok2 := getParam(request, "pathName")
 
 	if !ok1 || !ok2 {
 		return mcp.NewToolResultText("缺少必要参数"), nil
@@ -201,11 +231,12 @@ func (s *MCPServer) handleUnlockResource(ctx context.Context, request mcp.CallTo
 
 	unlockData := map[string]interface{}{
 		"resourceType": resourceType,
-		"resourceId":   resourceID,
 	}
 
 	jsonData, _ := json.Marshal(unlockData)
-	resp, err := http.Post(fmt.Sprintf("%s/lock/unlock", s.getApiURL()), "application/json", bytes.NewBuffer(jsonData))
+	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/lock/by-path/%s", s.getApiURL(), pathName), bytes.NewBuffer(jsonData))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
@@ -220,16 +251,16 @@ func (s *MCPServer) handleUnlockResource(ctx context.Context, request mcp.CallTo
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleGetLockStatus 查询锁定状态
-func (s *MCPServer) handleGetLockStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// handleGetLockStatusImpl 查询锁定状态
+func (s *MCPServer) handleGetLockStatusImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	resourceType, ok1 := getParam(request, "resourceType")
-	resourceID, ok2 := getParam(request, "resourceId")
+	pathName, ok2 := getParam(request, "pathName")
 
 	if !ok1 || !ok2 {
 		return mcp.NewToolResultText("缺少必要参数"), nil
 	}
 
-	resp, err := http.Get(fmt.Sprintf("%s/lock/status?resourceType=%s&resourceId=%s", s.getApiURL(), resourceType, resourceID))
+	resp, err := http.Get(fmt.Sprintf("%s/lock/by-path/%s?resourceType=%s", s.getApiURL(), pathName, resourceType))
 	if err != nil {
 		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
@@ -244,13 +275,47 @@ func (s *MCPServer) handleGetLockStatus(ctx context.Context, request mcp.CallToo
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleCreateModuleDependency 创建模块依赖
-func (s *MCPServer) handleCreateModuleDependency(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	moduleID, ok1 := getParam(request, "moduleId")
-	dependsOnModuleID, ok2 := getParam(request, "dependsOnModuleId")
+// handleCreateModuleDependencyImpl 创建模块依赖
+func (s *MCPServer) handleCreateModuleDependencyImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok1 := getParam(request, "pathName")
+	dependsOnPathName, ok2 := getParam(request, "dependsOnPathName")
 
 	if !ok1 || !ok2 {
 		return mcp.NewToolResultText("缺少必要参数"), nil
+	}
+
+	// 先获取被依赖模块的 ID
+	dependsOnResp, err := http.Get(fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), dependsOnPathName))
+	if err != nil {
+		return mcp.NewToolResultText("获取被依赖模块信息失败：" + err.Error()), nil
+	}
+	defer dependsOnResp.Body.Close()
+
+	var dependsOnModule map[string]interface{}
+	if err := json.NewDecoder(dependsOnResp.Body).Decode(&dependsOnModule); err != nil {
+		return mcp.NewToolResultText("解析被依赖模块信息失败：" + err.Error()), nil
+	}
+
+	dependsOnModuleID, ok := dependsOnModule["id"].(string)
+	if !ok {
+		return mcp.NewToolResultText("无法获取被依赖模块ID"), nil
+	}
+
+	// 获取当前模块的 ID
+	moduleResp, err := http.Get(fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), pathName))
+	if err != nil {
+		return mcp.NewToolResultText("获取模块信息失败：" + err.Error()), nil
+	}
+	defer moduleResp.Body.Close()
+
+	var module map[string]interface{}
+	if err := json.NewDecoder(moduleResp.Body).Decode(&module); err != nil {
+		return mcp.NewToolResultText("解析模块信息失败：" + err.Error()), nil
+	}
+
+	moduleID, ok := module["id"].(string)
+	if !ok {
+		return mcp.NewToolResultText("无法获取模块ID"), nil
 	}
 
 	depData := map[string]interface{}{
@@ -279,14 +344,15 @@ func (s *MCPServer) handleCreateModuleDependency(ctx context.Context, request mc
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleGetModuleDependencies 获取模块依赖
-func (s *MCPServer) handleGetModuleDependencies(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	moduleID, ok := getParam(request, "moduleId")
-	if !ok {
-		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
+// handleGetModuleDependenciesImpl 获取模块依赖
+func (s *MCPServer) handleGetModuleDependenciesImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("缺少 pathName 参数"), nil
 	}
 
-	resp, err := http.Get(fmt.Sprintf("%s/modules/%s/dependencies", s.getApiURL(), moduleID))
+	// 使用 action=dependencies 参数
+	resp, err := http.Get(fmt.Sprintf("%s/modules/by-path/%s?action=dependencies", s.getApiURL(), pathName))
 	if err != nil {
 		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
@@ -301,13 +367,47 @@ func (s *MCPServer) handleGetModuleDependencies(ctx context.Context, request mcp
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleCreateTaskDependency 创建任务依赖
-func (s *MCPServer) handleCreateTaskDependency(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	upstreamTaskID, ok1 := getParam(request, "upstreamTaskId")
-	downstreamTaskID, ok2 := getParam(request, "downstreamTaskId")
+// handleCreateTaskDependencyImpl 创建任务依赖
+func (s *MCPServer) handleCreateTaskDependencyImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	upstreamPathName, ok1 := getParam(request, "upstreamPathName")
+	downstreamPathName, ok2 := getParam(request, "downstreamPathName")
 
 	if !ok1 || !ok2 {
 		return mcp.NewToolResultText("缺少必要参数"), nil
+	}
+
+	// 获取上游任务 ID
+	upstreamResp, err := http.Get(fmt.Sprintf("%s/tasks/by-path/%s", s.getApiURL(), upstreamPathName))
+	if err != nil {
+		return mcp.NewToolResultText("获取上游任务信息失败：" + err.Error()), nil
+	}
+	defer upstreamResp.Body.Close()
+
+	var upstreamTask map[string]interface{}
+	if err := json.NewDecoder(upstreamResp.Body).Decode(&upstreamTask); err != nil {
+		return mcp.NewToolResultText("解析上游任务信息失败：" + err.Error()), nil
+	}
+
+	upstreamTaskID, ok := upstreamTask["id"].(string)
+	if !ok {
+		return mcp.NewToolResultText("无法获取上游任务ID"), nil
+	}
+
+	// 获取下游任务 ID
+	downstreamResp, err := http.Get(fmt.Sprintf("%s/tasks/by-path/%s", s.getApiURL(), downstreamPathName))
+	if err != nil {
+		return mcp.NewToolResultText("获取下游任务信息失败：" + err.Error()), nil
+	}
+	defer downstreamResp.Body.Close()
+
+	var downstreamTask map[string]interface{}
+	if err := json.NewDecoder(downstreamResp.Body).Decode(&downstreamTask); err != nil {
+		return mcp.NewToolResultText("解析下游任务信息失败：" + err.Error()), nil
+	}
+
+	downstreamTaskID, ok := downstreamTask["id"].(string)
+	if !ok {
+		return mcp.NewToolResultText("无法获取下游任务ID"), nil
 	}
 
 	depData := map[string]interface{}{
@@ -334,11 +434,28 @@ func (s *MCPServer) handleCreateTaskDependency(ctx context.Context, request mcp.
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleGetTaskDependencies 获取任务依赖
-func (s *MCPServer) handleGetTaskDependencies(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	taskID, ok := getParam(request, "taskId")
+// handleGetTaskDependenciesImpl 获取任务依赖
+func (s *MCPServer) handleGetTaskDependenciesImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("缺少 pathName 参数"), nil
+	}
+
+	// 先获取任务 ID
+	taskResp, err := http.Get(fmt.Sprintf("%s/tasks/by-path/%s", s.getApiURL(), pathName))
+	if err != nil {
+		return mcp.NewToolResultText("获取任务信息失败：" + err.Error()), nil
+	}
+	defer taskResp.Body.Close()
+
+	var task map[string]interface{}
+	if err := json.NewDecoder(taskResp.Body).Decode(&task); err != nil {
+		return mcp.NewToolResultText("解析任务信息失败：" + err.Error()), nil
+	}
+
+	taskID, ok := task["id"].(string)
 	if !ok {
-		return mcp.NewToolResultText("缺少 taskId 参数"), nil
+		return mcp.NewToolResultText("无法获取任务ID"), nil
 	}
 
 	resp, err := http.Get(fmt.Sprintf("%s/dependencies?taskId=%s", s.getApiURL(), taskID))

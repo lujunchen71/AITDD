@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -63,6 +64,7 @@ func CreateModule(c *gin.Context) {
 		ProjectID   string  `json:"projectId" binding:"required"`
 		ParentID    *string `json:"parentId"`
 		Name        string  `json:"name" binding:"required"`
+		PathName    string  `json:"pathName"`
 		Description string  `json:"description"`
 		Prompt      string  `json:"prompt"`
 	}
@@ -72,11 +74,34 @@ func CreateModule(c *gin.Context) {
 		return
 	}
 
+	// 获取项目信息以生成正确的 pathName
+	var project models.Project
+	if err := database.DB.First(&project, "id = ?", req.ProjectID).Error; err != nil {
+		NotFound(c, "项目不存在")
+		return
+	}
+
+	// 生成唯一的 pathName，格式：项目pathName/模块名称
+	basePathName := fmt.Sprintf("%s/%s", project.PathName, req.Name)
+	pathName := basePathName
+	// 检查pathName是否已存在，如果存在则添加数字后缀
+	suffix := 1
+	for {
+		var count int64
+		database.DB.Model(&models.Module{}).Where("path_name = ?", pathName).Count(&count)
+		if count == 0 {
+			break
+		}
+		pathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+		suffix++
+	}
+
 	module := models.Module{
 		ID:          uuid.New().String(),
 		ParentID:    req.ParentID,
 		ProjectID:   req.ProjectID,
 		Name:        req.Name,
+		PathName:    pathName,
 		Description: req.Description,
 		Prompt:      req.Prompt,
 		Status:      models.ModuleStatusDesigning,
@@ -129,8 +154,10 @@ func UpdateModule(c *gin.Context) {
 	}
 
 	// 更新字段
-	if req.Name != nil {
+	nameChanged := false
+	if req.Name != nil && *req.Name != module.Name {
 		module.Name = *req.Name
+		nameChanged = true
 	}
 	if req.Description != nil {
 		module.Description = *req.Description
@@ -149,6 +176,37 @@ func UpdateModule(c *gin.Context) {
 	}
 	if req.DownstreamContractSummary != nil {
 		module.DownstreamContractSummary = *req.DownstreamContractSummary
+	}
+
+	// 如果名称改变，需要更新 pathName 和所有子任务的 pathName
+	if nameChanged {
+		// 获取项目信息以生成新的 pathName
+		var project models.Project
+		if err := database.DB.First(&project, "id = ?", module.ProjectID).Error; err != nil {
+			InternalError(c, "获取项目失败")
+			return
+		}
+
+		// 计算新的 pathName
+		oldPathName := module.PathName
+		basePathName := fmt.Sprintf("%s/%s", project.PathName, module.Name)
+		newPathName := basePathName
+		suffix := 1
+		for {
+			var count int64
+			database.DB.Model(&models.Module{}).Where("path_name = ? AND id != ?", newPathName, module.ID).Count(&count)
+			if count == 0 {
+				break
+			}
+			newPathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+			suffix++
+		}
+		module.PathName = newPathName
+
+		// 级联更新所有子任务的 pathName
+		database.DB.Model(&models.Task{}).
+			Where("module_id = ?", module.ID).
+			Update("path_name", fmt.Sprintf("REPLACE(path_name, '%s', '%s')", oldPathName, newPathName))
 	}
 
 	module.Version++
@@ -444,5 +502,261 @@ func UpdateModuleDependency(c *gin.Context) {
 
 	Success(c, gin.H{
 		"dependency": dependency,
+	})
+}
+
+// GetModuleByPathName 通过 pathName 获取模块
+func GetModuleByPathName(c *gin.Context) {
+	// 获取 pathName，移除前导斜杠
+	pathName := strings.TrimPrefix(c.Param("pathName"), "/")
+
+	var module models.Module
+	if err := database.DB.First(&module, "path_name = ?", pathName).Error; err != nil {
+		NotFound(c, "模块不存在: "+pathName)
+		return
+	}
+
+	// 检查 action 参数
+	action := c.Query("action")
+	switch action {
+	case "tasks":
+		// 返回模块的任务列表
+		var tasks []models.Task
+		if err := database.DB.Where("module_id = ?", module.ID).Find(&tasks).Error; err != nil {
+			InternalError(c, "查询任务失败")
+			return
+		}
+		Success(c, gin.H{
+			"tasks": tasks,
+			"total": len(tasks),
+		})
+		return
+	case "dependencies":
+		// 返回模块的依赖列表
+		var dependencies []models.ModuleDependency
+		if err := database.DB.Where("module_id = ?", module.ID).Find(&dependencies).Error; err != nil {
+			InternalError(c, "查询模块依赖失败")
+			return
+		}
+		// 获取被依赖模块的详细信息
+		type DependencyWithModule struct {
+			models.ModuleDependency
+			DependsOnModule *models.Module `json:"dependsOnModule"`
+		}
+		var result []DependencyWithModule
+		for _, dep := range dependencies {
+			item := DependencyWithModule{
+				ModuleDependency: dep,
+			}
+			var mod models.Module
+			if err := database.DB.First(&mod, "id = ?", dep.DependsOnModuleID).Error; err == nil {
+				item.DependsOnModule = &mod
+			}
+			result = append(result, item)
+		}
+		Success(c, gin.H{
+			"dependencies": result,
+			"total":        len(result),
+		})
+		return
+	}
+
+	Success(c, gin.H{
+		"module": module,
+	})
+}
+
+// UpdateModuleByPathName 通过 pathName 更新模块
+func UpdateModuleByPathName(c *gin.Context) {
+	pathName := strings.TrimPrefix(c.Param("pathName"), "/")
+
+	var module models.Module
+	if err := database.DB.First(&module, "path_name = ?", pathName).Error; err != nil {
+		NotFound(c, "模块不存在: "+pathName)
+		return
+	}
+
+	var req struct {
+		Name                      *string  `json:"name"`
+		Description               *string  `json:"description"`
+		Prompt                    *string  `json:"prompt"`
+		Status                    *string  `json:"status"`
+		TestCoverage              *float64 `json:"testCoverage"`
+		UpstreamContractSummary   *string  `json:"upstreamContractSummary"`
+		DownstreamContractSummary *string  `json:"downstreamContractSummary"`
+		Version                   int      `json:"version"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ValidationError(c, "无效的请求数据", nil)
+		return
+	}
+
+	// 版本检查
+	if module.Version != req.Version {
+		VersionConflict(c, "数据已被其他请求修改，请刷新后重试")
+		return
+	}
+
+	// 更新字段
+	nameChanged := false
+	if req.Name != nil && *req.Name != module.Name {
+		module.Name = *req.Name
+		nameChanged = true
+	}
+	if req.Description != nil {
+		module.Description = *req.Description
+	}
+	if req.Prompt != nil {
+		module.Prompt = *req.Prompt
+	}
+	if req.Status != nil {
+		module.Status = *req.Status
+	}
+	if req.TestCoverage != nil {
+		module.TestCoverage = *req.TestCoverage
+	}
+	if req.UpstreamContractSummary != nil {
+		module.UpstreamContractSummary = *req.UpstreamContractSummary
+	}
+	if req.DownstreamContractSummary != nil {
+		module.DownstreamContractSummary = *req.DownstreamContractSummary
+	}
+
+	// 如果名称改变，需要更新 pathName 和所有子任务的 pathName
+	if nameChanged {
+		// 获取项目信息以生成新的 pathName
+		var project models.Project
+		if err := database.DB.First(&project, "id = ?", module.ProjectID).Error; err != nil {
+			InternalError(c, "获取项目失败")
+			return
+		}
+
+		// 计算新的 pathName
+		oldPathName := module.PathName
+		basePathName := fmt.Sprintf("%s/%s", project.PathName, module.Name)
+		newPathName := basePathName
+		suffix := 1
+		for {
+			var count int64
+			database.DB.Model(&models.Module{}).Where("path_name = ? AND id != ?", newPathName, module.ID).Count(&count)
+			if count == 0 {
+				break
+			}
+			newPathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+			suffix++
+		}
+		module.PathName = newPathName
+
+		// 级联更新所有子任务的 pathName
+		// 使用 Exec 执行原生 SQL 以确保 REPLACE 函数正确执行
+		database.DB.Exec(
+			"UPDATE tasks SET path_name = REPLACE(path_name, ?, ?) WHERE module_id = ?",
+			oldPathName, newPathName, module.ID,
+		)
+	}
+
+	module.Version++
+	module.UpdatedAt = time.Now().UnixMilli()
+
+	if err := database.DB.Save(&module).Error; err != nil {
+		InternalError(c, "更新模块失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"module": module,
+	})
+}
+
+// DeleteModuleByPathName 通过 pathName 删除模块
+func DeleteModuleByPathName(c *gin.Context) {
+	pathName := strings.TrimPrefix(c.Param("pathName"), "/")
+
+	var module models.Module
+	if err := database.DB.First(&module, "path_name = ?", pathName).Error; err != nil {
+		NotFound(c, "模块不存在: "+pathName)
+		return
+	}
+
+	// 检查是否锁定
+	if module.Locked {
+		Locked(c, "模块已被锁定，无法删除", gin.H{
+			"lockedBy": module.LockedBy,
+		})
+		return
+	}
+
+	if err := database.DB.Delete(&module).Error; err != nil {
+		InternalError(c, "删除模块失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"deleted": true,
+	})
+}
+
+// GetModuleTasksByPathName 通过 pathName 获取模块下的任务
+func GetModuleTasksByPathName(c *gin.Context) {
+	pathName := strings.TrimPrefix(c.Param("pathName"), "/")
+
+	var module models.Module
+	if err := database.DB.First(&module, "path_name = ?", pathName).Error; err != nil {
+		NotFound(c, "模块不存在: "+pathName)
+		return
+	}
+
+	var tasks []models.Task
+	if err := database.DB.Where("module_id = ?", module.ID).Find(&tasks).Error; err != nil {
+		InternalError(c, "查询任务失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"tasks": tasks,
+		"total": len(tasks),
+	})
+}
+
+// GetModuleDependenciesByPathName 通过 pathName 获取模块的依赖列表
+func GetModuleDependenciesByPathName(c *gin.Context) {
+	pathName := strings.TrimPrefix(c.Param("pathName"), "/")
+
+	var module models.Module
+	if err := database.DB.First(&module, "path_name = ?", pathName).Error; err != nil {
+		NotFound(c, "模块不存在: "+pathName)
+		return
+	}
+
+	var dependencies []models.ModuleDependency
+	if err := database.DB.Where("module_id = ?", module.ID).Find(&dependencies).Error; err != nil {
+		InternalError(c, "查询模块依赖失败")
+		return
+	}
+
+	// 获取被依赖模块的详细信息
+	type DependencyWithModule struct {
+		models.ModuleDependency
+		DependsOnModule *models.Module `json:"dependsOnModule"`
+	}
+
+	var result []DependencyWithModule
+	for _, dep := range dependencies {
+		item := DependencyWithModule{
+			ModuleDependency: dep,
+		}
+
+		var depModule models.Module
+		if err := database.DB.First(&depModule, "id = ?", dep.DependsOnModuleID).Error; err == nil {
+			item.DependsOnModule = &depModule
+		}
+
+		result = append(result, item)
+	}
+
+	Success(c, gin.H{
+		"dependencies": result,
+		"total":        len(result),
 	})
 }

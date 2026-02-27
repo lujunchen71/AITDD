@@ -10,17 +10,34 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// handleGetAllTaskStatus 获取所有任务状态
-func (s *MCPServer) handleGetAllTaskStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	projectID, _ := getParam(request, "projectId")
-	if projectID == "" {
-		projectID = s.configManager.GetProjectID()
+// handleGetAllTaskStatusImpl 获取所有任务状态
+func (s *MCPServer) handleGetAllTaskStatusImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, _ := getParam(request, "pathName")
+	if pathName == "" {
+		pathName = s.configManager.GetProjectPathName()
 	}
-	if projectID == "" {
-		return mcp.NewToolResultText("未配置项目ID，请先使用 init_project 或 set_project 设置项目"), nil
+	if pathName == "" {
+		return mcp.NewToolResultText("未配置项目路径名称，请先使用 init_project 或 set_project 设置项目"), nil
 	}
 
-	url := fmt.Sprintf("%s/tasks?projectId=%s&fields=id,name,moduleId,status", s.getApiURL(), projectID)
+	// 先获取项目 ID
+	projectResp, err := http.Get(fmt.Sprintf("%s/projects/by-path/%s", s.getApiURL(), pathName))
+	if err != nil {
+		return mcp.NewToolResultText("获取项目信息失败：" + err.Error()), nil
+	}
+	defer projectResp.Body.Close()
+
+	var project map[string]interface{}
+	if err := json.NewDecoder(projectResp.Body).Decode(&project); err != nil {
+		return mcp.NewToolResultText("解析项目信息失败：" + err.Error()), nil
+	}
+
+	projectID, ok := project["id"].(string)
+	if !ok {
+		return mcp.NewToolResultText("无法获取项目ID"), nil
+	}
+
+	url := fmt.Sprintf("%s/tasks?projectId=%s&fields=id,name,moduleId,status,pathName", s.getApiURL(), projectID)
 	if status, ok := getParam(request, "status"); ok && status != "" {
 		url += fmt.Sprintf("&status=%s", status)
 	}
@@ -43,14 +60,31 @@ func (s *MCPServer) handleGetAllTaskStatus(ctx context.Context, request mcp.Call
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleGetModuleTaskStatus 获取模块任务状态
-func (s *MCPServer) handleGetModuleTaskStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	moduleID, ok := getParam(request, "moduleId")
-	if !ok {
-		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
+// handleGetModuleTaskStatusImpl 获取模块任务状态
+func (s *MCPServer) handleGetModuleTaskStatusImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("缺少 pathName 参数"), nil
 	}
 
-	url := fmt.Sprintf("%s/tasks?moduleId=%s&fields=id,name,status", s.getApiURL(), moduleID)
+	// 先获取模块 ID
+	moduleResp, err := http.Get(fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), pathName))
+	if err != nil {
+		return mcp.NewToolResultText("获取模块信息失败：" + err.Error()), nil
+	}
+	defer moduleResp.Body.Close()
+
+	var module map[string]interface{}
+	if err := json.NewDecoder(moduleResp.Body).Decode(&module); err != nil {
+		return mcp.NewToolResultText("解析模块信息失败：" + err.Error()), nil
+	}
+
+	moduleID, ok := module["id"].(string)
+	if !ok {
+		return mcp.NewToolResultText("无法获取模块ID"), nil
+	}
+
+	url := fmt.Sprintf("%s/tasks?moduleId=%s&fields=id,name,status,pathName", s.getApiURL(), moduleID)
 	if includeLockInfo, ok := getParamBool(request, "includeLockInfo"); ok && includeLockInfo {
 		url += "&includeLockInfo=true"
 	}
@@ -70,14 +104,31 @@ func (s *MCPServer) handleGetModuleTaskStatus(ctx context.Context, request mcp.C
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleGetProjectErrors 获取项目错误列表
-func (s *MCPServer) handleGetProjectErrors(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	projectID, _ := getParam(request, "projectId")
-	if projectID == "" {
-		projectID = s.configManager.GetProjectID()
+// handleGetProjectErrorsImpl 获取项目错误列表
+func (s *MCPServer) handleGetProjectErrorsImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, _ := getParam(request, "pathName")
+	if pathName == "" {
+		pathName = s.configManager.GetProjectPathName()
 	}
-	if projectID == "" {
-		return mcp.NewToolResultText("未配置项目ID，请先使用 init_project 或 set_project 设置项目"), nil
+	if pathName == "" {
+		return mcp.NewToolResultText("未配置项目路径名称，请先使用 init_project 或 set_project 设置项目"), nil
+	}
+
+	// 先获取项目 ID
+	projectResp, err := http.Get(fmt.Sprintf("%s/projects/by-path/%s", s.getApiURL(), pathName))
+	if err != nil {
+		return mcp.NewToolResultText("获取项目信息失败：" + err.Error()), nil
+	}
+	defer projectResp.Body.Close()
+
+	var project map[string]interface{}
+	if err := json.NewDecoder(projectResp.Body).Decode(&project); err != nil {
+		return mcp.NewToolResultText("解析项目信息失败：" + err.Error()), nil
+	}
+
+	projectID, ok := project["id"].(string)
+	if !ok {
+		return mcp.NewToolResultText("无法获取项目ID"), nil
 	}
 
 	// 获取所有任务
@@ -94,7 +145,9 @@ func (s *MCPServer) handleGetProjectErrors(ctx context.Context, request mcp.Call
 
 	// 收集错误
 	var errors []map[string]interface{}
+	var totalTasks int
 	if tasks, ok := result["data"].([]interface{}); ok {
+		totalTasks = len(tasks)
 		for _, task := range tasks {
 			if taskMap, ok := task.(map[string]interface{}); ok {
 				var taskErrors []map[string]interface{}
@@ -117,9 +170,9 @@ func (s *MCPServer) handleGetProjectErrors(ctx context.Context, request mcp.Call
 
 				if len(taskErrors) > 0 {
 					errors = append(errors, map[string]interface{}{
-						"taskId":   taskMap["id"],
-						"taskName": taskMap["name"],
-						"errors":   taskErrors,
+						"taskPathName": taskMap["pathName"],
+						"taskName":     taskMap["name"],
+						"errors":       taskErrors,
 					})
 				}
 			}
@@ -127,22 +180,39 @@ func (s *MCPServer) handleGetProjectErrors(ctx context.Context, request mcp.Call
 	}
 
 	resultData := map[string]interface{}{
-		"projectId":  projectID,
-		"scanTime":   time.Now().Format(time.RFC3339),
-		"totalTasks": len(result["data"].([]interface{})),
-		"errorCount": len(errors),
-		"errors":     errors,
+		"projectPathName": pathName,
+		"scanTime":        time.Now().Format(time.RFC3339),
+		"totalTasks":      totalTasks,
+		"errorCount":      len(errors),
+		"errors":          errors,
 	}
 
 	data, _ := json.MarshalIndent(resultData, "", "  ")
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleGetModuleErrors 获取模块错误列表
-func (s *MCPServer) handleGetModuleErrors(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	moduleID, ok := getParam(request, "moduleId")
+// handleGetModuleErrorsImpl 获取模块错误列表
+func (s *MCPServer) handleGetModuleErrorsImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("缺少 pathName 参数"), nil
+	}
+
+	// 先获取模块 ID
+	moduleResp, err := http.Get(fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), pathName))
+	if err != nil {
+		return mcp.NewToolResultText("获取模块信息失败：" + err.Error()), nil
+	}
+	defer moduleResp.Body.Close()
+
+	var module map[string]interface{}
+	if err := json.NewDecoder(moduleResp.Body).Decode(&module); err != nil {
+		return mcp.NewToolResultText("解析模块信息失败：" + err.Error()), nil
+	}
+
+	moduleID, ok := module["id"].(string)
 	if !ok {
-		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
+		return mcp.NewToolResultText("无法获取模块ID"), nil
 	}
 
 	// 获取模块下的所有任务
@@ -159,7 +229,9 @@ func (s *MCPServer) handleGetModuleErrors(ctx context.Context, request mcp.CallT
 
 	// 收集错误
 	var errors []map[string]interface{}
+	var totalTasks int
 	if tasks, ok := result["data"].([]interface{}); ok {
+		totalTasks = len(tasks)
 		for _, task := range tasks {
 			if taskMap, ok := task.(map[string]interface{}); ok {
 				var taskErrors []map[string]interface{}
@@ -182,9 +254,9 @@ func (s *MCPServer) handleGetModuleErrors(ctx context.Context, request mcp.CallT
 
 				if len(taskErrors) > 0 {
 					errors = append(errors, map[string]interface{}{
-						"taskId":   taskMap["id"],
-						"taskName": taskMap["name"],
-						"errors":   taskErrors,
+						"taskPathName": taskMap["pathName"],
+						"taskName":     taskMap["name"],
+						"errors":       taskErrors,
 					})
 				}
 			}
@@ -192,11 +264,11 @@ func (s *MCPServer) handleGetModuleErrors(ctx context.Context, request mcp.CallT
 	}
 
 	resultData := map[string]interface{}{
-		"moduleId":   moduleID,
-		"scanTime":   time.Now().Format(time.RFC3339),
-		"totalTasks": len(result["data"].([]interface{})),
-		"errorCount": len(errors),
-		"errors":     errors,
+		"modulePathName": pathName,
+		"scanTime":       time.Now().Format(time.RFC3339),
+		"totalTasks":     totalTasks,
+		"errorCount":     len(errors),
+		"errors":         errors,
 	}
 
 	data, _ := json.MarshalIndent(resultData, "", "  ")

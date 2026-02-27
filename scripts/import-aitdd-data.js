@@ -356,7 +356,11 @@ async function importData() {
               console.log(`   ✅ 模块依赖: ${task.moduleId} -> ${downstreamTask.moduleId}`);
               modDepCount++;
             } catch (err) {
-              console.log(`   ⏭️  模块依赖已存在或失败`);
+              if (err.message.includes('already exists') || err.message.includes('duplicate')) {
+                console.log(`   ⏭️  模块依赖已存在: ${task.moduleId} -> ${downstreamTask.moduleId}`);
+              } else {
+                console.log(`   ❌ 模块依赖创建失败: ${err.message}`);
+              }
             }
           }
         }

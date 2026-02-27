@@ -11,6 +11,7 @@ type Task struct {
 	ID                     string  `json:"id" gorm:"primaryKey;type:text"`
 	ModuleID               string  `json:"moduleId" gorm:"not null;type:text;index"`
 	Name                   string  `json:"name" gorm:"not null;type:text"`
+	PathName               string  `json:"pathName" gorm:"unique;type:text"`
 	Description            string  `json:"description" gorm:"type:text"`
 	Status                 string  `json:"status" gorm:"not null;default:'ready';type:text;index"`
 	Assignee               *string `json:"assignee" gorm:"type:text"`

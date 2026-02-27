@@ -27,7 +27,7 @@ func (s *MCPServer) handleInitProjectImpl(ctx context.Context, request mcp.CallT
 	var output string
 	output = "【可用项目列表】\n\n"
 	output += "AI 请根据用户提供的项目名称，在下方列表中找到匹配的项目，然后自动调用 set_project 工具设置项目。\n"
-	output += "set_project 需要两个参数：projectId（项目ID）和 projectName（项目名称）。\n\n"
+	output += "set_project 需要参数：projectId（项目ID）、projectName（项目名称）和 pathName（项目路径名称，可选）。\n\n"
 	output += "==========================================\n"
 
 	// 解析项目列表
@@ -36,8 +36,9 @@ func (s *MCPServer) handleInitProjectImpl(ctx context.Context, request mcp.CallT
 			if project, ok := item.(map[string]interface{}); ok {
 				id, _ := project["id"].(string)
 				name, _ := project["name"].(string)
+				pathName, _ := project["pathName"].(string)
 				desc, _ := project["description"].(string)
-				output += fmt.Sprintf("%d. 项目名称: %s\n   项目ID: %s\n   简介: %s\n\n", i+1, name, id, desc)
+				output += fmt.Sprintf("%d. 项目名称: %s\n   项目ID: %s\n   路径名称: %s\n   简介: %s\n\n", i+1, name, id, pathName, desc)
 			}
 		}
 	} else {
@@ -65,14 +66,15 @@ func (s *MCPServer) handleGetConfigImpl(ctx context.Context, request mcp.CallToo
 func (s *MCPServer) handleSetProjectImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	projectID, ok1 := getParam(request, "projectId")
 	projectName, ok2 := getParam(request, "projectName")
+	pathName, _ := getParam(request, "pathName")
 
 	if !ok1 || !ok2 {
 		return mcp.NewToolResultText("缺少必要参数：projectId 和 projectName"), nil
 	}
 
-	if err := s.configManager.SetProject(projectID, projectName); err != nil {
+	if err := s.configManager.SetProject(projectID, projectName, pathName); err != nil {
 		return mcp.NewToolResultText("设置项目失败：" + err.Error()), nil
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("项目设置成功！\n项目ID: %s\n项目名称: %s", projectID, projectName)), nil
+	return mcp.NewToolResultText(fmt.Sprintf("项目设置成功！\n项目ID: %s\n项目名称: %s\n路径名称: %s", projectID, projectName, pathName)), nil
 }

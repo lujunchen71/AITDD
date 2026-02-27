@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/aitdd/backend/internal/database"
@@ -59,10 +60,30 @@ func (s *TaskService) GetTask(id string) (*models.Task, error) {
 
 // CreateTask 创建任务
 func (s *TaskService) CreateTask(moduleID, name, description, prompt, upstreamContract, downstreamContract string) (*models.Task, error) {
+	// 获取模块信息以生成 path_name
+	var module models.Module
+	if err := database.DB.First(&module, "id = ?", moduleID).Error; err != nil {
+		return nil, errors.New("模块不存在")
+	}
+
+	basePathName := fmt.Sprintf("%s/%s", module.PathName, name)
+	pathName := basePathName
+	suffix := 1
+	for {
+		var count int64
+		database.DB.Model(&models.Task{}).Where("path_name = ?", pathName).Count(&count)
+		if count == 0 {
+			break
+		}
+		pathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+		suffix++
+	}
+
 	task := models.Task{
 		ID:                     uuid.New().String(),
 		ModuleID:               moduleID,
 		Name:                   name,
+		PathName:               pathName,
 		Description:            description,
 		Prompt:                 prompt,
 		UpstreamContractDetail: upstreamContract,
@@ -104,6 +125,26 @@ func (s *TaskService) UpdateTask(id string, updates map[string]interface{}, vers
 	// 更新字段
 	updates["version"] = task.Version + 1
 	updates["updated_at"] = time.Now().UnixMilli()
+
+	if newName, ok := updates["name"].(string); ok && newName != task.Name {
+		// 获取模块信息以生成新的 path_name
+		var module models.Module
+		if err := database.DB.First(&module, "id = ?", task.ModuleID).Error; err == nil {
+			basePathName := fmt.Sprintf("%s/%s", module.PathName, newName)
+			pathName := basePathName
+			suffix := 1
+			for {
+				var count int64
+				database.DB.Model(&models.Task{}).Where("path_name = ? AND id != ?", pathName, id).Count(&count)
+				if count == 0 {
+					break
+				}
+				pathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+				suffix++
+			}
+			updates["path_name"] = pathName
+		}
+	}
 
 	if err := database.DB.Model(&task).Updates(updates).Error; err != nil {
 		return nil, err

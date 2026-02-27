@@ -12,6 +12,7 @@ type Module struct {
 	ParentID                 *string `json:"parentId" gorm:"type:text;index"`
 	ProjectID                string  `json:"projectId" gorm:"not null;type:text;index"`
 	Name                     string  `json:"name" gorm:"not null;type:text"`
+	PathName                 string  `json:"pathName" gorm:"unique;type:text"`
 	Description              string  `json:"description" gorm:"type:text"`
 	Prompt                   string  `json:"prompt" gorm:"type:text"`
 	Status                   string  `json:"status" gorm:"not null;default:'designing';type:text;index"`

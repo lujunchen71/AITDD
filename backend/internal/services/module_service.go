@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/aitdd/backend/internal/database"
@@ -57,11 +58,31 @@ func (s *ModuleService) GetModule(id string) (*models.Module, error) {
 
 // CreateModule 创建模块
 func (s *ModuleService) CreateModule(projectID string, parentID *string, name, description, prompt string) (*models.Module, error) {
+	// 获取项目信息以生成 path_name
+	var project models.Project
+	if err := database.DB.First(&project, "id = ?", projectID).Error; err != nil {
+		return nil, errors.New("项目不存在")
+	}
+
+	basePathName := fmt.Sprintf("%s/%s", project.PathName, name)
+	pathName := basePathName
+	suffix := 1
+	for {
+		var count int64
+		database.DB.Model(&models.Module{}).Where("path_name = ?", pathName).Count(&count)
+		if count == 0 {
+			break
+		}
+		pathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+		suffix++
+	}
+
 	module := models.Module{
 		ID:          uuid.New().String(),
 		ParentID:    parentID,
 		ProjectID:   projectID,
 		Name:        name,
+		PathName:    pathName,
 		Description: description,
 		Prompt:      prompt,
 		Status:      models.ModuleStatusDesigning,
@@ -102,12 +123,62 @@ func (s *ModuleService) UpdateModule(id string, updates map[string]interface{}, 
 	updates["version"] = module.Version + 1
 	updates["updated_at"] = time.Now().UnixMilli()
 
+	nameChanged := false
+	if newName, ok := updates["name"].(string); ok && newName != module.Name {
+		// 获取项目信息以生成新的 path_name
+		var project models.Project
+		if err := database.DB.First(&project, "id = ?", module.ProjectID).Error; err == nil {
+			basePathName := fmt.Sprintf("%s/%s", project.PathName, newName)
+			pathName := basePathName
+			suffix := 1
+			for {
+				var count int64
+				database.DB.Model(&models.Module{}).Where("path_name = ? AND id != ?", pathName, id).Count(&count)
+				if count == 0 {
+					break
+				}
+				pathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+				suffix++
+			}
+			updates["path_name"] = pathName
+			nameChanged = true
+		}
+	}
+
 	if err := database.DB.Model(&module).Updates(updates).Error; err != nil {
 		return nil, err
 	}
 
+	// 如果名称改变，级联更新任务的 path_name（同步执行确保数据一致性）
+	if nameChanged {
+		newPathName := updates["path_name"].(string)
+		s.cascadeUpdateModulePathName(id, newPathName)
+	}
+
 	// 重新获取
 	return s.GetModule(id)
+}
+
+func (s *ModuleService) cascadeUpdateModulePathName(moduleID string, modulePathName string) {
+	var tasks []models.Task
+	database.DB.Where("module_id = ?", moduleID).Find(&tasks)
+
+	for _, task := range tasks {
+		basePathName := fmt.Sprintf("%s/%s", modulePathName, task.Name)
+		pathName := basePathName
+		suffix := 1
+		for {
+			var count int64
+			database.DB.Model(&models.Task{}).Where("path_name = ? AND id != ?", pathName, task.ID).Count(&count)
+			if count == 0 {
+				break
+			}
+			pathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+			suffix++
+		}
+		
+		database.DB.Model(&task).Update("path_name", pathName)
+	}
 }
 
 // DeleteModule 删除模块

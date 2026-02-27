@@ -39,6 +39,7 @@ func SetupRouter() *gin.Engine {
 		projects := v1.Group("/projects")
 		{
 			projects.GET("", handlers.GetProjects)
+			projects.GET("/by-path/*pathName", handlers.GetProjectByPathName)
 			projects.POST("", handlers.CreateProject)
 			projects.DELETE("/:id", handlers.DeleteProject)
 		}
@@ -47,6 +48,10 @@ func SetupRouter() *gin.Engine {
 		modules := v1.Group("/modules")
 		{
 			modules.GET("", handlers.GetModules)
+			modules.GET("/by-path/*pathName", handlers.GetModuleByPathName)
+			modules.PUT("/by-path/*pathName", handlers.UpdateModuleByPathName)
+			modules.DELETE("/by-path/*pathName", handlers.DeleteModuleByPathName)
+			// 使用查询参数区分操作: /by-path/path?action=tasks 或 ?action=dependencies
 			modules.GET("/:id", handlers.GetModule)
 			modules.POST("", handlers.CreateModule)
 			modules.PUT("/:id", handlers.UpdateModule)
@@ -68,6 +73,9 @@ func SetupRouter() *gin.Engine {
 		tasks := v1.Group("/tasks")
 		{
 			tasks.GET("", handlers.GetTasks)
+			tasks.GET("/by-path/*pathName", handlers.GetTaskByPathName)
+			tasks.PUT("/by-path/*pathName", handlers.UpdateTaskByPathName)
+			tasks.DELETE("/by-path/*pathName", handlers.DeleteTaskByPathName)
 			tasks.GET("/:id", handlers.GetTask)
 			tasks.POST("", handlers.CreateTask)
 			tasks.PUT("/:id", handlers.UpdateTask)
@@ -100,6 +108,10 @@ func SetupRouter() *gin.Engine {
 			lock.POST("", handlers.LockResource)
 			lock.POST("/unlock", handlers.UnlockResource)
 			lock.GET("/status", handlers.GetLockStatus)
+			// 通过 pathName 锁定/解锁
+			lock.POST("/by-path/*pathName", handlers.LockResourceByPathName)
+			lock.POST("/unlock-by-path/*pathName", handlers.UnlockResourceByPathName)
+			lock.GET("/status-by-path/*pathName", handlers.GetLockStatusByPathName)
 		}
 
 		// 工具相关

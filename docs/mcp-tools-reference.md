@@ -55,6 +55,7 @@
 | 参数名 | 类型 | 必填 | 描述 |
 |-------|-----|------|------|
 | projectId | string | ❌ | 项目ID，不传则使用配置文件中的ID |
+| pathName | string | ❌ | 项目路径名称 |
 
 **返回字段**:
 | 字段名 | 类型 | 描述 | 来源模型 |
@@ -118,7 +119,8 @@
 **输入参数**:
 | 参数名 | 类型 | 必填 | 描述 |
 |-------|-----|------|------|
-| moduleId | string | ✅ | 模块ID |
+| moduleId | string | ❌ | 模块ID，与 pathName 二选一 |
+| pathName | string | ❌ | 模块路径名称，与 moduleId 二选一 |
 
 **返回字段**: 完整 Module 对象
 | 字段名 | 类型 | 描述 | 来源模型 |
@@ -170,7 +172,8 @@
 **输入参数**:
 | 参数名 | 类型 | 必填 | 描述 |
 |-------|-----|------|------|
-| moduleId | string | ✅ | 模块ID |
+| moduleId | string | ❌ | 模块ID，与 pathName 二选一 |
+| pathName | string | ❌ | 模块路径名称，与 moduleId 二选一 |
 | name | string | ❌ | 模块名称 |
 | description | string | ❌ | 模块描述 |
 | prompt | string | ❌ | 模块提示词 |
@@ -255,7 +258,8 @@
 **输入参数**:
 | 参数名 | 类型 | 必填 | 描述 |
 |-------|-----|------|------|
-| moduleId | string | ✅ | 模块ID |
+| moduleId | string | ❌ | 模块ID，与 pathName 二选一 |
+| pathName | string | ❌ | 模块路径名称，与 moduleId 二选一 |
 | includeContracts | boolean | ❌ | 是否包含契约信息 |
 
 **返回字段** (data数组中的每个对象):
@@ -287,7 +291,8 @@
 **输入参数**:
 | 参数名 | 类型 | 必填 | 描述 |
 |-------|-----|------|------|
-| taskId | string | ✅ | 任务ID |
+| taskId | string | ❌ | 任务ID，与 pathName 二选一 |
+| pathName | string | ❌ | 任务路径名称，与 taskId 二选一 |
 
 **返回字段**: 完整 Task 对象
 | 字段名 | 类型 | 描述 | 来源模型 |
@@ -368,7 +373,8 @@
 **输入参数**:
 | 参数名 | 类型 | 必填 | 描述 |
 |-------|-----|------|------|
-| taskId | string | ✅ | 任务ID |
+| taskId | string | ❌ | 任务ID，与 pathName 二选一 |
+| pathName | string | ❌ | 任务路径名称，与 taskId 二选一 |
 | name | string | ❌ | 任务名称 |
 | description | string | ❌ | 任务描述 |
 | status | string | ❌ | 任务状态 |
@@ -437,7 +443,8 @@
 **输入参数**:
 | 参数名 | 类型 | 必填 | 描述 |
 |-------|-----|------|------|
-| moduleId | string | ✅ | 模块ID |
+| moduleId | string | ❌ | 模块ID，与 pathName 二选一 |
+| pathName | string | ❌ | 模块路径名称，与 moduleId 二选一 |
 | includeLockInfo | boolean | ❌ | 是否包含锁定信息 |
 
 **返回字段** (data数组):

@@ -81,6 +81,7 @@ func (s *InitService) createConfigFiles() error {
 	// 创建 .aitdd/project.json
 	configContent := fmt.Sprintf(`{
   "projectName": "%s",
+  "pathName": "%s",
   "pluginType": "%s",
   "serverPort": 34567,
   "database": {
@@ -91,7 +92,7 @@ func (s *InitService) createConfigFiles() error {
     "enabled": false,
     "remoteUrl": ""
   }
-}`, s.projectName, s.pluginType)
+}`, s.projectName, s.projectName, s.pluginType)
 
 	configPath := filepath.Join(s.projectDir, ".aitdd", "project.json")
 	return os.WriteFile(configPath, []byte(configContent), 0644)

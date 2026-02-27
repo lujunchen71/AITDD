@@ -10,14 +10,14 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-// handleDeleteModule 删除模块
-func (s *MCPServer) handleDeleteModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	moduleID, ok := getParam(request, "moduleId")
-	if !ok {
-		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
+// handleDeleteModuleImpl 删除模块
+func (s *MCPServer) handleDeleteModuleImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("缺少 pathName 参数"), nil
 	}
 
-	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/modules/%s", s.getApiURL(), moduleID), nil)
+	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), pathName), nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
@@ -33,26 +33,44 @@ func (s *MCPServer) handleDeleteModule(ctx context.Context, request mcp.CallTool
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleCreateModule 创建模块
-func (s *MCPServer) handleCreateModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+// handleCreateModuleImpl 创建模块
+func (s *MCPServer) handleCreateModuleImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	name, ok := getParam(request, "name")
 	if !ok {
 		return mcp.NewToolResultText("缺少 name 参数"), nil
 	}
 
-	projectID, _ := getParam(request, "projectId")
-	if projectID == "" {
-		projectID = s.configManager.GetProjectID()
+	// 从配置文件获取项目 pathName
+	projectPathName := s.configManager.GetProjectPathName()
+	if projectPathName == "" {
+		return mcp.NewToolResultText("未配置项目路径名称，请先使用 init_project 或 set_project 设置项目"), nil
 	}
-	if projectID == "" {
-		return mcp.NewToolResultText("未配置项目ID，请先使用 init_project 或 set_project 设置项目"), nil
+
+	// 通过 pathName 获取项目信息（包含 ID）
+	resp, err := http.Get(fmt.Sprintf("%s/projects/by-path/%s", s.getApiURL(), projectPathName))
+	if err != nil {
+		return mcp.NewToolResultText("获取项目信息失败：" + err.Error()), nil
+	}
+	defer resp.Body.Close()
+
+	var projectResult map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&projectResult); err != nil {
+		return mcp.NewToolResultText("解析项目信息失败：" + err.Error()), nil
+	}
+
+	project, ok := projectResult["project"].(map[string]interface{})
+	if !ok {
+		return mcp.NewToolResultText("项目不存在或格式错误"), nil
+	}
+	projectID, ok := project["id"].(string)
+	if !ok {
+		return mcp.NewToolResultText("项目ID不存在"), nil
 	}
 
 	// 构建创建数据
 	createData := map[string]interface{}{
 		"name":      name,
 		"projectId": projectID,
-		"status":    "designing",
 	}
 	if description, ok := getParamAny(request, "description"); ok {
 		createData["description"] = description
@@ -60,19 +78,36 @@ func (s *MCPServer) handleCreateModule(ctx context.Context, request mcp.CallTool
 	if prompt, ok := getParamAny(request, "prompt"); ok {
 		createData["prompt"] = prompt
 	}
-	if parentId, ok := getParamAny(request, "parentId"); ok {
-		createData["parentId"] = parentId
+	// pathName 参数用于指定新模块的路径名称
+	if pathName, ok := getParam(request, "pathName"); ok && pathName != "" {
+		createData["pathName"] = pathName
+	}
+	// parentPathName 参数用于指定父模块
+	if parentPathName, ok := getParam(request, "parentPathName"); ok && parentPathName != "" {
+		// 需要先通过 pathName 获取父模块 ID
+		resp, err := http.Get(fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), parentPathName))
+		if err == nil {
+			defer resp.Body.Close()
+			var result map[string]interface{}
+			if json.NewDecoder(resp.Body).Decode(&result) == nil {
+				if module, ok := result["module"].(map[string]interface{}); ok {
+					if parentID, ok := module["id"].(string); ok {
+						createData["parentId"] = parentID
+					}
+				}
+			}
+		}
 	}
 
 	jsonData, _ := json.Marshal(createData)
-	resp, err := http.Post(fmt.Sprintf("%s/modules", s.getApiURL()), "application/json", bytes.NewBuffer(jsonData))
+	resp2, err := http.Post(fmt.Sprintf("%s/modules", s.getApiURL()), "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
 	}
-	defer resp.Body.Close()
+	defer resp2.Body.Close()
 
 	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(resp2.Body).Decode(&result); err != nil {
 		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
 	}
 
@@ -80,11 +115,11 @@ func (s *MCPServer) handleCreateModule(ctx context.Context, request mcp.CallTool
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleUpdateModule 更新模块
-func (s *MCPServer) handleUpdateModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	moduleID, ok := getParam(request, "moduleId")
-	if !ok {
-		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
+// handleUpdateModuleImpl 更新模块
+func (s *MCPServer) handleUpdateModuleImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("缺少 pathName 参数"), nil
 	}
 
 	// 构建更新数据
@@ -106,7 +141,7 @@ func (s *MCPServer) handleUpdateModule(ctx context.Context, request mcp.CallTool
 	}
 
 	jsonData, _ := json.Marshal(updateData)
-	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/modules/%s", s.getApiURL(), moduleID), bytes.NewBuffer(jsonData))
+	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), pathName), bytes.NewBuffer(jsonData))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -123,15 +158,15 @@ func (s *MCPServer) handleUpdateModule(ctx context.Context, request mcp.CallTool
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleDeleteModuleTasks 删除模块所有任务
-func (s *MCPServer) handleDeleteModuleTasks(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	moduleID, ok := getParam(request, "moduleId")
-	if !ok {
-		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
+// handleDeleteModuleTasksImpl 删除模块所有任务
+func (s *MCPServer) handleDeleteModuleTasksImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("缺少 pathName 参数"), nil
 	}
 
 	// 获取模块下的所有任务
-	resp, err := http.Get(fmt.Sprintf("%s/tasks?moduleId=%s", s.getApiURL(), moduleID))
+	resp, err := http.Get(fmt.Sprintf("%s/tasks?modulePathName=%s", s.getApiURL(), pathName))
 	if err != nil {
 		return mcp.NewToolResultText("获取任务列表失败：" + err.Error()), nil
 	}
@@ -155,22 +190,27 @@ func (s *MCPServer) handleDeleteModuleTasks(ctx context.Context, request mcp.Cal
 
 	for _, task := range tasks {
 		if taskMap, ok := task.(map[string]interface{}); ok {
-			taskID, ok := taskMap["id"].(string)
+			taskPathName, ok := taskMap["pathName"].(string)
 			if !ok {
-				continue
+				// 尝试使用 ID
+				taskID, okID := taskMap["id"].(string)
+				if !okID {
+					continue
+				}
+				taskPathName = taskID
 			}
 
-			req, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/tasks/%s", s.getApiURL(), taskID), nil)
+			req, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/tasks/by-path/%s", s.getApiURL(), taskPathName), nil)
 			delResp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				errors = append(errors, fmt.Sprintf("删除任务 %s 失败: %s", taskID, err.Error()))
+				errors = append(errors, fmt.Sprintf("删除任务 %s 失败: %s", taskPathName, err.Error()))
 				continue
 			}
 			delResp.Body.Close()
 			deletedCount++
 			deletedTasks = append(deletedTasks, map[string]interface{}{
-				"id":   taskID,
-				"name": taskMap["name"],
+				"pathName": taskPathName,
+				"name":     taskMap["name"],
 			})
 		}
 	}
@@ -189,16 +229,38 @@ func (s *MCPServer) handleDeleteModuleTasks(ctx context.Context, request mcp.Cal
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleCreateTask 创建任务
-func (s *MCPServer) handleCreateTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	moduleID, ok := getParam(request, "moduleId")
-	if !ok {
-		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
+// handleCreateTaskImpl 创建任务
+func (s *MCPServer) handleCreateTaskImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	modulePathName, ok := getParam(request, "pathName")
+	if !ok || modulePathName == "" {
+		return mcp.NewToolResultText("缺少 pathName 参数（模块路径名称）"), nil
 	}
 
 	name, ok := getParam(request, "name")
 	if !ok {
 		return mcp.NewToolResultText("缺少 name 参数"), nil
+	}
+
+	// 先通过 pathName 获取模块 ID
+	moduleResp, err := http.Get(fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), modulePathName))
+	if err != nil {
+		return mcp.NewToolResultText("获取模块信息失败：" + err.Error()), nil
+	}
+	defer moduleResp.Body.Close()
+
+	var moduleResult map[string]interface{}
+	if err := json.NewDecoder(moduleResp.Body).Decode(&moduleResult); err != nil {
+		return mcp.NewToolResultText("解析模块信息失败：" + err.Error()), nil
+	}
+
+	// API 返回格式是 {"module": {...}}
+	moduleData, ok := moduleResult["module"].(map[string]interface{})
+	if !ok {
+		return mcp.NewToolResultText("模块数据格式错误"), nil
+	}
+	moduleID, ok := moduleData["id"].(string)
+	if !ok {
+		return mcp.NewToolResultText("无法获取模块ID"), nil
 	}
 
 	// 构建创建数据
@@ -242,11 +304,11 @@ func (s *MCPServer) handleCreateTask(ctx context.Context, request mcp.CallToolRe
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleUpdateModuleFull 完整更新模块
-func (s *MCPServer) handleUpdateModuleFull(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	moduleID, ok := getParam(request, "moduleId")
-	if !ok {
-		return mcp.NewToolResultText("缺少 moduleId 参数"), nil
+// handleUpdateModuleFullImpl 完整更新模块
+func (s *MCPServer) handleUpdateModuleFullImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("必须提供 pathName 参数"), nil
 	}
 
 	moduleJson, ok := getParam(request, "moduleJson")
@@ -260,8 +322,10 @@ func (s *MCPServer) handleUpdateModuleFull(ctx context.Context, request mcp.Call
 		return mcp.NewToolResultText("解析 moduleJson 失败：" + err.Error()), nil
 	}
 
+	url := fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), pathName)
+
 	jsonData, _ := json.Marshal(updateData)
-	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/modules/%s", s.getApiURL(), moduleID), bytes.NewBuffer(jsonData))
+	req, _ := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -278,11 +342,11 @@ func (s *MCPServer) handleUpdateModuleFull(ctx context.Context, request mcp.Call
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleUpdateTaskFull 完整更新任务
-func (s *MCPServer) handleUpdateTaskFull(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	taskID, ok := getParam(request, "taskId")
-	if !ok {
-		return mcp.NewToolResultText("缺少 taskId 参数"), nil
+// handleUpdateTaskFullImpl 完整更新任务
+func (s *MCPServer) handleUpdateTaskFullImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("必须提供 pathName 参数"), nil
 	}
 
 	taskJson, ok := getParam(request, "taskJson")
@@ -296,8 +360,10 @@ func (s *MCPServer) handleUpdateTaskFull(ctx context.Context, request mcp.CallTo
 		return mcp.NewToolResultText("解析 taskJson 失败：" + err.Error()), nil
 	}
 
+	url := fmt.Sprintf("%s/tasks/by-path/%s", s.getApiURL(), pathName)
+
 	jsonData, _ := json.Marshal(updateData)
-	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/tasks/%s", s.getApiURL(), taskID), bytes.NewBuffer(jsonData))
+	req, _ := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -314,11 +380,11 @@ func (s *MCPServer) handleUpdateTaskFull(ctx context.Context, request mcp.CallTo
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleUpdateTask 更新任务
-func (s *MCPServer) handleUpdateTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	taskID, ok := getParam(request, "taskId")
-	if !ok {
-		return mcp.NewToolResultText("缺少 taskId 参数"), nil
+// handleUpdateTaskImpl 更新任务
+func (s *MCPServer) handleUpdateTaskImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("缺少 pathName 参数"), nil
 	}
 
 	// 构建更新数据
@@ -337,7 +403,7 @@ func (s *MCPServer) handleUpdateTask(ctx context.Context, request mcp.CallToolRe
 	}
 
 	jsonData, _ := json.Marshal(updateData)
-	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/tasks/%s", s.getApiURL(), taskID), bytes.NewBuffer(jsonData))
+	req, _ := http.NewRequest("PUT", fmt.Sprintf("%s/tasks/by-path/%s", s.getApiURL(), pathName), bytes.NewBuffer(jsonData))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -354,14 +420,14 @@ func (s *MCPServer) handleUpdateTask(ctx context.Context, request mcp.CallToolRe
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// handleDeleteTask 删除任务
-func (s *MCPServer) handleDeleteTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	taskID, ok := getParam(request, "taskId")
-	if !ok {
-		return mcp.NewToolResultText("缺少 taskId 参数"), nil
+// handleDeleteTaskImpl 删除任务
+func (s *MCPServer) handleDeleteTaskImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathName, ok := getParam(request, "pathName")
+	if !ok || pathName == "" {
+		return mcp.NewToolResultText("缺少 pathName 参数"), nil
 	}
 
-	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/tasks/%s", s.getApiURL(), taskID), nil)
+	req, _ := http.NewRequest("DELETE", fmt.Sprintf("%s/tasks/by-path/%s", s.getApiURL(), pathName), nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return mcp.NewToolResultText("请求失败：" + err.Error()), nil

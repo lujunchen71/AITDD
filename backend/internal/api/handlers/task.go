@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -83,6 +84,7 @@ func CreateTask(c *gin.Context) {
 	var req struct {
 		ModuleID                 string `json:"moduleId" binding:"required"`
 		Name                     string `json:"name" binding:"required"`
+		PathName                 string `json:"pathName"`
 		Description              string `json:"description"`
 		Prompt                   string `json:"prompt"`
 		UpstreamContractDetail   string `json:"upstreamContractDetail"`
@@ -94,10 +96,33 @@ func CreateTask(c *gin.Context) {
 		return
 	}
 
+	// 获取模块信息以生成正确的 pathName
+	var module models.Module
+	if err := database.DB.First(&module, "id = ?", req.ModuleID).Error; err != nil {
+		NotFound(c, "模块不存在")
+		return
+	}
+
+	// 生成唯一的 pathName，格式：模块pathName/任务名称
+	basePathName := fmt.Sprintf("%s/%s", module.PathName, req.Name)
+	pathName := basePathName
+	// 检查pathName是否已存在，如果存在则添加数字后缀
+	suffix := 1
+	for {
+		var count int64
+		database.DB.Model(&models.Task{}).Where("path_name = ?", pathName).Count(&count)
+		if count == 0 {
+			break
+		}
+		pathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+		suffix++
+	}
+
 	task := models.Task{
 		ID:                       uuid.New().String(),
 		ModuleID:                 req.ModuleID,
 		Name:                     req.Name,
+		PathName:                 pathName,
 		Description:              req.Description,
 		Prompt:                   req.Prompt,
 		UpstreamContractDetail:   req.UpstreamContractDetail,
@@ -165,8 +190,11 @@ func UpdateTask(c *gin.Context) {
 	}
 
 	// 更新字段
-	if req.Name != nil {
+	nameChanged := false
+	moduleChanged := false
+	if req.Name != nil && *req.Name != task.Name {
 		task.Name = *req.Name
+		nameChanged = true
 	}
 	if req.Description != nil {
 		task.Description = *req.Description
@@ -180,8 +208,9 @@ func UpdateTask(c *gin.Context) {
 	if req.Prompt != nil {
 		task.Prompt = *req.Prompt
 	}
-	if req.ModuleID != nil {
+	if req.ModuleID != nil && *req.ModuleID != task.ModuleID {
 		task.ModuleID = *req.ModuleID
+		moduleChanged = true
 	}
 	if req.UpstreamContractDetail != nil {
 		task.UpstreamContractDetail = *req.UpstreamContractDetail
@@ -200,6 +229,31 @@ func UpdateTask(c *gin.Context) {
 	}
 	if req.HumanAssistance != nil {
 		task.HumanAssistance = *req.HumanAssistance
+	}
+
+	// 如果名称改变或模块改变，需要更新 pathName
+	if nameChanged || moduleChanged {
+		// 获取模块信息以生成新的 pathName
+		var module models.Module
+		if err := database.DB.First(&module, "id = ?", task.ModuleID).Error; err != nil {
+			BadRequest(c, "目标模块不存在")
+			return
+		}
+
+		// 计算新的 pathName
+		basePathName := fmt.Sprintf("%s/%s", module.PathName, task.Name)
+		newPathName := basePathName
+		suffix := 1
+		for {
+			var count int64
+			database.DB.Model(&models.Task{}).Where("path_name = ? AND id != ?", newPathName, task.ID).Count(&count)
+			if count == 0 {
+				break
+			}
+			newPathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+			suffix++
+		}
+		task.PathName = newPathName
 	}
 
 	task.Version++
@@ -388,5 +442,173 @@ func ToggleTaskLock(c *gin.Context) {
 			}
 			return "任务已解锁"
 		}(),
+	})
+}
+
+// GetTaskByPathName 通过 pathName 获取任务
+func GetTaskByPathName(c *gin.Context) {
+	pathName := strings.TrimPrefix(c.Param("pathName"), "/")
+
+	var task models.Task
+	if err := database.DB.First(&task, "path_name = ?", pathName).Error; err != nil {
+		NotFound(c, "任务不存在: "+pathName)
+		return
+	}
+
+	Success(c, gin.H{
+		"task": task,
+	})
+}
+
+// UpdateTaskByPathName 通过 pathName 更新任务
+func UpdateTaskByPathName(c *gin.Context) {
+	pathName := strings.TrimPrefix(c.Param("pathName"), "/")
+
+	var task models.Task
+	if err := database.DB.First(&task, "path_name = ?", pathName).Error; err != nil {
+		NotFound(c, "任务不存在: "+pathName)
+		return
+	}
+
+	var req struct {
+		Name                     *string `json:"name"`
+		Description              *string `json:"description"`
+		Status                   *string `json:"status"`
+		Assignee                 *string `json:"assignee"`
+		Prompt                   *string `json:"prompt"`
+		ModuleID                 *string `json:"moduleId"`
+		UpstreamContractDetail   *string `json:"upstreamContractDetail"`
+		DownstreamContractDetail *string `json:"downstreamContractDetail"`
+		Tests                    *string `json:"tests"`
+		Logs                     *string `json:"logs"`
+		CodePaths                *string `json:"codePaths"`
+		HumanAssistance          *string `json:"humanAssistance"`
+		Version                  int     `json:"version"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		ValidationError(c, "无效的请求数据", nil)
+		return
+	}
+
+	// 版本检查
+	if task.Version != req.Version {
+		VersionConflict(c, "数据已被其他请求修改，请刷新后重试")
+		return
+	}
+
+	// 检查是否锁定
+	if task.Locked {
+		Locked(c, "任务已被锁定，无法修改", gin.H{
+			"lockedBy": task.LockedBy,
+		})
+		return
+	}
+
+	// 更新字段
+	nameChanged := false
+	moduleChanged := false
+	if req.Name != nil && *req.Name != task.Name {
+		task.Name = *req.Name
+		nameChanged = true
+	}
+	if req.Description != nil {
+		task.Description = *req.Description
+	}
+	if req.Status != nil {
+		task.Status = *req.Status
+	}
+	if req.Assignee != nil {
+		task.Assignee = req.Assignee
+	}
+	if req.Prompt != nil {
+		task.Prompt = *req.Prompt
+	}
+	if req.ModuleID != nil && *req.ModuleID != task.ModuleID {
+		task.ModuleID = *req.ModuleID
+		moduleChanged = true
+	}
+	if req.UpstreamContractDetail != nil {
+		task.UpstreamContractDetail = *req.UpstreamContractDetail
+	}
+	if req.DownstreamContractDetail != nil {
+		task.DownstreamContractDetail = *req.DownstreamContractDetail
+	}
+	if req.Tests != nil {
+		task.Tests = *req.Tests
+	}
+	if req.Logs != nil {
+		task.BugLog = *req.Logs
+	}
+	if req.CodePaths != nil {
+		task.CodePaths = *req.CodePaths
+	}
+	if req.HumanAssistance != nil {
+		task.HumanAssistance = *req.HumanAssistance
+	}
+
+	// 如果名称改变或模块改变，需要更新 pathName
+	if nameChanged || moduleChanged {
+		// 获取模块信息以生成新的 pathName
+		var module models.Module
+		if err := database.DB.First(&module, "id = ?", task.ModuleID).Error; err != nil {
+			BadRequest(c, "目标模块不存在")
+			return
+		}
+
+		// 计算新的 pathName
+		basePathName := fmt.Sprintf("%s/%s", module.PathName, task.Name)
+		newPathName := basePathName
+		suffix := 1
+		for {
+			var count int64
+			database.DB.Model(&models.Task{}).Where("path_name = ? AND id != ?", newPathName, task.ID).Count(&count)
+			if count == 0 {
+				break
+			}
+			newPathName = fmt.Sprintf("%s-%d", basePathName, suffix)
+			suffix++
+		}
+		task.PathName = newPathName
+	}
+
+	task.Version++
+	task.UpdatedAt = time.Now().UnixMilli()
+
+	if err := database.DB.Save(&task).Error; err != nil {
+		InternalError(c, "更新任务失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"task": task,
+	})
+}
+
+// DeleteTaskByPathName 通过 pathName 删除任务
+func DeleteTaskByPathName(c *gin.Context) {
+	pathName := strings.TrimPrefix(c.Param("pathName"), "/")
+
+	var task models.Task
+	if err := database.DB.First(&task, "path_name = ?", pathName).Error; err != nil {
+		NotFound(c, "任务不存在: "+pathName)
+		return
+	}
+
+	// 检查是否锁定
+	if task.Locked {
+		Locked(c, "任务已被锁定，无法删除", gin.H{
+			"lockedBy": task.LockedBy,
+		})
+		return
+	}
+
+	if err := database.DB.Delete(&task).Error; err != nil {
+		InternalError(c, "删除任务失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"deleted": true,
 	})
 }

@@ -8,24 +8,12 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"time"
 )
 
-// Config 配置文件结构
+// Config 配置文件结构（简化版，只保留必要字段）
 type Config struct {
-	ProjectID   string    `json:"projectId"`
-	ProjectName string    `json:"projectName"`
-	ApiBaseUrl  string    `json:"apiBaseUrl"`
-	MCP         MCPConfig `json:"mcp"`
-	CreatedAt   string    `json:"createdAt"`
-	UpdatedAt   string    `json:"updatedAt"`
-}
-
-// MCPConfig MCP配置
-type MCPConfig struct {
-	ServerName  string `json:"serverName"`
-	Version     string `json:"version"`
-	Description string `json:"description"`
+	PathName   string `json:"pathName"`
+	ApiBaseUrl string `json:"apiBaseUrl"`
 }
 
 // ConfigManager 配置管理器
@@ -108,13 +96,6 @@ func (cm *ConfigManager) Load() error {
 		// 创建默认配置
 		cm.config = &Config{
 			ApiBaseUrl: "http://localhost:34567/api/v1",
-			MCP: MCPConfig{
-				ServerName:  "aitdd-mcp",
-				Version:     "1.0.0",
-				Description: "AITDD数据库增删改查MCP服务",
-			},
-			CreatedAt: time.Now().Format(time.RFC3339),
-			UpdatedAt: time.Now().Format(time.RFC3339),
 		}
 		return cm.saveWithoutLock()
 	}
@@ -150,9 +131,6 @@ func (cm *ConfigManager) saveWithoutLock() error {
 		return fmt.Errorf("创建配置目录失败: %w", err)
 	}
 
-	// 更新时间
-	cm.config.UpdatedAt = time.Now().Format(time.RFC3339)
-
 	// 序列化JSON
 	data, err := json.MarshalIndent(cm.config, "", "  ")
 	if err != nil {
@@ -174,13 +152,14 @@ func (cm *ConfigManager) GetConfig() *Config {
 	return cm.config
 }
 
-// SetProject 设置项目信息
-func (cm *ConfigManager) SetProject(projectID, projectName string) error {
+// SetProject 设置项目信息（只保存 pathName）
+func (cm *ConfigManager) SetProject(projectID, projectName, pathName string) error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	cm.config.ProjectID = projectID
-	cm.config.ProjectName = projectName
+	if pathName != "" {
+		cm.config.PathName = pathName
+	}
 
 	return cm.saveWithoutLock()
 }
@@ -195,11 +174,11 @@ func (cm *ConfigManager) SetApiBaseUrl(url string) error {
 	return cm.saveWithoutLock()
 }
 
-// GetProjectID 获取项目ID
-func (cm *ConfigManager) GetProjectID() string {
+// GetProjectPathName 获取项目路径名称
+func (cm *ConfigManager) GetProjectPathName() string {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
-	return cm.config.ProjectID
+	return cm.config.PathName
 }
 
 // GetApiBaseUrl 获取API基础URL
@@ -216,7 +195,7 @@ func (cm *ConfigManager) GetApiBaseUrl() string {
 func (cm *ConfigManager) IsConfigured() bool {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
-	return cm.config != nil && cm.config.ProjectID != ""
+	return cm.config != nil && cm.config.PathName != ""
 }
 
 // ToJSON 将配置转换为JSON字符串

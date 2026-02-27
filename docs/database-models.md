@@ -12,6 +12,7 @@
 |-------|---------|--------|---------|------|
 | ID | `id` | string | primaryKey;type:text | 项目ID |
 | Name | `name` | string | not null;type:text | 项目名称 |
+| PathName | `pathName` | string | unique;type:text | 路径标识 |
 | Constitution | `constitution` | string | type:text | 项目公约/架构信息 |
 | CreatedAt | `createdAt` | int64 | not null | 创建时间戳(毫秒) |
 | UpdatedAt | `updatedAt` | int64 | not null | 更新时间戳(毫秒) |
@@ -36,6 +37,7 @@
 | ParentID | `parentId` | *string | type:text;index | 父模块ID |
 | ProjectID | `projectId` | string | not null;type:text;index | 所属项目ID |
 | Name | `name` | string | not null;type:text | 模块名称 |
+| PathName | `pathName` | string | unique;type:text | 路径标识 |
 | Description | `description` | string | type:text | 模块描述 |
 | Prompt | `prompt` | string | type:text | 模块提示词 |
 | Status | `status` | string | not null;default:'designing';type:text;index | 模块状态 |
@@ -71,6 +73,7 @@
 | ID | `id` | primaryKey;type:text | string | 任务ID |
 | ModuleID | `moduleId` | not null;type:text;index | string | 所属模块ID |
 | Name | `name` | not null;type:text | string | 任务名称 |
+| PathName | `pathName` | unique;type:text | string | 路径标识 |
 | Description | `description` | type:text | string | 任务描述 |
 | Status | `status` | not null;default:'ready';type:text;index | string | 任务状态 |
 | Assignee | `assignee` | type:text | *string | 负责人 |

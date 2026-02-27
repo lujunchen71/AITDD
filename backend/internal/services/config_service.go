@@ -15,6 +15,7 @@ type ConfigService struct {
 // AppConfig 应用配置
 type AppConfig struct {
 	ProjectName string     `json:"projectName"`
+	PathName    string     `json:"pathName"`
 	PluginType  string     `json:"pluginType"`
 	ServerPort  int        `json:"serverPort"`
 	Database    DBConfig   `json:"database"`
@@ -73,6 +74,7 @@ func (s *ConfigService) Save(config *AppConfig) error {
 func (s *ConfigService) CreateDefault(projectName, pluginType string) error {
 	config := &AppConfig{
 		ProjectName: projectName,
+		PathName:    projectName,
 		PluginType:  pluginType,
 		ServerPort:  34567,
 		Database: DBConfig{
