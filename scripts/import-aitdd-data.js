@@ -263,6 +263,7 @@ async function importData() {
         name: task.name,
         description: task.description || '',
         prompt: task.prompt || '',
+        codePaths: task.codePaths || '',
         // API 期望字符串，如果是对象则转换为 JSON 字符串
         upstreamContractDetail: typeof task.upstreamContractDetail === 'object'
           ? JSON.stringify(task.upstreamContractDetail)

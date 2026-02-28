@@ -1,5 +1,5 @@
 import React from 'react';
-import { Drawer, Tabs, Descriptions, Tag, Input, Spin, List, Card, Typography, Collapse, Empty } from 'antd';
+import { Drawer, Tabs, Descriptions, Tag, Input, Spin, List, Card, Typography, Collapse, Empty, Table } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../../../../services/api';
 import { ContractDetail, TestItem } from '../../../../types';
@@ -107,42 +107,47 @@ const ContractDetailCard: React.FC<{ detail: ContractDetail | null; title: strin
   );
 };
 
-// 测试列表渲染组件
+// 测试列表渲染组件 - MCP格式 {target, api}
 const TestsList: React.FC<{ tests: TestItem[] }> = ({ tests }) => {
   if (!tests || tests.length === 0) {
     return <Empty description="无测试" image={Empty.PRESENTED_IMAGE_SIMPLE} />;
   }
 
+  const columns = [
+    {
+      title: '#',
+      key: 'index',
+      width: 40,
+      render: (_: any, __: any, index: number) => (
+        <Tag color="green">{index + 1}</Tag>
+      ),
+    },
+    {
+      title: '测试目标',
+      dataIndex: 'target',
+      key: 'target',
+      render: (value: string) => value || <span className="text-gray-400">未填写</span>,
+    },
+    {
+      title: '测试API',
+      dataIndex: 'api',
+      key: 'api',
+      width: 250,
+      render: (value: string) => value ? (
+        <Text code style={{ fontSize: 12 }}>{value}</Text>
+      ) : (
+        <span className="text-gray-400">未填写</span>
+      ),
+    },
+  ];
+
   return (
-    <List
-      size="small"
+    <Table
       dataSource={tests}
-      renderItem={(item, index) => (
-        <List.Item>
-          <Card size="small" className="w-full" title={<><Tag color="green">测试 {index + 1}</Tag> {item.name}</>}>
-            <Descriptions column={1} size="small">
-              {item.description && (
-                <Descriptions.Item label="描述">{item.description}</Descriptions.Item>
-              )}
-              {item.precondition && (
-                <Descriptions.Item label="前置条件">{item.precondition}</Descriptions.Item>
-              )}
-              {item.steps && item.steps.length > 0 && (
-                <Descriptions.Item label="步骤">
-                  <ol style={{ margin: 0, paddingLeft: 20 }}>
-                    {item.steps.map((step, idx) => (
-                      <li key={idx}>{step}</li>
-                    ))}
-                  </ol>
-                </Descriptions.Item>
-              )}
-              {item.expected && (
-                <Descriptions.Item label="预期结果">{item.expected}</Descriptions.Item>
-              )}
-            </Descriptions>
-          </Card>
-        </List.Item>
-      )}
+      columns={columns}
+      pagination={false}
+      size="small"
+      rowKey={(_, index) => `test-${index}`}
     />
   );
 };

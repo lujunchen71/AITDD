@@ -1,15 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input, Select, Button, Space, Card } from 'antd';
+import { Modal, Form, Input, Select, Button, Table } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { FormProps } from 'antd';
-
-interface TestItem {
-  name: string;
-  description: string;
-  precondition: string;
-  steps: string[];
-  expected: string;
-}
+import { TestItem } from '../../../../types';
 
 interface TaskFormProps {
   open: boolean;
@@ -49,7 +42,6 @@ const TaskForm: React.FC<TaskFormProps> = ({
   const [form] = Form.useForm();
   const isEdit = !!initialValues?.id;
   const [tests, setTests] = useState<TestItem[]>([]);
-  const [newStep, setNewStep] = useState<{ [key: number]: string }>({});
 
   // 解析初始值中的tests字段
   useEffect(() => {
@@ -57,7 +49,12 @@ const TaskForm: React.FC<TaskFormProps> = ({
       try {
         const parsedTests = JSON.parse(initialValues.tests);
         if (Array.isArray(parsedTests)) {
-          setTests(parsedTests);
+          // 统一转换为 MCP 格式 {target, api}
+          const normalizedTests = parsedTests.map((test: any) => ({
+            target: test.target || test.name || '',
+            api: test.api || test.expected || '',
+          }));
+          setTests(normalizedTests);
         } else {
           setTests([]);
         }
@@ -67,7 +64,6 @@ const TaskForm: React.FC<TaskFormProps> = ({
     } else {
       setTests([]);
     }
-    setNewStep({});
   }, [initialValues?.tests, open]);
 
   const handleSubmit: FormProps['onFinish'] = (values) => {
@@ -80,7 +76,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
   };
 
   const addTest = () => {
-    setTests([...tests, { name: '', description: '', precondition: '', steps: [], expected: '' }]);
+    setTests([...tests, { target: '', api: '' }]);
   };
 
   const removeTest = (index: number) => {
@@ -88,33 +84,61 @@ const TaskForm: React.FC<TaskFormProps> = ({
     setTests(newTests);
   };
 
-  const updateTest = (index: number, field: keyof TestItem, value: string | string[]) => {
+  const updateTest = (index: number, field: keyof TestItem, value: string) => {
     const newTests = [...tests];
     newTests[index] = { ...newTests[index], [field]: value };
     setTests(newTests);
   };
 
-  const addStep = (testIndex: number) => {
-    const step = newStep[testIndex]?.trim();
-    if (step) {
-      const newTests = [...tests];
-      newTests[testIndex] = {
-        ...newTests[testIndex],
-        steps: [...newTests[testIndex].steps, step],
-      };
-      setTests(newTests);
-      setNewStep({ ...newStep, [testIndex]: '' });
-    }
-  };
-
-  const removeStep = (testIndex: number, stepIndex: number) => {
-    const newTests = [...tests];
-    newTests[testIndex] = {
-      ...newTests[testIndex],
-      steps: newTests[testIndex].steps.filter((_, i) => i !== stepIndex),
-    };
-    setTests(newTests);
-  };
+  // 测试用例表格列定义
+  const testColumns = [
+    {
+      title: '#',
+      key: 'index',
+      width: 40,
+      render: (_: any, __: any, index: number) => index + 1,
+    },
+    {
+      title: '测试目标',
+      dataIndex: 'target',
+      key: 'target',
+      render: (value: string, _record: TestItem, index: number) => (
+        <Input
+          placeholder="描述测试目标，如：验证构造函数正确初始化"
+          value={value}
+          onChange={(e) => updateTest(index, 'target', e.target.value)}
+        />
+      ),
+    },
+    {
+      title: '测试API',
+      dataIndex: 'api',
+      key: 'api',
+      width: 250,
+      render: (value: string, _record: TestItem, index: number) => (
+        <Input
+          placeholder="测试函数名，如：test_constructor()"
+          value={value}
+          onChange={(e) => updateTest(index, 'api', e.target.value)}
+          style={{ fontFamily: 'monospace' }}
+        />
+      ),
+    },
+    {
+      title: '',
+      key: 'action',
+      width: 40,
+      render: (_: any, _record: TestItem, index: number) => (
+        <Button
+          type="text"
+          danger
+          size="small"
+          icon={<DeleteOutlined />}
+          onClick={() => removeTest(index)}
+        />
+      ),
+    },
+  ];
 
   return (
     <Modal
@@ -203,94 +227,17 @@ const TaskForm: React.FC<TaskFormProps> = ({
               添加测试用例
             </Button>
           </div>
-          {tests.map((test, index) => (
-            <Card
-              key={index}
+          
+          {tests.length > 0 ? (
+            <Table
+              dataSource={tests}
+              columns={testColumns}
+              pagination={false}
               size="small"
-              style={{ marginBottom: 8 }}
-              title={`测试用例 ${index + 1}${test.name ? `: ${test.name}` : ''}`}
-              extra={
-                <Button
-                  type="text"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => removeTest(index)}
-                />
-              }
-            >
-              <Space direction="vertical" style={{ width: '100%' }} size="small">
-                <div>
-                  <label style={{ fontSize: 12, color: '#666', marginBottom: 4, display: 'block' }}>名称 *</label>
-                  <Input
-                    placeholder="测试用例名称"
-                    value={test.name}
-                    onChange={(e) => updateTest(index, 'name', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: '#666', marginBottom: 4, display: 'block' }}>描述</label>
-                  <Input.TextArea
-                    placeholder="测试用例描述"
-                    rows={2}
-                    value={test.description}
-                    onChange={(e) => updateTest(index, 'description', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: '#666', marginBottom: 4, display: 'block' }}>前置条件</label>
-                  <Input
-                    placeholder="执行测试的前置条件"
-                    value={test.precondition}
-                    onChange={(e) => updateTest(index, 'precondition', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: '#666', marginBottom: 4, display: 'block' }}>测试步骤</label>
-                  {test.steps.map((step, stepIdx) => (
-                    <div key={stepIdx} style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-                      <span style={{ color: '#1890ff', marginRight: 8 }}>{stepIdx + 1}.</span>
-                      <Input
-                        value={step}
-                        onChange={(e) => {
-                          const newSteps = [...test.steps];
-                          newSteps[stepIdx] = e.target.value;
-                          updateTest(index, 'steps', newSteps);
-                        }}
-                        style={{ flex: 1 }}
-                      />
-                      <Button
-                        type="text"
-                        danger
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        onClick={() => removeStep(index, stepIdx)}
-                      />
-                    </div>
-                  ))}
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <Input
-                      placeholder="添加新步骤"
-                      value={newStep[index] || ''}
-                      onChange={(e) => setNewStep({ ...newStep, [index]: e.target.value })}
-                      onPressEnter={() => addStep(index)}
-                    />
-                    <Button size="small" onClick={() => addStep(index)}>添加</Button>
-                  </div>
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, color: '#666', marginBottom: 4, display: 'block' }}>预期结果</label>
-                  <Input.TextArea
-                    placeholder="测试的预期结果"
-                    rows={2}
-                    value={test.expected}
-                    onChange={(e) => updateTest(index, 'expected', e.target.value)}
-                  />
-                </div>
-              </Space>
-            </Card>
-          ))}
-          {tests.length === 0 && (
-            <div style={{ color: '#999', textAlign: 'center', padding: 16 }}>
+              rowKey={(_, index) => `test-${index}`}
+            />
+          ) : (
+            <div style={{ color: '#999', textAlign: 'center', padding: 16, border: '1px dashed #d9d9d9', borderRadius: 4 }}>
               暂无测试用例，点击上方按钮添加
             </div>
           )}

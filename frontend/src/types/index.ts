@@ -100,13 +100,12 @@ export interface ContractDetail {
   list: ContractInterfaceItem[];
 }
 
-/** 测试用例 - 实际数据格式 */
+/** 测试用例 - MCP格式 */
 export interface TestItem {
-  name: string;
-  description: string;
-  precondition: string;
-  steps: string[];
-  expected: string;
+  /** 测试目标/描述 */
+  target: string;
+  /** 测试函数/API */
+  api: string;
 }
 
 /** 日志条目 */

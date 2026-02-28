@@ -12,8 +12,9 @@ import (
 
 // Config 配置文件结构（简化版，只保留必要字段）
 type Config struct {
-	PathName   string `json:"pathName"`
-	ApiBaseUrl string `json:"apiBaseUrl"`
+	ProjectName string `json:"projectName"`
+	PathName    string `json:"pathName"`
+	ApiBaseUrl  string `json:"apiBaseUrl"`
 }
 
 // ConfigManager 配置管理器
@@ -221,4 +222,30 @@ type ProjectInfo struct {
 type ProjectListResponse struct {
 	Projects []ProjectInfo `json:"projects"`
 	Total    int           `json:"total"`
+}
+
+// SaveConfig 保存配置（接受 map 参数）
+func (cm *ConfigManager) SaveConfig(config map[string]interface{}) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	// 更新配置字段
+	if projectName, ok := config["projectName"].(string); ok {
+		cm.config.ProjectName = projectName
+	}
+	if pathName, ok := config["pathName"].(string); ok {
+		cm.config.PathName = pathName
+	}
+	if apiBaseUrl, ok := config["apiBaseUrl"].(string); ok {
+		cm.config.ApiBaseUrl = apiBaseUrl
+	}
+
+	return cm.saveWithoutLock()
+}
+
+// GetProjectName 获取项目名称
+func (cm *ConfigManager) GetProjectName() string {
+	cm.mu.RLock()
+	defer cm.mu.RUnlock()
+	return cm.config.ProjectName
 }

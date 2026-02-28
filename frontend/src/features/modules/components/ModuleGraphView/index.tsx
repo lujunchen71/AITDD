@@ -1338,7 +1338,7 @@ const InfoBadge: React.FC<{
   const scaledFontSize = Math.round(fontSize * tooltipScale);
   const tooltipWidth = Math.round(350 * tooltipScale);
 
-  // 解析测试用例内容
+  // 解析测试用例内容 - MCP格式 {target, api}
   const renderContent = () => {
     if (type === 'tests') {
       try {
@@ -1362,28 +1362,19 @@ const InfoBadge: React.FC<{
                   borderRadius: 4,
                   marginBottom: idx < tests.length - 1 ? 8 : 0,
                 }}>
-                  <div style={{ color: '#fff', fontWeight: 600, marginBottom: 4 }}>🧪 {test.name}</div>
-                  {test.description && <div style={{ color: '#aaa', marginBottom: 4 }}>{test.description}</div>}
-                  {test.precondition && (
-                    <div style={{ color: '#888', fontSize: scaledFontSize - 1, marginBottom: 4 }}>
-                      <span style={{ color: '#f59e0b' }}>前置条件:</span> {test.precondition}
-                    </div>
-                  )}
-                  {test.steps && test.steps.length > 0 && (
-                    <div style={{ marginBottom: 4 }}>
-                      <div style={{ color: '#10b981', fontSize: scaledFontSize - 1 }}>步骤:</div>
-                      {test.steps.map((step: string, stepIdx: number) => (
-                        <div key={stepIdx} style={{ color: '#ccc', fontSize: scaledFontSize - 1, paddingLeft: 8 }}>
-                          {stepIdx + 1}. {step}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {test.expected && (
-                    <div style={{ color: color, fontSize: scaledFontSize - 1 }}>
-                      <span style={{ fontWeight: 500 }}>预期:</span> {test.expected}
-                    </div>
-                  )}
+                  <div style={{ color: '#fff', fontWeight: 600, marginBottom: 4 }}>
+                    🧪 {test.target || test.name || '未命名测试'}
+                  </div>
+                  <div style={{
+                    color: '#a855f7',
+                    fontSize: scaledFontSize - 1,
+                    fontFamily: 'monospace',
+                    background: '#1e1e2e',
+                    padding: '4px 8px',
+                    borderRadius: 4,
+                  }}>
+                    {test.api || test.expected || '未定义API'}
+                  </div>
                 </div>
               ))}
             </div>

@@ -130,6 +130,20 @@ func SetupRouter() *gin.Engine {
 			promptVersions.POST("/:type/:id/compare", handlers.ComparePromptVersions)
 		}
 
+		// 问题相关
+		issues := v1.Group("/issues")
+		{
+			issues.GET("", handlers.QueryIssues)
+			issues.POST("", handlers.CreateIssue)
+			issues.POST("/reply", handlers.ReplyIssue)
+			issues.POST("/resolve", handlers.ResolveIssue)
+			issues.GET("/id/:id", handlers.GetIssueByID)
+			issues.DELETE("/:id", handlers.DeleteIssue)
+			issues.GET("/by-task/*pathName", handlers.GetIssuesByTask)
+			// 通过关键字段获取问题（需要在最后，避免与其他路由冲突）
+			issues.GET("/:fromTaskPathName/:toTaskPathName/:title", handlers.GetIssue)
+		}
+
 		// 图表相关
 		graph := v1.Group("/graph")
 		{

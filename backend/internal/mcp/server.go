@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"context"
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -15,6 +14,8 @@ type MCPServer struct {
 	server        *server.MCPServer
 	configManager *ConfigManager
 	ruleEngine    *RuleEngine
+	cache         *MCPCache
+	logger        *MCPLogger
 }
 
 // NewMCPServer 创建 MCP 服务器
@@ -22,6 +23,8 @@ func NewMCPServer() *MCPServer {
 	s := &MCPServer{
 		configManager: GetConfigManager(),
 		ruleEngine:    GetRuleEngine(),
+		cache:         GetMCPCache(),
+		logger:        GetMCPLogger(),
 	}
 
 	// 创建 MCP 服务器
@@ -45,316 +48,299 @@ func (s *MCPServer) getApiURL() string {
 
 // registerTools 注册所有 MCP 工具
 func (s *MCPServer) registerTools() {
-	// ==================== 配置管理工具 ====================
-	s.registerConfigTools()
+	// ==================== 1. 项目上下文 (2个) ====================
+	s.registerContextTools()
 
-	// ==================== 获取类工具 ====================
-	s.registerGetTools()
+	// ==================== 2. 信息查询 (3个) ====================
+	s.registerQueryTools()
 
-	// ==================== 修改类工具 ====================
-	s.registerModifyTools()
-
-	// ==================== 状态类工具 ====================
-	s.registerStatusTools()
-
-	// ==================== 错误处理类工具 ====================
-	s.registerErrorTools()
-
-	// ==================== 检查类工具 ====================
+	// ==================== 3. 验证检查 (3个) ====================
 	s.registerCheckTools()
 
-	// ==================== 其他工具 ====================
-	s.registerOtherTools()
+	// ==================== 4. 节点操作 (3个) ====================
+	s.registerNodeTools()
+
+	// ==================== 5. 依赖管理 (3个) ====================
+	s.registerDependencyTools()
+
+	// ==================== 6. 问答系统 (4个) ====================
+	s.registerIssueTools()
+
+	// ==================== 7. 锁管理 (2个) ====================
+	s.registerLockTools()
+
+	// ==================== 8. 编译接口 (2个) ====================
+	s.registerCompileTools()
+
+	// ==================== 9. 配置和规则管理 (4个) ====================
+	s.registerConfigRuleTools()
+
+	// ==================== 10. 状态管理 (1个) ====================
+	s.registerStatusTools()
 }
 
-// registerConfigTools 注册配置管理工具
-func (s *MCPServer) registerConfigTools() {
-	// init_project - 初始化项目配置
+// ==================== 1. 项目上下文工具 ====================
+func (s *MCPServer) registerContextTools() {
+	// init_project - 初始化/设置当前项目
 	s.server.AddTool(mcp.NewTool("init_project",
-		mcp.WithDescription("初始化项目配置。获取数据库中所有项目列表（包含id、名称、简介），返回给AI让用户选择。AI会根据用户提供的项目名称匹配对应的projectId，然后自动调用set_project工具设置当前项目。"),
+		mcp.WithDescription("初始化/设置当前项目。不传 pathName 则列出所有项目供选择；传入 pathName 则设置为当前项目。"),
+		mcp.WithString("pathName", mcp.Description("项目路径名称（可选，不传则返回项目列表供选择）")),
 	), s.handleInitProject)
 
-	// get_config - 获取当前配置
-	s.server.AddTool(mcp.NewTool("get_config",
-		mcp.WithDescription("获取当前 .aitdd/project.json 配置文件的内容"),
-	), s.handleGetConfig)
-
-	// set_project - 设置当前项目
-	s.server.AddTool(mcp.NewTool("set_project",
-		mcp.WithDescription("设置当前项目。将项目ID、名称和路径名称保存到 .aitdd/project.json 文件中，后续所有MCP工具调用都会使用这个项目ID。通常由AI在init_project后根据用户选择的项目名称自动调用。"),
-		mcp.WithString("projectId", mcp.Description("项目 ID"), mcp.Required()),
-		mcp.WithString("projectName", mcp.Description("项目名称"), mcp.Required()),
-		mcp.WithString("pathName", mcp.Description("项目路径名称")),
-	), s.handleSetProject)
+	// get_context - 获取当前上下文
+	s.server.AddTool(mcp.NewTool("get_context",
+		mcp.WithDescription("获取当前项目上下文信息，包括项目配置、当前状态、最近操作的模块/任务等。"),
+	), s.handleGetContext)
 }
 
-// registerGetTools 注册获取类工具
-func (s *MCPServer) registerGetTools() {
-	// get_project_info - 获取项目简介
-	s.server.AddTool(mcp.NewTool("get_project_info",
-		mcp.WithDescription("获取项目简介、架构信息、编码规范"),
-		mcp.WithString("pathName", mcp.Description("项目路径名称"), mcp.Required()),
-	), s.handleGetProjectInfo)
+// ==================== 2. 信息查询工具 ====================
+func (s *MCPServer) registerQueryTools() {
+	// query_module - 查询模块
+	s.server.AddTool(mcp.NewTool("query_module",
+		mcp.WithDescription(`查询模块信息。
 
-	// get_all_task_code_paths - 获取所有task代码路径
-	s.server.AddTool(mcp.NewTool("get_all_task_code_paths",
-		mcp.WithDescription("获取项目中所有任务的代码结构路径"),
-		mcp.WithString("pathName", mcp.Description("项目路径名称"), mcp.Required()),
-	), s.handleGetAllTaskCodePaths)
+可查询字段: name, description, status, prompt, upstreamContractSummary, downstreamContractSummary, testCoverage, locked, version
 
-	// get_all_modules - 获取所有模块概要
-	s.server.AddTool(mcp.NewTool("get_all_modules",
-		mcp.WithDescription("获取所有模块的 id、名称、介绍"),
-		mcp.WithString("pathName", mcp.Description("项目路径名称"), mcp.Required()),
-		mcp.WithBoolean("includeStats", mcp.Description("是否包含统计信息")),
-	), s.handleGetAllModules)
+fields 不填返回所有字段。`),
+		mcp.WithString("pathName", mcp.Description("模块路径，格式: 项目名/模块名"), mcp.Required()),
+		mcp.WithArray("fields", mcp.Description("指定返回字段，如 [\"name\",\"status\"]")),
+	), s.handleQueryModule)
 
-	// get_module_tasks - 获取模块任务列表
-	s.server.AddTool(mcp.NewTool("get_module_tasks",
-		mcp.WithDescription("获取某模块的所有任务列表概要"),
-		mcp.WithString("pathName", mcp.Description("模块路径名称"), mcp.Required()),
-		mcp.WithBoolean("includeContracts", mcp.Description("是否包含契约信息")),
-	), s.handleGetModuleTasks)
+	// query_task - 查询任务
+	s.server.AddTool(mcp.NewTool("query_task",
+		mcp.WithDescription(`查询任务信息。
 
-	// get_task_detail - 获取任务详情
-	s.server.AddTool(mcp.NewTool("get_task_detail",
-		mcp.WithDescription("获取某任务的详细信息"),
-		mcp.WithString("pathName", mcp.Description("任务路径名称"), mcp.Required()),
-	), s.handleGetTaskDetail)
+可查询字段: name, description, status, prompt, upstreamContractDetail, downstreamContractDetail, tests, testResult, codePaths, bugLog, humanAssistance, issueDetails, locked, version
 
-	// get_task_contracts - 获取任务上下游契约
-	s.server.AddTool(mcp.NewTool("get_task_contracts",
-		mcp.WithDescription("获取某任务的上下游契约接口信息"),
-		mcp.WithString("pathName", mcp.Description("任务路径名称"), mcp.Required()),
-		mcp.WithString("direction", mcp.Description("方向：upstream/downstream/both，默认 both")),
-	), s.handleGetTaskContracts)
+fields 不填返回所有字段。`),
+		mcp.WithString("pathName", mcp.Description("任务路径，格式: 项目名/模块名/任务名"), mcp.Required()),
+		mcp.WithArray("fields", mcp.Description("指定返回字段，如 [\"name\",\"tests\"]")),
+	), s.handleQueryTask)
 
-	// 保留旧的工具名称以兼容
-	s.server.AddTool(mcp.NewTool("get_project_summary",
-		mcp.WithDescription("获取项目简述信息（兼容旧版）"),
-		mcp.WithString("pathName", mcp.Description("项目路径名称")),
-	), s.handleGetProjectInfo)
+	// query_project_index_tree - 查询项目计划索引树
+	s.server.AddTool(mcp.NewTool("query_project_index_tree",
+		mcp.WithDescription("查询项目计划索引树，返回项目和模块、任务的树形结构，包含名称、类型和状态。返回格式为简洁的树形文本。"),
+		mcp.WithString("pathName", mcp.Description("起始 pathName，不传则返回整个项目树")),
+	), s.handleQueryProjectIndexTree)
 
-	s.server.AddTool(mcp.NewTool("get_constitution",
-		mcp.WithDescription("获取项目公约"),
-	), s.handleGetConstitution)
-
-	s.server.AddTool(mcp.NewTool("get_module_overview",
-		mcp.WithDescription("获取模块概览"),
-		mcp.WithString("pathName", mcp.Description("模块路径名称"), mcp.Required()),
-	), s.handleGetModuleOverview)
-
-	s.server.AddTool(mcp.NewTool("get_module_task_path_names",
-		mcp.WithDescription("获取模块中所有任务的 pathName 列表"),
-		mcp.WithString("pathName", mcp.Description("模块路径名称"), mcp.Required()),
-	), s.handleGetModuleTaskPathNames)
-
-	s.server.AddTool(mcp.NewTool("get_task_details",
-		mcp.WithDescription("获取任务详细信息（兼容旧版）"),
-		mcp.WithString("pathName", mcp.Description("任务路径名称"), mcp.Required()),
-	), s.handleGetTaskDetail)
+	// query_file_code_path_tree - 查询代码文件路径树
+	s.server.AddTool(mcp.NewTool("query_file_code_path_tree",
+		mcp.WithDescription("查询任务或模块关联的代码文件路径树，显示代码文件与任务的对应关系。"),
+		mcp.WithString("pathName", mcp.Description("任务或模块的 pathName，不传则返回整个项目的代码文件列表")),
+	), s.handleQueryFileCodePathTree)
 }
 
-// registerModifyTools 注册修改类工具
-func (s *MCPServer) registerModifyTools() {
-	// delete_module - 删除模块
-	s.server.AddTool(mcp.NewTool("delete_module",
-		mcp.WithDescription("删除指定模块及其所有子任务"),
-		mcp.WithString("pathName", mcp.Description("要删除的模块路径名称"), mcp.Required()),
-		mcp.WithBoolean("force", mcp.Description("是否强制删除（即使有依赖）")),
-	), s.handleDeleteModule)
-
-	// create_module - 创建模块
-	s.server.AddTool(mcp.NewTool("create_module",
-		mcp.WithDescription("添加新模块"),
-		mcp.WithString("name", mcp.Description("模块名称"), mcp.Required()),
-		mcp.WithString("description", mcp.Description("模块描述")),
-		mcp.WithString("prompt", mcp.Description("模块提示词")),
-		mcp.WithString("pathName", mcp.Description("模块路径名称（可选，不传则使用name自动生成）")),
-		mcp.WithString("parentPathName", mcp.Description("父模块路径名称，如果是根模块则不传")),
-	), s.handleCreateModule)
-
-	// update_module - 更新模块
-	s.server.AddTool(mcp.NewTool("update_module",
-		mcp.WithDescription("修改模块信息"),
-		mcp.WithString("pathName", mcp.Description("模块路径名称"), mcp.Required()),
-		mcp.WithString("name", mcp.Description("模块名称")),
-		mcp.WithString("description", mcp.Description("模块描述")),
-		mcp.WithString("prompt", mcp.Description("模块提示词")),
-		mcp.WithString("status", mcp.Description("模块状态")),
-		mcp.WithNumber("version", mcp.Description("当前版本号"), mcp.Required()),
-	), s.handleUpdateModule)
-
-	// delete_module_tasks - 删除模块所有任务
-	s.server.AddTool(mcp.NewTool("delete_module_tasks",
-		mcp.WithDescription("删除模块的所有任务"),
-		mcp.WithString("pathName", mcp.Description("模块路径名称"), mcp.Required()),
-		mcp.WithBoolean("force", mcp.Description("是否强制删除（即使有依赖）")),
-	), s.handleDeleteModuleTasks)
-
-	// create_task - 创建任务
-	s.server.AddTool(mcp.NewTool("create_task",
-		mcp.WithDescription("在模块中添加新任务"),
-		mcp.WithString("pathName", mcp.Description("所属模块的路径名称"), mcp.Required()),
-		mcp.WithString("name", mcp.Description("任务名称"), mcp.Required()),
-		mcp.WithString("description", mcp.Description("任务描述")),
-		mcp.WithString("prompt", mcp.Description("任务提示词")),
-		mcp.WithString("upstreamContractDetail", mcp.Description("上游契约详情JSON")),
-		mcp.WithString("downstreamContractDetail", mcp.Description("下游契约详情JSON")),
-		mcp.WithString("tests", mcp.Description("测试用例JSON数组")),
-		mcp.WithString("codePaths", mcp.Description("代码路径JSON数组")),
-	), s.handleCreateTask)
-
-	// update_module_full - 完整更新模块
-	s.server.AddTool(mcp.NewTool("update_module_full",
-		mcp.WithDescription("重新定义模块的所有信息"),
-		mcp.WithString("pathName", mcp.Description("模块路径名称"), mcp.Required()),
-		mcp.WithString("moduleJson", mcp.Description("完整的模块JSON数据"), mcp.Required()),
-	), s.handleUpdateModuleFull)
-
-	// update_task_full - 完整更新任务
-	s.server.AddTool(mcp.NewTool("update_task_full",
-		mcp.WithDescription("重新定义任务的完整信息"),
-		mcp.WithString("pathName", mcp.Description("任务路径名称"), mcp.Required()),
-		mcp.WithString("taskJson", mcp.Description("完整的任务JSON数据"), mcp.Required()),
-	), s.handleUpdateTaskFull)
-
-	// 保留旧的工具名称
-	s.server.AddTool(mcp.NewTool("update_task",
-		mcp.WithDescription("修改任务详细信息"),
-		mcp.WithString("pathName", mcp.Description("任务路径名称"), mcp.Required()),
-		mcp.WithString("name", mcp.Description("任务名称")),
-		mcp.WithString("description", mcp.Description("任务描述")),
-		mcp.WithString("status", mcp.Description("任务状态")),
-		mcp.WithString("prompt", mcp.Description("任务提示词")),
-	), s.handleUpdateTask)
-
-	s.server.AddTool(mcp.NewTool("delete_task",
-		mcp.WithDescription("删除任务"),
-		mcp.WithString("pathName", mcp.Description("要删除的任务路径名称"), mcp.Required()),
-	), s.handleDeleteTask)
-}
-
-// registerStatusTools 注册状态类工具
-func (s *MCPServer) registerStatusTools() {
-	// get_all_task_status - 获取所有任务状态
-	s.server.AddTool(mcp.NewTool("get_all_task_status",
-		mcp.WithDescription("获取项目中所有任务的状态信息"),
-		mcp.WithString("pathName", mcp.Description("项目路径名称"), mcp.Required()),
-		mcp.WithString("status", mcp.Description("状态过滤")),
-		mcp.WithBoolean("includeLockInfo", mcp.Description("是否包含锁定信息")),
-	), s.handleGetAllTaskStatus)
-
-	// get_module_task_status - 获取模块任务状态
-	s.server.AddTool(mcp.NewTool("get_module_task_status",
-		mcp.WithDescription("获取当前模块的所有任务状态信息"),
-		mcp.WithString("pathName", mcp.Description("模块路径名称"), mcp.Required()),
-		mcp.WithBoolean("includeLockInfo", mcp.Description("是否包含锁定信息")),
-	), s.handleGetModuleTaskStatus)
-}
-
-// registerErrorTools 注册错误处理类工具
-func (s *MCPServer) registerErrorTools() {
-	// get_project_errors - 获取项目错误列表
-	s.server.AddTool(mcp.NewTool("get_project_errors",
-		mcp.WithDescription("返回整个项目的错误列表，遍历所有任务检查issue_details和bug_log"),
-		mcp.WithString("pathName", mcp.Description("项目路径名称"), mcp.Required()),
-		mcp.WithString("severity", mcp.Description("严重级别过滤：error/warning/info")),
-		mcp.WithBoolean("includeDetails", mcp.Description("是否包含详细信息")),
-	), s.handleGetProjectErrors)
-
-	// get_module_errors - 获取模块错误列表
-	s.server.AddTool(mcp.NewTool("get_module_errors",
-		mcp.WithDescription("返回某模块的所有子任务错误列表"),
-		mcp.WithString("pathName", mcp.Description("模块路径名称"), mcp.Required()),
-		mcp.WithString("severity", mcp.Description("严重级别过滤")),
-		mcp.WithBoolean("includeDetails", mcp.Description("是否包含详细信息")),
-	), s.handleGetModuleErrors)
-}
-
-// registerCheckTools 注册检查类工具
+// ==================== 3. 验证检查工具 ====================
 func (s *MCPServer) registerCheckTools() {
-	// check_module - 检查模块并生成报告
-	s.server.AddTool(mcp.NewTool("check_module",
-		mcp.WithDescription("根据 .aitdd/rule.json 中的规则检查模块并生成报告"),
-		mcp.WithString("pathName", mcp.Description("模块路径名称"), mcp.Required()),
-		mcp.WithArray("rules", mcp.Description("指定检查规则ID列表，不传则检查所有")),
-		mcp.WithBoolean("includeDynamic", mcp.Description("是否包含动态检查，默认 true")),
-		mcp.WithString("format", mcp.Description("输出格式：json/markdown，默认 json")),
-	), s.handleCheckModule)
+	// check_contract_alignment - 检查上下游任务契约是否对齐
+	s.server.AddTool(mcp.NewTool("check_contract_alignment",
+		mcp.WithDescription("检查上下游任务契约是否对齐。比较上游任务的 downstreamContractDetail 与下游任务的 upstreamContractDetail，返回差异列表。"),
+		mcp.WithString("upstreamPathName", mcp.Description("上游任务 pathName"), mcp.Required()),
+		mcp.WithString("downstreamPathName", mcp.Description("下游任务 pathName"), mcp.Required()),
+	), s.handleCheckContractAlignment)
+
+	// check_task_readiness - 检查任务是否准备好开始开发
+	s.server.AddTool(mcp.NewTool("check_task_readiness",
+		mcp.WithDescription("检查任务是否准备好开始开发。检查项包括：prompt 是否为空(error)、tests 是否为空(warning)、上游契约是否存在(error)、是否被锁定(info)、上游任务是否完成(warning)。"),
+		mcp.WithString("pathName", mcp.Description("任务 pathName"), mcp.Required()),
+	), s.handleCheckTaskReadiness)
+
+	// check_dependencies - 检查依赖关系和阻塞状态
+	s.server.AddTool(mcp.NewTool("check_dependencies",
+		mcp.WithDescription("检查任务或模块的依赖关系和阻塞状态。返回是否有循环依赖、是否被阻塞、阻塞方列表、上下游依赖列表。"),
+		mcp.WithString("pathName", mcp.Description("任务或模块 pathName"), mcp.Required()),
+		mcp.WithString("type", mcp.Description("类型：task 或 module"), mcp.Required()),
+	), s.handleCheckDependencies)
 }
 
-// registerOtherTools 注册其他工具
-func (s *MCPServer) registerOtherTools() {
-	// 工具相关
-	s.server.AddTool(mcp.NewTool("open_frontend",
-		mcp.WithDescription("打开前端网页"),
-	), s.handleOpenFrontend)
+// ==================== 4. 节点操作工具 ====================
+func (s *MCPServer) registerNodeTools() {
+	// create_node - 统一创建节点
+	s.server.AddTool(mcp.NewTool("create_node",
+		mcp.WithDescription("统一创建节点接口。根据 type 创建模块或任务。type='module' 时创建模块，type='task' 时创建任务。"),
+		mcp.WithString("type", mcp.Description("节点类型：module 或 task"), mcp.Required()),
+		mcp.WithString("parentPath", mcp.Description("父节点 pathName。创建模块时为项目或父模块 pathName，创建任务时为所属模块 pathName"), mcp.Required()),
+		mcp.WithString("name", mcp.Description("节点名称"), mcp.Required()),
+		mcp.WithString("pathName", mcp.Description("节点 pathName（可选，不传则根据 parentPath 和 name 自动生成）")),
+		mcp.WithObject("data", mcp.Description("类型相关的具体字段。module: description, prompt, upstreamContractSummary, downstreamContractSummary；task: description, prompt, upstreamContractDetail, downstreamContractDetail, tests, codePaths")),
+	), s.handleCreateNode)
 
-	// 通知相关
-	s.server.AddTool(mcp.NewTool("send_notification",
-		mcp.WithDescription("发送通知"),
-		mcp.WithString("pathName", mcp.Description("目标任务路径名称"), mcp.Required()),
-		mcp.WithString("type", mcp.Description("通知类型"), mcp.Required()),
-		mcp.WithString("title", mcp.Description("通知标题"), mcp.Required()),
-		mcp.WithString("message", mcp.Description("通知内容"), mcp.Required()),
-	), s.handleSendNotification)
+	// modify_module - 修改模块
+	s.server.AddTool(mcp.NewTool("modify_module",
+		mcp.WithDescription(`修改模块。只更新 data 中传入的字段。
 
-	s.server.AddTool(mcp.NewTool("read_notifications",
-		mcp.WithDescription("读取未读通知"),
-		mcp.WithString("pathName", mcp.Description("任务路径名称")),
-	), s.handleReadNotifications)
+可修改字段: name(string), description(string), status(designing|developing|completed|deprecated), prompt(string), upstreamContractSummary(string), downstreamContractSummary(string), testCoverage(0-100)`),
+		mcp.WithString("pathName", mcp.Description("模块路径，格式: 项目名/模块名"), mcp.Required()),
+		mcp.WithNumber("version", mcp.Description("当前版本号，用于乐观锁"), mcp.Required()),
+		mcp.WithObject("data", mcp.Description("要修改的字段，如 {\"description\":\"新描述\",\"status\":\"developing\"}"), mcp.Required()),
+	), s.handleModifyModule)
 
-	// 锁相关
-	s.server.AddTool(mcp.NewTool("lock_resource",
-		mcp.WithDescription("锁定资源"),
+	// modify_task - 修改任务
+	s.server.AddTool(mcp.NewTool("modify_task",
+		mcp.WithDescription(`修改任务。只更新 data 中传入的字段。
+
+可修改字段:
+- name, description, status, prompt: string
+- upstreamContractDetail/downstreamContractDetail: {title, list:[{label,contract_api,from}]}
+- tests: [{target:string, api:string}]
+- testResult/codePaths/bugLog: string[]
+- humanAssistance: object
+- issueDetails: string`),
+		mcp.WithString("pathName", mcp.Description("任务路径，格式: 项目名/模块名/任务名"), mcp.Required()),
+		mcp.WithNumber("version", mcp.Description("当前版本号，用于乐观锁"), mcp.Required()),
+		mcp.WithObject("data", mcp.Description("要修改的字段，如 {\"status\":\"in_progress\",\"tests\":[{\"target\":\"验证XX\",\"api\":\"test_xx()\"}]}"), mcp.Required()),
+	), s.handleModifyTask)
+
+	// delete_node - 统一删除节点
+	s.server.AddTool(mcp.NewTool("delete_node",
+		mcp.WithDescription("统一删除节点接口。根据 path 自动识别类型（module/task）。删除模块时级联删除其下所有任务。"),
+		mcp.WithString("path", mcp.Description("节点 pathName"), mcp.Required()),
+		mcp.WithBoolean("force", mcp.Description("强制删除（忽略依赖）")),
+	), s.handleDeleteNode)
+}
+
+// ==================== 5. 依赖管理工具 ====================
+func (s *MCPServer) registerDependencyTools() {
+	// create_dependency - 统一创建依赖
+	s.server.AddTool(mcp.NewTool("create_dependency",
+		mcp.WithDescription("统一创建依赖接口。根据 type 创建模块或任务依赖。type='module' 时创建模块依赖，type='task' 时创建任务依赖。"),
+		mcp.WithString("type", mcp.Description("依赖类型：module 或 task"), mcp.Required()),
+		mcp.WithString("upstreamPath", mcp.Description("上游资源 pathName（被依赖方）"), mcp.Required()),
+		mcp.WithString("downstreamPath", mcp.Description("下游资源 pathName（依赖方）"), mcp.Required()),
+		mcp.WithString("dependencyType", mcp.Description("依赖类型：required / optional / conditional")),
+		mcp.WithString("contractSummary", mcp.Description("契约摘要")),
+	), s.handleCreateDependency)
+
+	// delete_dependency - 统一删除依赖
+	s.server.AddTool(mcp.NewTool("delete_dependency",
+		mcp.WithDescription("统一删除依赖接口。根据 type 删除模块或任务依赖。"),
+		mcp.WithString("type", mcp.Description("依赖类型：module 或 task"), mcp.Required()),
+		mcp.WithString("upstreamPath", mcp.Description("上游资源 pathName（被依赖方）"), mcp.Required()),
+		mcp.WithString("downstreamPath", mcp.Description("下游资源 pathName（依赖方）"), mcp.Required()),
+	), s.handleDeleteDependency)
+
+	// query_dependencies - 统一查询依赖
+	s.server.AddTool(mcp.NewTool("query_dependencies",
+		mcp.WithDescription("统一查询依赖接口。根据 type 查询模块或任务的依赖关系，支持指定方向（上游/下游/双向）。"),
+		mcp.WithString("type", mcp.Description("依赖类型：module 或 task"), mcp.Required()),
+		mcp.WithString("pathName", mcp.Description("资源 pathName"), mcp.Required()),
+		mcp.WithString("direction", mcp.Description("查询方向：upstream（上游）/ downstream（下游）/ both（双向，默认）")),
+	), s.handleQueryDependencies)
+}
+
+// ==================== 6. 问答系统工具 ====================
+func (s *MCPServer) registerIssueTools() {
+	// create_issue - 创建问题
+	s.server.AddTool(mcp.NewTool("create_issue",
+		mcp.WithDescription("创建问题（下游任务发现上游有问题时发起）"),
+		mcp.WithString("fromTaskPathName", mcp.Description("发起方任务 pathName"), mcp.Required()),
+		mcp.WithString("toTaskPathName", mcp.Description("接收方任务 pathName"), mcp.Required()),
+		mcp.WithString("type", mcp.Description("问题类型: contract/test/other"), mcp.Required()),
+		mcp.WithString("title", mcp.Description("问题标题"), mcp.Required()),
+		mcp.WithString("content", mcp.Description("问题内容"), mcp.Required()),
+	), s.handleCreateIssue)
+
+	// reply_issue - 回复问题
+	s.server.AddTool(mcp.NewTool("reply_issue",
+		mcp.WithDescription("回复问题"),
+		mcp.WithString("fromTaskPathName", mcp.Description("发起方任务 pathName"), mcp.Required()),
+		mcp.WithString("toTaskPathName", mcp.Description("接收方任务 pathName"), mcp.Required()),
+		mcp.WithString("title", mcp.Description("问题标题（定位用）"), mcp.Required()),
+		mcp.WithString("replyContent", mcp.Description("回复内容"), mcp.Required()),
+	), s.handleReplyIssue)
+
+	// resolve_issue - 解决问题
+	s.server.AddTool(mcp.NewTool("resolve_issue",
+		mcp.WithDescription("解决问题"),
+		mcp.WithString("fromTaskPathName", mcp.Description("发起方任务 pathName"), mcp.Required()),
+		mcp.WithString("toTaskPathName", mcp.Description("接收方任务 pathName"), mcp.Required()),
+		mcp.WithString("title", mcp.Description("问题标题（定位用）"), mcp.Required()),
+	), s.handleResolveIssue)
+
+	// query_issues - 查询问题列表
+	s.server.AddTool(mcp.NewTool("query_issues",
+		mcp.WithDescription("查询问题列表"),
+		mcp.WithString("taskPathName", mcp.Description("任务 pathName 过滤")),
+		mcp.WithString("direction", mcp.Description("方向: from/to/both（默认 both）")),
+		mcp.WithString("status", mcp.Description("状态过滤: pending/replied/resolved")),
+		mcp.WithString("type", mcp.Description("类型过滤: contract/test/other")),
+	), s.handleQueryIssues)
+}
+
+// ==================== 7. 锁管理工具 ====================
+func (s *MCPServer) registerLockTools() {
+	// acquire_lock - 获取锁
+	s.server.AddTool(mcp.NewTool("acquire_lock",
+		mcp.WithDescription("锁定资源（模块或任务），防止并发修改冲突。"),
 		mcp.WithString("resourceType", mcp.Description("资源类型：module 或 task"), mcp.Required()),
 		mcp.WithString("pathName", mcp.Description("资源路径名称"), mcp.Required()),
 	), s.handleLockResource)
 
-	s.server.AddTool(mcp.NewTool("unlock_resource",
-		mcp.WithDescription("解锁资源"),
+	// release_lock - 释放锁
+	s.server.AddTool(mcp.NewTool("release_lock",
+		mcp.WithDescription("释放资源锁。"),
 		mcp.WithString("resourceType", mcp.Description("资源类型：module 或 task"), mcp.Required()),
 		mcp.WithString("pathName", mcp.Description("资源路径名称"), mcp.Required()),
 	), s.handleUnlockResource)
+}
 
-	s.server.AddTool(mcp.NewTool("get_lock_status",
-		mcp.WithDescription("查询锁定状态"),
-		mcp.WithString("resourceType", mcp.Description("资源类型：module 或 task"), mcp.Required()),
-		mcp.WithString("pathName", mcp.Description("资源路径名称"), mcp.Required()),
-	), s.handleGetLockStatus)
+// ==================== 8. 编译接口工具 ====================
+func (s *MCPServer) registerCompileTools() {
+	// compile_static - 静态编译
+	s.server.AddTool(mcp.NewTool("compile_static",
+		mcp.WithDescription("静态编译：检查项目结构完整性、契约对齐、依赖关系等，生成编译报告。"),
+		mcp.WithString("pathName", mcp.Description("项目或模块 pathName"), mcp.Required()),
+		mcp.WithBoolean("includeWarnings", mcp.Description("是否包含警告")),
+	), s.handleCompileStatic)
 
-	// 模块依赖相关
-	s.server.AddTool(mcp.NewTool("create_module_dependency",
-		mcp.WithDescription("创建模块依赖"),
-		mcp.WithString("pathName", mcp.Description("模块路径名称"), mcp.Required()),
-		mcp.WithString("dependsOnPathName", mcp.Description("被依赖模块的路径名称"), mcp.Required()),
-		mcp.WithString("dependencyType", mcp.Description("依赖类型")),
-		mcp.WithString("contractSummary", mcp.Description("契约摘要")),
-	), s.handleCreateModuleDependency)
+	// compile_dynamic - 动态编译
+	s.server.AddTool(mcp.NewTool("compile_dynamic",
+		mcp.WithDescription("动态编译：执行实际代码生成、测试运行等，生成执行报告。"),
+		mcp.WithString("pathName", mcp.Description("项目或模块 pathName"), mcp.Required()),
+		mcp.WithBoolean("runTests", mcp.Description("是否运行测试")),
+	), s.handleCompileDynamic)
+}
 
-	s.server.AddTool(mcp.NewTool("get_module_dependencies",
-		mcp.WithDescription("获取模块依赖"),
-		mcp.WithString("pathName", mcp.Description("模块路径名称"), mcp.Required()),
-	), s.handleGetModuleDependencies)
+// ==================== 9. 配置和规则管理工具 ====================
+func (s *MCPServer) registerConfigRuleTools() {
+	// get_config - 获取配置
+	s.server.AddTool(mcp.NewTool("get_config",
+		mcp.WithDescription("获取当前 .aitdd/project.json 配置文件的内容"),
+	), s.handleGetConfig)
 
-	// 任务依赖相关
-	s.server.AddTool(mcp.NewTool("create_task_dependency",
-		mcp.WithDescription("创建任务依赖"),
-		mcp.WithString("upstreamPathName", mcp.Description("上游任务路径名称"), mcp.Required()),
-		mcp.WithString("downstreamPathName", mcp.Description("下游任务路径名称"), mcp.Required()),
-		mcp.WithString("contractSummary", mcp.Description("契约摘要")),
-	), s.handleCreateTaskDependency)
+	// update_config - 更新配置
+	s.server.AddTool(mcp.NewTool("update_config",
+		mcp.WithDescription("更新 .aitdd/project.json 配置文件"),
+		mcp.WithObject("config", mcp.Description("配置对象"), mcp.Required()),
+	), s.handleUpdateConfig)
 
-	s.server.AddTool(mcp.NewTool("get_task_dependencies",
-		mcp.WithDescription("获取任务依赖"),
-		mcp.WithString("pathName", mcp.Description("任务路径名称"), mcp.Required()),
-	), s.handleGetTaskDependencies)
+	// get_rule - 获取规则
+	s.server.AddTool(mcp.NewTool("get_rule",
+		mcp.WithDescription("获取 .aitdd/rule.json 规则文件的内容"),
+	), s.handleGetRule)
+
+	// update_rule - 更新规则
+	s.server.AddTool(mcp.NewTool("update_rule",
+		mcp.WithDescription("更新 .aitdd/rule.json 规则文件"),
+		mcp.WithObject("rule", mcp.Description("规则对象"), mcp.Required()),
+	), s.handleUpdateRule)
+}
+
+// ==================== 10. 状态管理工具 ====================
+func (s *MCPServer) registerStatusTools() {
+	// get_status - 获取状态
+	s.server.AddTool(mcp.NewTool("get_status",
+		mcp.WithDescription("获取项目、模块或任务的状态信息，包括进度、错误、警告等。"),
+		mcp.WithString("pathName", mcp.Description("节点 pathName，不传则返回整个项目状态")),
+		mcp.WithString("type", mcp.Description("类型：project/module/task，不传则根据 pathName 自动识别")),
+		mcp.WithBoolean("includeErrors", mcp.Description("是否包含错误信息")),
+		mcp.WithBoolean("includeLockInfo", mcp.Description("是否包含锁定信息")),
+	), s.handleGetStatus)
 }
 
 // RunStdio 运行 MCP 服务器 (Stdio 模式)
 func (s *MCPServer) RunStdio() error {
-	log.Println("Starting AITDD MCP Server (Stdio mode)...")
+	s.logger.Info("Starting AITDD MCP Server (Stdio mode)...")
 	return server.ServeStdio(s.server)
 }
 
@@ -386,11 +372,11 @@ func (s *MCPServer) RegisterSSERoutes(mux *http.ServeMux, basePath string) {
 // 这种方式更可靠，避免了 http.ServeMux 与 Gin 路由的冲突
 func (s *MCPServer) RegisterSSERoutesGin(router *gin.Engine) {
 	sseServer := s.NewSSEServer("/mcp")
-	log.Println("正在注册 MCP SSE 路由...")
+	s.logger.Info("Registering MCP SSE routes...")
 	// 注册 SSE 端点 - 使用 wrapHandler 将 http.Handler 转换为 Gin 处理器
 	router.GET("/mcp/sse", wrapHandler(sseServer.SSEHandler()))
 	router.POST("/mcp/message", wrapHandler(sseServer.MessageHandler()))
-	log.Println("MCP SSE 路由注册完成: GET /mcp/sse, POST /mcp/message")
+	s.logger.Info("MCP SSE routes registered: GET /mcp/sse, POST /mcp/message")
 }
 
 // wrapHandler 将 http.Handler 包装为 Gin 处理函数
@@ -463,122 +449,93 @@ func getParamBool(request mcp.CallToolRequest, key string) (bool, bool) {
 // ==================== 工具处理函数存根 ====================
 // 这些函数将在 tools_*.go 文件中实现
 
+// 1. 项目上下文
 func (s *MCPServer) handleInitProject(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return s.handleInitProjectImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetConfig(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetConfigImpl(ctx, request)
+func (s *MCPServer) handleGetContext(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleGetContextImpl(ctx, request)
 }
 
-func (s *MCPServer) handleSetProject(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleSetProjectImpl(ctx, request)
+// 2. 信息查询
+func (s *MCPServer) handleQueryModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleQueryModuleImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetProjectInfo(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetProjectInfoImpl(ctx, request)
+func (s *MCPServer) handleQueryTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleQueryTaskImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetAllTaskCodePaths(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetAllTaskCodePathsImpl(ctx, request)
+func (s *MCPServer) handleQueryProjectIndexTree(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleQueryProjectIndexTreeImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetAllModules(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetAllModulesImpl(ctx, request)
+func (s *MCPServer) handleQueryFileCodePathTree(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleQueryFileCodePathTreeImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetModuleTasks(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetModuleTasksImpl(ctx, request)
+// 3. 验证检查
+func (s *MCPServer) handleCheckContractAlignment(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleCheckContractAlignmentImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetTaskDetail(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetTaskDetailImpl(ctx, request)
+func (s *MCPServer) handleCheckTaskReadiness(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleCheckTaskReadinessImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetTaskContracts(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetTaskContractsImpl(ctx, request)
+func (s *MCPServer) handleCheckDependencies(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleCheckDependenciesImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetConstitution(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetConstitutionImpl(ctx, request)
+// 4. 节点操作
+func (s *MCPServer) handleCreateNode(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleCreateNodeImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetModuleOverview(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetModuleOverviewImpl(ctx, request)
+func (s *MCPServer) handleModifyModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleModifyModuleImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetModuleTaskPathNames(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetModuleTaskPathNamesImpl(ctx, request)
+func (s *MCPServer) handleModifyTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleModifyTaskImpl(ctx, request)
 }
 
-func (s *MCPServer) handleDeleteModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleDeleteModuleImpl(ctx, request)
+func (s *MCPServer) handleDeleteNode(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleDeleteNodeImpl(ctx, request)
 }
 
-func (s *MCPServer) handleCreateModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleCreateModuleImpl(ctx, request)
+// 5. 依赖管理
+func (s *MCPServer) handleCreateDependency(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleCreateDependencyImpl(ctx, request)
 }
 
-func (s *MCPServer) handleUpdateModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleUpdateModuleImpl(ctx, request)
+func (s *MCPServer) handleDeleteDependency(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleDeleteDependencyImpl(ctx, request)
 }
 
-func (s *MCPServer) handleDeleteModuleTasks(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleDeleteModuleTasksImpl(ctx, request)
+func (s *MCPServer) handleQueryDependencies(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleQueryDependenciesImpl(ctx, request)
 }
 
-func (s *MCPServer) handleCreateTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleCreateTaskImpl(ctx, request)
+// 6. 问答系统
+func (s *MCPServer) handleCreateIssue(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleCreateIssueImpl(ctx, request)
 }
 
-func (s *MCPServer) handleUpdateModuleFull(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleUpdateModuleFullImpl(ctx, request)
+func (s *MCPServer) handleReplyIssue(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleReplyIssueImpl(ctx, request)
 }
 
-func (s *MCPServer) handleUpdateTaskFull(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleUpdateTaskFullImpl(ctx, request)
+func (s *MCPServer) handleResolveIssue(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleResolveIssueImpl(ctx, request)
 }
 
-func (s *MCPServer) handleUpdateTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleUpdateTaskImpl(ctx, request)
+func (s *MCPServer) handleQueryIssues(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleQueryIssuesImpl(ctx, request)
 }
 
-func (s *MCPServer) handleDeleteTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleDeleteTaskImpl(ctx, request)
-}
-
-func (s *MCPServer) handleGetAllTaskStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetAllTaskStatusImpl(ctx, request)
-}
-
-func (s *MCPServer) handleGetModuleTaskStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetModuleTaskStatusImpl(ctx, request)
-}
-
-func (s *MCPServer) handleGetProjectErrors(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetProjectErrorsImpl(ctx, request)
-}
-
-func (s *MCPServer) handleGetModuleErrors(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetModuleErrorsImpl(ctx, request)
-}
-
-func (s *MCPServer) handleCheckModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleCheckModuleImpl(ctx, request)
-}
-
-func (s *MCPServer) handleOpenFrontend(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleOpenFrontendImpl(ctx, request)
-}
-
-func (s *MCPServer) handleSendNotification(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleSendNotificationImpl(ctx, request)
-}
-
-func (s *MCPServer) handleReadNotifications(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleReadNotificationsImpl(ctx, request)
-}
-
+// 7. 锁管理
 func (s *MCPServer) handleLockResource(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return s.handleLockResourceImpl(ctx, request)
 }
@@ -587,22 +544,33 @@ func (s *MCPServer) handleUnlockResource(ctx context.Context, request mcp.CallTo
 	return s.handleUnlockResourceImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetLockStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetLockStatusImpl(ctx, request)
+// 8. 编译接口
+func (s *MCPServer) handleCompileStatic(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleCompileStaticImpl(ctx, request)
 }
 
-func (s *MCPServer) handleCreateModuleDependency(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleCreateModuleDependencyImpl(ctx, request)
+func (s *MCPServer) handleCompileDynamic(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleCompileDynamicImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetModuleDependencies(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetModuleDependenciesImpl(ctx, request)
+// 9. 配置和规则管理
+func (s *MCPServer) handleGetConfig(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleGetConfigImpl(ctx, request)
 }
 
-func (s *MCPServer) handleCreateTaskDependency(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleCreateTaskDependencyImpl(ctx, request)
+func (s *MCPServer) handleUpdateConfig(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleUpdateConfigImpl(ctx, request)
 }
 
-func (s *MCPServer) handleGetTaskDependencies(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleGetTaskDependenciesImpl(ctx, request)
+func (s *MCPServer) handleGetRule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleGetRuleImpl(ctx, request)
+}
+
+func (s *MCPServer) handleUpdateRule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleUpdateRuleImpl(ctx, request)
+}
+
+// 10. 状态管理
+func (s *MCPServer) handleGetStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleGetStatusImpl(ctx, request)
 }

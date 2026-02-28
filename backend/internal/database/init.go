@@ -67,6 +67,7 @@ func autoMigrate() error {
 		&models.ChangeHistory{},
 		&models.Config{},
 		&models.PromptVersion{},
+		&models.Issue{},
 	)
 }
 

@@ -592,3 +592,47 @@ func (report *CheckReport) ToMarkdown() string {
 
 	return md
 }
+
+// GetRule 获取规则配置（返回 map 格式）
+func (e *RuleEngine) GetRule() map[string]interface{} {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	if e.config == nil {
+		return nil
+	}
+
+	// 转换为 map
+	data, _ := json.Marshal(e.config)
+	var result map[string]interface{}
+	json.Unmarshal(data, &result)
+	return result
+}
+
+// SaveRule 保存规则配置（接受 map 参数）
+func (e *RuleEngine) SaveRule(rule map[string]interface{}) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// 转换为 RuleConfig
+	data, _ := json.Marshal(rule)
+	var config RuleConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("解析规则失败: %w", err)
+	}
+
+	e.config = &config
+
+	// 保存到文件
+	if e.configPath != "" {
+		data, err := json.MarshalIndent(e.config, "", "  ")
+		if err != nil {
+			return fmt.Errorf("序列化规则失败: %w", err)
+		}
+		if err := os.WriteFile(e.configPath, data, 0644); err != nil {
+			return fmt.Errorf("写入规则文件失败: %w", err)
+		}
+	}
+
+	return nil
+}

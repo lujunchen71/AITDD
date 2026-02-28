@@ -89,6 +89,7 @@ func CreateTask(c *gin.Context) {
 		Prompt                   string `json:"prompt"`
 		UpstreamContractDetail   string `json:"upstreamContractDetail"`
 		DownstreamContractDetail string `json:"downstreamContractDetail"`
+		CodePaths                string `json:"codePaths"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -127,6 +128,7 @@ func CreateTask(c *gin.Context) {
 		Prompt:                   req.Prompt,
 		UpstreamContractDetail:   req.UpstreamContractDetail,
 		DownstreamContractDetail: req.DownstreamContractDetail,
+		CodePaths:                req.CodePaths,
 		Status:                   models.TaskStatusReady,
 		CreatedAt:                time.Now().UnixMilli(),
 		UpdatedAt:                time.Now().UnixMilli(),
