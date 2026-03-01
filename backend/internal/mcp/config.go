@@ -182,6 +182,15 @@ func (cm *ConfigManager) GetProjectPathName() string {
 	return cm.config.PathName
 }
 
+// SetProjectPathName 设置项目路径名称
+func (cm *ConfigManager) SetProjectPathName(pathName string) error {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	cm.config.PathName = pathName
+	return cm.saveWithoutLock()
+}
+
 // GetApiBaseUrl 获取API基础URL
 func (cm *ConfigManager) GetApiBaseUrl() string {
 	cm.mu.RLock()

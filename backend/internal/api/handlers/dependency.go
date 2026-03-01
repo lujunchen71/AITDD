@@ -91,3 +91,51 @@ func DeleteDependency(c *gin.Context) {
 		"deleted": true,
 	})
 }
+
+// DeleteDependenciesByProject 删除项目的所有任务依赖
+func DeleteDependenciesByProject(c *gin.Context) {
+	projectID := c.Query("projectId")
+	if projectID == "" {
+		BadRequest(c, "缺少 projectId 参数")
+		return
+	}
+
+	// 获取项目下所有模块
+	var moduleIDs []string
+	if err := database.DB.Model(&models.Module{}).Where("project_id = ?", projectID).Pluck("id", &moduleIDs).Error; err != nil {
+		InternalError(c, "查询模块失败")
+		return
+	}
+
+	if len(moduleIDs) == 0 {
+		Success(c, gin.H{
+			"deleted": 0,
+		})
+		return
+	}
+
+	// 获取模块下所有任务ID
+	var taskIDs []string
+	if err := database.DB.Model(&models.Task{}).Where("module_id IN ?", moduleIDs).Pluck("id", &taskIDs).Error; err != nil {
+		InternalError(c, "查询任务失败")
+		return
+	}
+
+	if len(taskIDs) == 0 {
+		Success(c, gin.H{
+			"deleted": 0,
+		})
+		return
+	}
+
+	// 删除所有相关的依赖
+	result := database.DB.Where("upstream_task_id IN ? OR downstream_task_id IN ?", taskIDs, taskIDs).Delete(&models.Dependency{})
+	if result.Error != nil {
+		InternalError(c, "删除依赖失败")
+		return
+	}
+
+	Success(c, gin.H{
+		"deleted": result.RowsAffected,
+	})
+}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -1447,6 +1448,30 @@ type CompileStaticResult struct {
 	Warnings       []CompileIssue  `json:"warnings"`
 }
 
+// ContractDetailItem 契约条目
+type ContractDetailItem struct {
+	Label       string `json:"label"`
+	ContractAPI string `json:"contract_api"`
+	From        string `json:"from"`
+}
+
+// ContractDetail 契约详情
+type ContractDetail struct {
+	Title string                `json:"title"`
+	List  []ContractDetailItem `json:"list"`
+}
+
+// BugLog Bug日志结构
+type BugLog struct {
+	Static  []string `json:"static"`
+	Dynamic []string `json:"dynamic"`
+}
+
+// HasErrors 检查是否存在错误
+func (b *BugLog) HasErrors() bool {
+	return len(b.Static) > 0 || len(b.Dynamic) > 0
+}
+
 // handleCompileStaticImpl 静态编译
 // 遍历所有模块和任务，验证结构完整性，生成静态报告
 func (s *MCPServer) handleCompileStaticImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -1527,8 +1552,8 @@ func (s *MCPServer) handleCompileStaticImpl(ctx context.Context, request mcp.Cal
 
 // compileStaticProject 项目级别静态编译
 func (s *MCPServer) compileStaticProject(projectPathName string, includeWarnings bool, result *CompileStaticResult) {
-	// 获取项目下所有模块
-	modulesResp, err := http.Get(fmt.Sprintf("%s/projects/by-path/%s/modules", s.getApiURL(), projectPathName))
+	// 获取所有模块，然后通过路径前缀过滤
+	modulesResp, err := http.Get(fmt.Sprintf("%s/modules", s.getApiURL()))
 	if err != nil {
 		result.Errors = append(result.Errors, CompileIssue{
 			RuleID:           "E-S-00",
@@ -1536,40 +1561,232 @@ func (s *MCPServer) compileStaticProject(projectPathName string, includeWarnings
 			ResourceType:     "project",
 			ResourceName:     projectPathName,
 			ResourcePathName: projectPathName,
-			Message:          "获取项目模块失败: " + err.Error(),
+			Message:          "获取模块列表失败: " + err.Error(),
 			Severity:         "error",
 		})
 		return
 	}
 	defer modulesResp.Body.Close()
 
-	var modulesData struct {
-		Data []map[string]interface{} `json:"data"`
-	}
-	if err := json.NewDecoder(modulesResp.Body).Decode(&modulesData); err != nil {
+	body, err := io.ReadAll(modulesResp.Body)
+	if err != nil {
 		result.Errors = append(result.Errors, CompileIssue{
 			RuleID:           "E-S-00",
 			RuleName:         "项目结构检查",
 			ResourceType:     "project",
 			ResourceName:     projectPathName,
 			ResourcePathName: projectPathName,
-			Message:          "解析项目模块失败: " + err.Error(),
+			Message:          "读取模块列表响应失败: " + err.Error(),
 			Severity:         "error",
 		})
 		return
 	}
 
-	result.TotalModules = len(modulesData.Data)
+	// 解析模块响应
+	var modulesData struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Modules []map[string]interface{} `json:"modules"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &modulesData); err != nil {
+		result.Errors = append(result.Errors, CompileIssue{
+			RuleID:           "E-S-00",
+			RuleName:         "项目结构检查",
+			ResourceType:     "project",
+			ResourceName:     projectPathName,
+			ResourcePathName: projectPathName,
+			Message:          fmt.Sprintf("解析模块列表失败: %v", err),
+			Severity:         "error",
+		})
+		return
+	}
+
+	// 通过路径前缀过滤出属于该项目的模块
+	// 模块 pathName 格式为 "项目名/模块名"
+	var modules []map[string]interface{}
+	prefix := projectPathName + "/"
+	for _, module := range modulesData.Data.Modules {
+		pathName, _ := module["pathName"].(string)
+		if strings.HasPrefix(pathName, prefix) {
+			modules = append(modules, module)
+		}
+	}
+
+	result.TotalModules = len(modules)
+
+	// 收集所有任务用于契约一致性检查
+	var allTasks []map[string]interface{}
 
 	// 遍历每个模块进行编译
-	for _, module := range modulesData.Data {
+	for _, module := range modules {
 		modulePathName, _ := module["pathName"].(string)
-		s.compileStaticModule(modulePathName, includeWarnings, result)
+		moduleTasks := s.compileStaticModuleWithTasks(modulePathName, includeWarnings, result)
+		allTasks = append(allTasks, moduleTasks...)
+	}
+
+	// 执行契约一致性检查
+	s.checkContractConsistency(allTasks, result)
+
+	// E-S-09: 检查模块跨模块依赖
+	s.checkModuleCrossDependency(allTasks, modules, result)
+
+	// 如果编译成功，更新任务依赖关系到数据库
+	if result.ErrorCount == 0 {
+		s.updateTaskDependencies(allTasks, result)
 	}
 }
 
-// compileStaticModule 模块级别静态编译
-func (s *MCPServer) compileStaticModule(modulePathName string, includeWarnings bool, result *CompileStaticResult) {
+// updateTaskDependencies 从契约中提取依赖关系并更新到数据库
+func (s *MCPServer) updateTaskDependencies(allTasks []map[string]interface{}, result *CompileStaticResult) {
+	// 构建任务路径到任务ID的映射
+	taskPathToID := make(map[string]string)
+	// 构建任务名称到任务ID的映射（用于跨模块查找）
+	taskNameToID := make(map[string]string)
+	for _, task := range allTasks {
+		pathName, _ := task["pathName"].(string)
+		taskID, _ := task["id"].(string)
+		taskName, _ := task["name"].(string)
+		if pathName != "" && taskID != "" {
+			taskPathToID[pathName] = taskID
+		}
+		if taskName != "" && taskID != "" {
+			taskNameToID[taskName] = taskID
+		}
+	}
+
+	// 收集所有依赖关系
+	type DependencyInfo struct {
+		UpstreamTaskID   string
+		DownstreamTaskID string
+		ContractAPI      string
+	}
+
+	var dependencies []DependencyInfo
+
+	// 遍历所有任务，从上游契约中提取依赖
+	for _, task := range allTasks {
+		downstreamTaskID, _ := task["id"].(string)
+		downstreamPathName, _ := task["pathName"].(string)
+
+		upstreamContractStr, _ := task["upstreamContractDetail"].(string)
+		if upstreamContractStr == "" {
+			continue
+		}
+
+		var upstreamContract ContractDetail
+		if err := json.Unmarshal([]byte(upstreamContractStr), &upstreamContract); err != nil {
+			continue
+		}
+
+		// 跳过首个任务
+		if upstreamContract.Title == "start" {
+			continue
+		}
+
+		// 从上游契约列表中提取依赖
+		for _, item := range upstreamContract.List {
+			// item.From 是上游任务的名称或路径
+			upstreamTaskPath := item.From
+
+			// 尝试查找上游任务ID
+			upstreamTaskID := ""
+
+			// 首先尝试直接匹配路径
+			if id, exists := taskPathToID[upstreamTaskPath]; exists {
+				upstreamTaskID = id
+			} else {
+				// 尝试在当前模块内查找
+				modulePath := downstreamPathName
+				if idx := strings.LastIndex(modulePath, "/"); idx > 0 {
+					modulePath = modulePath[:idx]
+					possiblePath := modulePath + "/" + upstreamTaskPath
+					if id, exists := taskPathToID[possiblePath]; exists {
+						upstreamTaskID = id
+					}
+				}
+				// 如果模块内找不到，尝试在整个项目范围内按名称查找（跨模块）
+				if upstreamTaskID == "" {
+					if id, exists := taskNameToID[upstreamTaskPath]; exists {
+						upstreamTaskID = id
+					}
+				}
+			}
+
+			if upstreamTaskID != "" && downstreamTaskID != "" {
+				dependencies = append(dependencies, DependencyInfo{
+					UpstreamTaskID:   upstreamTaskID,
+					DownstreamTaskID: downstreamTaskID,
+					ContractAPI:      item.ContractAPI,
+				})
+			}
+		}
+	}
+
+	// 通过API更新依赖关系
+	if len(dependencies) > 0 {
+		// 先删除该项目的所有现有依赖
+		// 获取项目ID（从第一个任务获取）
+		if len(allTasks) > 0 {
+			firstTask := allTasks[0]
+			moduleID, _ := firstTask["moduleId"].(string)
+			if moduleID != "" {
+				// 获取模块信息以获取项目ID
+				moduleResp, err := http.Get(fmt.Sprintf("%s/modules/%s", s.getApiURL(), moduleID))
+				if err == nil {
+					body, _ := io.ReadAll(moduleResp.Body)
+					moduleResp.Body.Close()
+					var moduleData struct {
+						Success bool `json:"success"`
+						Data    struct {
+							Module map[string]interface{} `json:"module"`
+						} `json:"data"`
+					}
+					if json.Unmarshal(body, &moduleData) == nil && moduleData.Success {
+						projectID, _ := moduleData.Data.Module["projectId"].(string)
+						if projectID != "" {
+							// 删除该项目的所有现有任务依赖
+							deleteURL := fmt.Sprintf("%s/dependencies/by-project?projectId=%s", s.getApiURL(), projectID)
+							req, _ := http.NewRequest("DELETE", deleteURL, nil)
+							resp, err := http.DefaultClient.Do(req)
+							if err == nil {
+								resp.Body.Close()
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// 创建新的依赖关系
+		for _, dep := range dependencies {
+			depData := map[string]interface{}{
+				"upstreamTaskId":   dep.UpstreamTaskID,
+				"downstreamTaskId": dep.DownstreamTaskID,
+				"contractSummary":  dep.ContractAPI,
+			}
+			depJSON, _ := json.Marshal(depData)
+			http.Post(fmt.Sprintf("%s/dependencies", s.getApiURL()), "application/json", bytes.NewReader(depJSON))
+		}
+
+		// 在结果中记录更新的依赖数量
+		result.Warnings = append(result.Warnings, CompileIssue{
+			RuleID:           "W-S-07",
+			RuleName:         "依赖关系已更新",
+			ResourceType:     "project",
+			ResourceName:     "",
+			ResourcePathName: "",
+			Message:          fmt.Sprintf("已更新 %d 个任务依赖关系", len(dependencies)),
+			Suggestion:       "依赖关系已同步到数据库，前端可查看可视化图",
+			Severity:         "warning",
+		})
+	}
+}
+
+// compileStaticModuleWithTasks 模块级别静态编译，返回任务列表
+func (s *MCPServer) compileStaticModuleWithTasks(modulePathName string, includeWarnings bool, result *CompileStaticResult) []map[string]interface{} {
+	var allTasks []map[string]interface{}
+
 	// 获取模块信息
 	moduleResp, err := http.Get(fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), modulePathName))
 	if err != nil {
@@ -1581,23 +1798,55 @@ func (s *MCPServer) compileStaticModule(modulePathName string, includeWarnings b
 			Message:          "获取模块信息失败: " + err.Error(),
 			Severity:         "error",
 		})
-		return
+		return allTasks
 	}
 	defer moduleResp.Body.Close()
 
-	var module map[string]interface{}
-	if err := json.NewDecoder(moduleResp.Body).Decode(&module); err != nil {
+	body, err := io.ReadAll(moduleResp.Body)
+	if err != nil {
 		result.Errors = append(result.Errors, CompileIssue{
 			RuleID:           "E-S-00",
 			RuleName:         "模块结构检查",
 			ResourceType:     "module",
 			ResourcePathName: modulePathName,
-			Message:          "解析模块信息失败: " + err.Error(),
+			Message:          "读取模块信息失败: " + err.Error(),
 			Severity:         "error",
 		})
-		return
+		return allTasks
 	}
 
+	// 解析模块响应 - API返回格式: {"success":true,"data":{"module":{...}}}
+	var moduleRespData struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Module map[string]interface{} `json:"module"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &moduleRespData); err != nil {
+		result.Errors = append(result.Errors, CompileIssue{
+			RuleID:           "E-S-00",
+			RuleName:         "模块结构检查",
+			ResourceType:     "module",
+			ResourcePathName: modulePathName,
+			Message:          fmt.Sprintf("解析模块信息失败: %v, 响应: %s", err, string(body)),
+			Severity:         "error",
+		})
+		return allTasks
+	}
+
+	if !moduleRespData.Success || moduleRespData.Data.Module == nil {
+		result.Errors = append(result.Errors, CompileIssue{
+			RuleID:           "E-S-00",
+			RuleName:         "模块结构检查",
+			ResourceType:     "module",
+			ResourcePathName: modulePathName,
+			Message:          "模块不存在或获取失败",
+			Severity:         "error",
+		})
+		return allTasks
+	}
+
+	module := moduleRespData.Data.Module
 	moduleName, _ := module["name"].(string)
 	moduleID, _ := module["id"].(string)
 
@@ -1645,21 +1894,62 @@ func (s *MCPServer) compileStaticModule(modulePathName string, includeWarnings b
 			Message:          "获取模块任务失败: " + err.Error(),
 			Severity:         "error",
 		})
-		return
+		return allTasks
 	}
 	defer tasksResp.Body.Close()
 
-	var tasksData struct {
-		Data []map[string]interface{} `json:"data"`
-	}
-	if err := json.NewDecoder(tasksResp.Body).Decode(&tasksData); err != nil {
-		return
+	tasksBody, err := io.ReadAll(tasksResp.Body)
+	if err != nil {
+		result.Errors = append(result.Errors, CompileIssue{
+			RuleID:           "E-S-00",
+			RuleName:         "模块任务检查",
+			ResourceType:     "module",
+			ResourceName:     moduleName,
+			ResourcePathName: modulePathName,
+			Message:          "读取模块任务失败: " + err.Error(),
+			Severity:         "error",
+		})
+		return allTasks
 	}
 
-	// 遍历任务进行编译
-	for _, task := range tasksData.Data {
-		s.compileStaticTaskFromData(task, modulePathName, moduleName, includeWarnings, result)
+	// 解析任务列表 - API返回格式: {"success":true,"data":{"tasks":[...],"total":42}}
+	var tasksRespData struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Tasks []map[string]interface{} `json:"tasks"`
+			Total int                       `json:"total"`
+		} `json:"data"`
 	}
+	if err := json.Unmarshal(tasksBody, &tasksRespData); err != nil {
+		result.Warnings = append(result.Warnings, CompileIssue{
+			RuleID:           "W-S-06",
+			RuleName:         "任务列表解析失败",
+			ResourceType:     "module",
+			ResourceName:     moduleName,
+			ResourcePathName: modulePathName,
+			Message:          fmt.Sprintf("解析模块任务列表失败: %v", err),
+			Suggestion:       "请检查API返回格式",
+			Severity:         "warning",
+		})
+		return allTasks
+	}
+
+	tasks := tasksRespData.Data.Tasks
+
+	// 遍历任务进行编译
+	for _, task := range tasks {
+		s.compileStaticTaskFromData(task, modulePathName, moduleName, includeWarnings, result)
+		allTasks = append(allTasks, task)
+	}
+
+	return allTasks
+}
+
+// compileStaticModule 模块级别静态编译（保留兼容性）
+func (s *MCPServer) compileStaticModule(modulePathName string, includeWarnings bool, result *CompileStaticResult) {
+	tasks := s.compileStaticModuleWithTasks(modulePathName, includeWarnings, result)
+	// 对于单个模块编译，也需要执行契约一致性检查
+	s.checkContractConsistency(tasks, result)
 }
 
 // compileStaticTask 任务级别静态编译
@@ -1721,7 +2011,7 @@ func (s *MCPServer) compileStaticTaskFromData(task map[string]interface{}, modul
 
 	// E-S-01: 检查代码路径
 	codePaths, _ := task["codePaths"].(string)
-	if codePaths == "" || codePaths == "[]" {
+	if codePaths == "" || codePaths == "[]" || codePaths == "null" {
 		result.Errors = append(result.Errors, CompileIssue{
 			RuleID:           "E-S-01",
 			RuleName:         "代码路径为空",
@@ -1734,24 +2024,30 @@ func (s *MCPServer) compileStaticTaskFromData(task map[string]interface{}, modul
 		})
 	}
 
-	// E-S-02: 检查 Bug 日志
-	bugLog, _ := task["bugLog"].(string)
-	if bugLog != "" && bugLog != "[]" {
-		result.Errors = append(result.Errors, CompileIssue{
-			RuleID:           "E-S-02",
-			RuleName:         "存在Bug日志",
-			ResourceType:     "task",
-			ResourceName:     taskName,
-			ResourcePathName: taskPathName,
-			Message:          fmt.Sprintf("任务 [%s] 存在未解决的Bug", taskName),
-			Suggestion:       "请解决Bug后清除日志",
-			Severity:         "error",
-		})
+	// E-S-02: 检查 Bug 日志（使用新的 BugLog 结构）
+	bugLogStr, _ := task["bugLog"].(string)
+	if bugLogStr != "" && bugLogStr != "{}" && bugLogStr != "null" {
+		var bugLog BugLog
+		if err := json.Unmarshal([]byte(bugLogStr), &bugLog); err == nil {
+			if bugLog.HasErrors() {
+				result.Errors = append(result.Errors, CompileIssue{
+					RuleID:           "E-S-02",
+					RuleName:         "存在Bug日志",
+					ResourceType:     "task",
+					ResourceName:     taskName,
+					ResourcePathName: taskPathName,
+					Message:          fmt.Sprintf("任务 [%s] 存在未解决的Bug - static: %d, dynamic: %d",
+						taskName, len(bugLog.Static), len(bugLog.Dynamic)),
+					Suggestion:       "请解决Bug后清除日志",
+					Severity:         "error",
+				})
+			}
+		}
 	}
 
 	// E-S-03: 检查人工协助
 	humanAssistance, _ := task["humanAssistance"].(string)
-	if humanAssistance != "" && humanAssistance != "{}" {
+	if humanAssistance != "" && humanAssistance != "{}" && humanAssistance != "null" {
 		result.Errors = append(result.Errors, CompileIssue{
 			RuleID:           "E-S-03",
 			RuleName:         "需要人工协助",
@@ -1779,10 +2075,19 @@ func (s *MCPServer) compileStaticTaskFromData(task map[string]interface{}, modul
 		})
 	}
 
+	// E-S-05: 检查上游契约
+	s.checkUpstreamContract(task, taskPathName, result)
+
+	// E-S-06: 检查下游契约
+	s.checkDownstreamContract(task, taskPathName, result)
+
+	// E-S-08: 检查状态异常
+	s.checkStatusAnomaly(task, taskPathName, result)
+
 	// W-S-01: 检查测试用例
 	if includeWarnings {
 		tests, _ := task["tests"].(string)
-		if tests == "" || tests == "[]" {
+		if tests == "" || tests == "[]" || tests == "null" {
 			result.Warnings = append(result.Warnings, CompileIssue{
 				RuleID:           "W-S-01",
 				RuleName:         "测试用例为空",
@@ -1793,6 +2098,343 @@ func (s *MCPServer) compileStaticTaskFromData(task map[string]interface{}, modul
 				Suggestion:       "建议添加测试用例",
 				Severity:         "warning",
 			})
+		}
+	}
+}
+
+// checkUpstreamContract 检查上游契约 (E-S-05)
+func (s *MCPServer) checkUpstreamContract(task map[string]interface{}, taskPathName string, result *CompileStaticResult) {
+	taskName, _ := task["name"].(string)
+	upstreamContractStr, _ := task["upstreamContractDetail"].(string)
+
+	// 首个任务标记检查
+	if upstreamContractStr == "" {
+		result.Errors = append(result.Errors, CompileIssue{
+			RuleID:           "E-S-05",
+			RuleName:         "上游契约缺失",
+			ResourceType:     "task",
+			ResourceName:     taskName,
+			ResourcePathName: taskPathName,
+			Message:          fmt.Sprintf("任务 [%s] 缺少上游契约定义", taskName),
+			Suggestion:       "首个任务应设置 title 为 'start'，其他任务需定义上游依赖",
+			Severity:         "error",
+		})
+		return
+	}
+
+	var upstreamContract ContractDetail
+	if err := json.Unmarshal([]byte(upstreamContractStr), &upstreamContract); err != nil {
+		result.Errors = append(result.Errors, CompileIssue{
+			RuleID:           "E-S-05",
+			RuleName:         "上游契约格式错误",
+			ResourceType:     "task",
+			ResourceName:     taskName,
+			ResourcePathName: taskPathName,
+			Message:          fmt.Sprintf("任务 [%s] 上游契约JSON解析失败: %v", taskName, err),
+			Suggestion:       "请检查 upstreamContractDetail 的JSON格式",
+			Severity:         "error",
+		})
+		return
+	}
+
+	// 检查是否为首个任务（无上游依赖）
+	if upstreamContract.Title == "start" {
+		// 首个任务，list 应为空
+		if len(upstreamContract.List) > 0 {
+			result.Warnings = append(result.Warnings, CompileIssue{
+				RuleID:           "W-S-03",
+				RuleName:         "首个任务存在上游依赖",
+				ResourceType:     "task",
+				ResourceName:     taskName,
+				ResourcePathName: taskPathName,
+				Message:          fmt.Sprintf("任务 [%s] 标记为首个任务但存在上游依赖", taskName),
+				Suggestion:       "请确认是否为首任务，若是则清空list",
+				Severity:         "warning",
+			})
+		}
+		return
+	}
+
+	// 非首个任务必须有 title 和 list
+	if upstreamContract.Title == "" {
+		result.Errors = append(result.Errors, CompileIssue{
+			RuleID:           "E-S-05",
+			RuleName:         "上游契约标题缺失",
+			ResourceType:     "task",
+			ResourceName:     taskName,
+			ResourcePathName: taskPathName,
+			Message:          fmt.Sprintf("任务 [%s] 上游契约缺少 title", taskName),
+			Suggestion:       "请添加描述性的 title，如 '依赖xxx提供'",
+			Severity:         "error",
+		})
+	}
+
+	// 检查 list 中每个条目的完整性
+	for i, item := range upstreamContract.List {
+		if item.Label == "" || item.ContractAPI == "" || item.From == "" {
+			result.Errors = append(result.Errors, CompileIssue{
+				RuleID:           "E-S-05",
+				RuleName:         "上游契约条目不完整",
+				ResourceType:     "task",
+				ResourceName:     taskName,
+				ResourcePathName: taskPathName,
+				Message:          fmt.Sprintf("任务 [%s] 上游契约第%d条缺少必要字段", taskName, i+1),
+				Suggestion:       "每个条目需包含 label, contract_api, from 三个字段",
+				Severity:         "error",
+			})
+		}
+	}
+}
+
+// checkDownstreamContract 检查下游契约 (E-S-06)
+func (s *MCPServer) checkDownstreamContract(task map[string]interface{}, taskPathName string, result *CompileStaticResult) {
+	taskName, _ := task["name"].(string)
+	downstreamContractStr, _ := task["downstreamContractDetail"].(string)
+
+	if downstreamContractStr == "" {
+		result.Errors = append(result.Errors, CompileIssue{
+			RuleID:           "E-S-06",
+			RuleName:         "下游契约缺失",
+			ResourceType:     "task",
+			ResourceName:     taskName,
+			ResourcePathName: taskPathName,
+			Message:          fmt.Sprintf("任务 [%s] 缺少下游契约定义", taskName),
+			Suggestion:       "末尾任务应设置 title 为 'end'，其他任务需定义下游输出",
+			Severity:         "error",
+		})
+		return
+	}
+
+	var downstreamContract ContractDetail
+	if err := json.Unmarshal([]byte(downstreamContractStr), &downstreamContract); err != nil {
+		result.Errors = append(result.Errors, CompileIssue{
+			RuleID:           "E-S-06",
+			RuleName:         "下游契约格式错误",
+			ResourceType:     "task",
+			ResourceName:     taskName,
+			ResourcePathName: taskPathName,
+			Message:          fmt.Sprintf("任务 [%s] 下游契约JSON解析失败: %v", taskName, err),
+			Suggestion:       "请检查 downstreamContractDetail 的JSON格式",
+			Severity:         "error",
+		})
+		return
+	}
+
+	// 检查是否为末尾任务（无下游依赖）
+	if downstreamContract.Title == "end" {
+		if len(downstreamContract.List) > 0 {
+			result.Warnings = append(result.Warnings, CompileIssue{
+				RuleID:           "W-S-04",
+				RuleName:         "末尾任务存在下游输出",
+				ResourceType:     "task",
+				ResourceName:     taskName,
+				ResourcePathName: taskPathName,
+				Message:          fmt.Sprintf("任务 [%s] 标记为末尾任务但存在下游输出", taskName),
+				Suggestion:       "请确认是否为末尾任务，若是则清空list",
+				Severity:         "warning",
+			})
+		}
+		return
+	}
+
+	// 非末尾任务必须有 title 和 list
+	if downstreamContract.Title == "" {
+		result.Errors = append(result.Errors, CompileIssue{
+			RuleID:           "E-S-06",
+			RuleName:         "下游契约标题缺失",
+			ResourceType:     "task",
+			ResourceName:     taskName,
+			ResourcePathName: taskPathName,
+			Message:          fmt.Sprintf("任务 [%s] 下游契约缺少 title", taskName),
+			Suggestion:       "请添加描述性的 title，如 '为下游任务提供以下接口'",
+			Severity:         "error",
+		})
+	}
+
+	// 检查 list 中每个条目的完整性
+	for i, item := range downstreamContract.List {
+		if item.Label == "" || item.ContractAPI == "" || item.From == "" {
+			result.Errors = append(result.Errors, CompileIssue{
+				RuleID:           "E-S-06",
+				RuleName:         "下游契约条目不完整",
+				ResourceType:     "task",
+				ResourceName:     taskName,
+				ResourcePathName: taskPathName,
+				Message:          fmt.Sprintf("任务 [%s] 下游契约第%d条缺少必要字段", taskName, i+1),
+				Suggestion:       "每个条目需包含 label, contract_api, from 三个字段",
+				Severity:         "error",
+			})
+		}
+	}
+}
+
+// checkStatusAnomaly 检查状态异常 (E-S-08)
+func (s *MCPServer) checkStatusAnomaly(task map[string]interface{}, taskPathName string, result *CompileStaticResult) {
+	taskName, _ := task["name"].(string)
+	status, _ := task["status"].(string)
+
+	// 只检查已完成状态的任务
+	if status != "completed" {
+		return
+	}
+
+	// 检查 bugLog
+	bugLogStr, _ := task["bugLog"].(string)
+	if bugLogStr != "" && bugLogStr != "{}" && bugLogStr != "null" {
+		var bugLog BugLog
+		if err := json.Unmarshal([]byte(bugLogStr), &bugLog); err == nil {
+			if bugLog.HasErrors() {
+				result.Errors = append(result.Errors, CompileIssue{
+					RuleID:           "E-S-08",
+					RuleName:         "已完成任务存在Bug",
+					ResourceType:     "task",
+					ResourceName:     taskName,
+					ResourcePathName: taskPathName,
+					Message:          fmt.Sprintf("任务 [%s] 已完成但存在未解决的Bug - static: %d, dynamic: %d",
+						taskName, len(bugLog.Static), len(bugLog.Dynamic)),
+					Suggestion:       "请解决Bug后清除日志或将状态改为非完成状态",
+					Severity:         "error",
+				})
+			}
+		}
+	}
+}
+
+// findTaskPathByName 根据任务名称或路径查找任务路径
+func findTaskPathByName(taskMap map[string]map[string]interface{}, from string, currentTaskPath string) string {
+	// 首先尝试直接匹配 pathName
+	if _, exists := taskMap[from]; exists {
+		return from
+	}
+
+	// 尝试在同一模块下查找任务名称
+	currentParts := strings.Split(currentTaskPath, "/")
+	if len(currentParts) >= 2 {
+		modulePath := currentParts[0] + "/" + currentParts[1]
+		// 尝试构建完整路径
+		possiblePath := modulePath + "/" + from
+		if _, exists := taskMap[possiblePath]; exists {
+			return possiblePath
+		}
+	}
+
+	// 遍历所有任务查找匹配的名称
+	for pathName, task := range taskMap {
+		name, _ := task["name"].(string)
+		if name == from {
+			return pathName
+		}
+	}
+
+	return ""
+}
+
+// checkContractMatch 检查契约条目是否在上游任务的下游契约中存在匹配
+// 参数:
+//   - upstreamTask: 上游任务数据
+//   - item: 当前任务的上游契约条目（来自 upstreamContractDetail.list）
+// 返回值:
+//   - bool: true 表示找到匹配，false 表示未找到匹配
+func checkContractMatch(upstreamTask map[string]interface{}, item ContractDetailItem) bool {
+	downstreamContractStr, _ := upstreamTask["downstreamContractDetail"].(string)
+	if downstreamContractStr == "" {
+		return false
+	}
+
+	var downstreamContract ContractDetail
+	if err := json.Unmarshal([]byte(downstreamContractStr), &downstreamContract); err != nil {
+		return false
+	}
+
+	// 在上游任务的下游契约列表中查找匹配项
+	// 三个字段必须全部匹配：
+	// 1. label 必须完全相同
+	// 2. contract_api 必须完全相同
+	// 3. from 必须完全相同（都表示这条契约来自哪个任务）
+	for _, downstreamItem := range downstreamContract.List {
+		if item.Label == downstreamItem.Label &&
+			item.ContractAPI == downstreamItem.ContractAPI &&
+			item.From == downstreamItem.From {
+			return true
+		}
+	}
+
+	return false
+}
+
+// checkContractConsistency 检查契约一致性 (E-S-07)
+// 只检查上游方向：遍历每个任务的上游契约，在上游任务的下游契约中查找匹配
+// 需要在所有任务数据加载完成后执行
+func (s *MCPServer) checkContractConsistency(allTasks []map[string]interface{}, result *CompileStaticResult) {
+	// 构建任务路径到任务的映射
+	taskMap := make(map[string]map[string]interface{})
+	for _, task := range allTasks {
+		pathName, _ := task["pathName"].(string)
+		taskMap[pathName] = task
+	}
+
+	// 遍历所有任务，检查每个任务的上游契约
+	for _, task := range allTasks {
+		taskName, _ := task["name"].(string)
+		taskPathName, _ := task["pathName"].(string)
+
+		upstreamContractStr, _ := task["upstreamContractDetail"].(string)
+		if upstreamContractStr == "" {
+			continue
+		}
+
+		var upstreamContract ContractDetail
+		if err := json.Unmarshal([]byte(upstreamContractStr), &upstreamContract); err != nil {
+			continue // 格式错误已在E-S-05中报告
+		}
+
+		// 跳过首个任务（title 为 "start"）
+		if upstreamContract.Title == "start" {
+			continue
+		}
+
+		// 遍历上游契约列表中的每一条契约
+		for _, upstreamItem := range upstreamContract.List {
+			// 1. 获取 item.from，找到对应的上游任务
+			upstreamTaskPathName := upstreamItem.From
+
+			// 2. 查找上游任务
+			upstreamTask, exists := taskMap[upstreamTaskPathName]
+			if !exists {
+				// 尝试使用辅助函数查找（支持任务名称匹配）
+				upstreamTaskPath := findTaskPathByName(taskMap, upstreamTaskPathName, taskPathName)
+				if upstreamTaskPath == "" {
+					result.Warnings = append(result.Warnings, CompileIssue{
+						RuleID:           "W-S-05",
+						RuleName:         "上游任务未找到",
+						ResourceType:     "task",
+						ResourceName:     taskName,
+						ResourcePathName: taskPathName,
+						Message:          fmt.Sprintf("任务 [%s] 引用的上游任务 '%s' 不存在", taskName, upstreamItem.From),
+						Suggestion:       "请检查 from 字段是否正确",
+						Severity:         "warning",
+					})
+					continue
+				}
+				upstreamTask = taskMap[upstreamTaskPath]
+			}
+
+			// 3. 在上游任务的下游契约列表中查找匹配项
+			if !checkContractMatch(upstreamTask, upstreamItem) {
+				// 4. 找不到匹配项，报错
+				result.Errors = append(result.Errors, CompileIssue{
+					RuleID:           "E-S-07",
+					RuleName:         "契约不一致",
+					ResourceType:     "task",
+					ResourceName:     taskName,
+					ResourcePathName: taskPathName,
+					Message:          fmt.Sprintf("任务 [%s] 的上游契约条目 '%s' 在上游任务 '%s' 的下游契约中未找到匹配项",
+						taskName, upstreamItem.Label, upstreamItem.From),
+					Suggestion:       fmt.Sprintf("期望格式: {\"label\": \"%s\", \"contract_api\": \"%s\", \"from\": \"%s\"}",
+						upstreamItem.Label, upstreamItem.ContractAPI, upstreamItem.From),
+					Severity:         "error",
+				})
+			}
 		}
 	}
 }
@@ -2320,4 +2962,145 @@ func (s *MCPServer) handleGetStatusImpl(ctx context.Context, request mcp.CallToo
 	}
 
 	return mcp.NewToolResultText(output.String()), nil
+}
+
+// checkModuleCrossDependency 检查模块跨模块依赖 (E-S-09)
+// 规则：每个模块必须至少有一个跨模块的依赖（作为上游或下游）
+func (s *MCPServer) checkModuleCrossDependency(allTasks []map[string]interface{}, modules []map[string]interface{}, result *CompileStaticResult) {
+	// 如果只有一个模块，跳过检查
+	if len(modules) <= 1 {
+		return
+	}
+
+	// 构建任务路径到模块路径的映射
+	taskToModule := make(map[string]string)
+	for _, task := range allTasks {
+		taskPathName, _ := task["pathName"].(string)
+		if taskPathName == "" {
+			continue
+		}
+		// 模块路径是任务路径的前两部分
+		parts := strings.Split(taskPathName, "/")
+		if len(parts) >= 2 {
+			modulePath := parts[0] + "/" + parts[1]
+			taskToModule[taskPathName] = modulePath
+		}
+	}
+
+	// 构建任务名称到模块路径的映射（用于跨模块查找）
+	taskNameToModule := make(map[string]string)
+	for _, task := range allTasks {
+		taskName, _ := task["name"].(string)
+		taskPathName, _ := task["pathName"].(string)
+		if taskName != "" && taskPathName != "" {
+			taskNameToModule[taskName] = taskToModule[taskPathName]
+		}
+	}
+
+	// 记录每个模块是否有跨模块依赖
+	moduleHasCrossDependency := make(map[string]bool)
+	for _, module := range modules {
+		modulePathName, _ := module["pathName"].(string)
+		moduleHasCrossDependency[modulePathName] = false
+	}
+
+	// 遍历所有任务，检查跨模块依赖
+	for _, task := range allTasks {
+		taskPathName, _ := task["pathName"].(string)
+		currentModulePath := taskToModule[taskPathName]
+		if currentModulePath == "" {
+			continue
+		}
+
+		// 检查上游契约
+		upstreamContractStr, _ := task["upstreamContractDetail"].(string)
+		if upstreamContractStr != "" {
+			var upstreamContract ContractDetail
+			if err := json.Unmarshal([]byte(upstreamContractStr), &upstreamContract); err == nil {
+				for _, item := range upstreamContract.List {
+					upstreamTaskPath := item.From
+					if upstreamTaskPath == "" {
+						continue
+					}
+
+					// 查找上游任务所属模块
+					upstreamModulePath := ""
+					// 首先尝试直接匹配路径
+					if modulePath, exists := taskToModule[upstreamTaskPath]; exists {
+						upstreamModulePath = modulePath
+					} else if modulePath, exists := taskNameToModule[upstreamTaskPath]; exists {
+						// 尝试按名称匹配
+						upstreamModulePath = modulePath
+					} else {
+						// 尝试在当前模块内查找
+						possiblePath := currentModulePath + "/" + upstreamTaskPath
+						if modulePath, exists := taskToModule[possiblePath]; exists {
+							upstreamModulePath = modulePath
+						}
+					}
+
+					// 如果找到了上游模块且与当前模块不同，则存在跨模块依赖
+					if upstreamModulePath != "" && upstreamModulePath != currentModulePath {
+						moduleHasCrossDependency[currentModulePath] = true
+						moduleHasCrossDependency[upstreamModulePath] = true
+					}
+				}
+			}
+		}
+
+		// 检查下游契约
+		downstreamContractStr, _ := task["downstreamContractDetail"].(string)
+		if downstreamContractStr != "" {
+			var downstreamContract ContractDetail
+			if err := json.Unmarshal([]byte(downstreamContractStr), &downstreamContract); err == nil {
+				for _, item := range downstreamContract.List {
+					downstreamTaskPath := item.From
+					if downstreamTaskPath == "" {
+						continue
+					}
+
+					// 查找下游任务所属模块
+					downstreamModulePath := ""
+					// 首先尝试直接匹配路径
+					if modulePath, exists := taskToModule[downstreamTaskPath]; exists {
+						downstreamModulePath = modulePath
+					} else if modulePath, exists := taskNameToModule[downstreamTaskPath]; exists {
+						// 尝试按名称匹配
+						downstreamModulePath = modulePath
+					} else {
+						// 尝试在当前模块内查找
+						possiblePath := currentModulePath + "/" + downstreamTaskPath
+						if modulePath, exists := taskToModule[possiblePath]; exists {
+							downstreamModulePath = modulePath
+						}
+					}
+
+					// 如果找到了下游模块且与当前模块不同，则存在跨模块依赖
+					if downstreamModulePath != "" && downstreamModulePath != currentModulePath {
+						moduleHasCrossDependency[currentModulePath] = true
+						moduleHasCrossDependency[downstreamModulePath] = true
+					}
+				}
+			}
+		}
+	}
+
+	// 检查每个模块是否有跨模块依赖，如果没有则报错
+	for _, module := range modules {
+		modulePathName, _ := module["pathName"].(string)
+		moduleName, _ := module["name"].(string)
+
+		if !moduleHasCrossDependency[modulePathName] {
+			result.Errors = append(result.Errors, CompileIssue{
+				RuleID:           "E-S-09",
+				RuleName:         "模块缺少跨模块依赖",
+				ResourceType:     "module",
+				ResourceName:     moduleName,
+				ResourcePathName: modulePathName,
+				Message:          fmt.Sprintf("模块 [%s] 没有任何跨模块依赖，模块必须与外部链接", moduleName),
+				Suggestion:       "请在任务的契约中添加对其他模块任务的依赖关系",
+				Severity:         "error",
+			})
+		}
+	}
 }

@@ -91,6 +91,7 @@ func SetupRouter() *gin.Engine {
 		{
 			dependencies.GET("", handlers.GetDependencies)
 			dependencies.POST("", handlers.CreateDependency)
+			dependencies.DELETE("/by-project", handlers.DeleteDependenciesByProject)
 			dependencies.DELETE("/:id", handlers.DeleteDependency)
 		}
 

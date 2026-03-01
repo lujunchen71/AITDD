@@ -95,26 +95,29 @@ func (s *MCPServer) registerContextTools() {
 
 // ==================== 2. 信息查询工具 ====================
 func (s *MCPServer) registerQueryTools() {
-	// query_module - 查询模块
+	// query_module - 批量查询模块
 	s.server.AddTool(mcp.NewTool("query_module",
-		mcp.WithDescription(`查询模块信息。
+		mcp.WithDescription(`批量查询模块信息。使用 queries 数组批量查询，每个路径可指定不同字段。
 
-可查询字段: name, description, status, prompt, upstreamContractSummary, downstreamContractSummary, testCoverage, locked, version
+可查询字段: name, description, status, prompt, upstreamContractSummary,
+downstreamContractSummary, testCoverage, locked, version
 
-fields 不填返回所有字段。`),
-		mcp.WithString("pathName", mcp.Description("模块路径，格式: 项目名/模块名"), mcp.Required()),
-		mcp.WithArray("fields", mcp.Description("指定返回字段，如 [\"name\",\"status\"]")),
+输出按路径层级组织。`),
+		mcp.WithArray("queries", mcp.Description("查询数组，每项: {pathName: string, fields?: string[]}"), mcp.Required()),
 	), s.handleQueryModule)
 
-	// query_task - 查询任务
+	// query_task - 批量查询任务
 	s.server.AddTool(mcp.NewTool("query_task",
-		mcp.WithDescription(`查询任务信息。
+		mcp.WithDescription(`批量查询任务信息。使用 queries 数组批量查询，每个路径可指定不同字段。
 
-可查询字段: name, description, status, prompt, upstreamContractDetail, downstreamContractDetail, tests, testResult, codePaths, bugLog, humanAssistance, issueDetails, locked, version
+注意：只能传任务路径（包含两个斜杠），不支持传模块路径查询所有子任务。
 
-fields 不填返回所有字段。`),
-		mcp.WithString("pathName", mcp.Description("任务路径，格式: 项目名/模块名/任务名"), mcp.Required()),
-		mcp.WithArray("fields", mcp.Description("指定返回字段，如 [\"name\",\"tests\"]")),
+可查询字段: name, description, status, prompt, upstreamContractDetail,
+downstreamContractDetail, tests, testResult, codePaths, bugLog,
+humanAssistance, issueDetails, locked, version
+
+输出按路径层级组织。`),
+		mcp.WithArray("queries", mcp.Description("查询数组，每项: {pathName: string, fields?: string[]}，pathName必须包含两个斜杠"), mcp.Required()),
 	), s.handleQueryTask)
 
 	// query_project_index_tree - 查询项目计划索引树
@@ -155,29 +158,79 @@ func (s *MCPServer) registerCheckTools() {
 
 // ==================== 4. 节点操作工具 ====================
 func (s *MCPServer) registerNodeTools() {
-	// create_node - 统一创建节点
-	s.server.AddTool(mcp.NewTool("create_node",
-		mcp.WithDescription("统一创建节点接口。根据 type 创建模块或任务。type='module' 时创建模块，type='task' 时创建任务。"),
-		mcp.WithString("type", mcp.Description("节点类型：module 或 task"), mcp.Required()),
-		mcp.WithString("parentPath", mcp.Description("父节点 pathName。创建模块时为项目或父模块 pathName，创建任务时为所属模块 pathName"), mcp.Required()),
-		mcp.WithString("name", mcp.Description("节点名称"), mcp.Required()),
-		mcp.WithString("pathName", mcp.Description("节点 pathName（可选，不传则根据 parentPath 和 name 自动生成）")),
-		mcp.WithObject("data", mcp.Description("类型相关的具体字段。module: description, prompt, upstreamContractSummary, downstreamContractSummary；task: description, prompt, upstreamContractDetail, downstreamContractDetail, tests, codePaths")),
-	), s.handleCreateNode)
+	// create_module - 批量创建模块
+	s.server.AddTool(mcp.NewTool("create_module",
+		mcp.WithDescription(`批量创建模块。使用 operations 数组，每项包含 {parentPath, name, pathName?, data?}。
 
-	// modify_module - 修改模块
+支持部分成功：每个操作独立执行，返回各自的创建结果。
+
+【重要】pathName 命名规则：
+1. pathName 格式必须为: parentPath + "/" + name（直接使用 name，不做任何转换）
+2. 例如: parentPath="MyProject", name="用户管理" → pathName="MyProject/用户管理"
+3. 如果不传 pathName，系统会自动按此规则生成
+4. 如果传入 pathName，必须符合上述格式，否则会报错
+
+data 可选字段:
+- description(string): 模块描述
+- prompt(string): 模块提示词
+- upstreamContractSummary(string): 上游契约摘要
+- downstreamContractSummary(string): 下游契约摘要
+- status(string): 初始状态，默认 designing`),
+		mcp.WithArray("operations", mcp.Description("批量操作数组，每项: {parentPath: string, name: string, pathName?: string, data?: object}"), mcp.Required()),
+	), s.handleCreateModule)
+
+	// create_task - 批量创建任务
+	s.server.AddTool(mcp.NewTool("create_task",
+		mcp.WithDescription(`批量创建任务。使用 operations 数组，每项包含 {parentPath, name, pathName?, data?}。
+
+支持部分成功：每个操作独立执行，返回各自的创建结果。
+parentPath 必须是模块路径（包含一个斜杠）。
+
+【重要】pathName 命名规则：
+1. pathName 格式必须为: parentPath + "/" + name（直接使用 name，不做任何转换）
+2. 例如: parentPath="MyProject/用户管理", name="登录功能" → pathName="MyProject/用户管理/登录功能"
+3. 如果不传 pathName，系统会自动按此规则生成
+4. 如果传入 pathName，必须符合上述格式，否则会报错
+
+data 可选字段:
+- description(string): 任务描述
+- prompt(string): 任务提示词
+- upstreamContractDetail(object): {title, list:[{label,contract_api,from}]}
+- downstreamContractDetail(object): {title, list:[{label,contract_api,from}]}
+- tests(array): [{target:string, api:string}]
+- codePaths(string[]): 代码文件路径列表
+- status(string): 初始状态，默认 ready`),
+		mcp.WithArray("operations", mcp.Description("批量操作数组，每项: {parentPath: string, name: string, pathName?: string, data?: object}"), mcp.Required()),
+	), s.handleCreateTask)
+
+	// create_project - 批量创建项目
+	s.server.AddTool(mcp.NewTool("create_project",
+		mcp.WithDescription(`批量创建项目。使用 operations 数组，每项包含 {name, pathName, data?}。
+
+支持部分成功：每个操作独立执行，返回各自的创建结果。
+pathName 是项目的唯一标识，不含斜杠。
+
+data 可选字段:
+- description(string): 项目描述
+- repository(string): 代码仓库地址`),
+		mcp.WithArray("operations", mcp.Description("批量操作数组，每项: {name: string, pathName: string, data?: object}"), mcp.Required()),
+	), s.handleCreateProject)
+
+	// modify_module - 批量修改模块
 	s.server.AddTool(mcp.NewTool("modify_module",
-		mcp.WithDescription(`修改模块。只更新 data 中传入的字段。
+		mcp.WithDescription(`批量修改模块。使用 operations 数组，每项包含 {pathName, version, data}。
+
+原子性保证：预检所有版本号，任一冲突则全部拒绝。使用数据库事务保证原子性。
 
 可修改字段: name(string), description(string), status(designing|developing|completed|deprecated), prompt(string), upstreamContractSummary(string), downstreamContractSummary(string), testCoverage(0-100)`),
-		mcp.WithString("pathName", mcp.Description("模块路径，格式: 项目名/模块名"), mcp.Required()),
-		mcp.WithNumber("version", mcp.Description("当前版本号，用于乐观锁"), mcp.Required()),
-		mcp.WithObject("data", mcp.Description("要修改的字段，如 {\"description\":\"新描述\",\"status\":\"developing\"}"), mcp.Required()),
+		mcp.WithArray("operations", mcp.Description("批量操作数组，每项: {pathName: string, version: number, data: object}"), mcp.Required()),
 	), s.handleModifyModule)
 
-	// modify_task - 修改任务
+	// modify_task - 批量修改任务
 	s.server.AddTool(mcp.NewTool("modify_task",
-		mcp.WithDescription(`修改任务。只更新 data 中传入的字段。
+		mcp.WithDescription(`批量修改任务。使用 operations 数组，每项包含 {pathName, version, data}。
+
+原子性保证：预检所有版本号，任一冲突则全部拒绝。使用数据库事务保证原子性。
 
 可修改字段:
 - name, description, status, prompt: string
@@ -186,9 +239,7 @@ func (s *MCPServer) registerNodeTools() {
 - testResult/codePaths/bugLog: string[]
 - humanAssistance: object
 - issueDetails: string`),
-		mcp.WithString("pathName", mcp.Description("任务路径，格式: 项目名/模块名/任务名"), mcp.Required()),
-		mcp.WithNumber("version", mcp.Description("当前版本号，用于乐观锁"), mcp.Required()),
-		mcp.WithObject("data", mcp.Description("要修改的字段，如 {\"status\":\"in_progress\",\"tests\":[{\"target\":\"验证XX\",\"api\":\"test_xx()\"}]}"), mcp.Required()),
+		mcp.WithArray("operations", mcp.Description("批量操作数组，每项: {pathName: string, version: number, data: object}"), mcp.Required()),
 	), s.handleModifyTask)
 
 	// delete_node - 统一删除节点
@@ -491,6 +542,18 @@ func (s *MCPServer) handleCheckDependencies(ctx context.Context, request mcp.Cal
 // 4. 节点操作
 func (s *MCPServer) handleCreateNode(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return s.handleCreateNodeImpl(ctx, request)
+}
+
+func (s *MCPServer) handleCreateModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleCreateModuleImpl(ctx, request)
+}
+
+func (s *MCPServer) handleCreateTask(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleCreateTaskImpl(ctx, request)
+}
+
+func (s *MCPServer) handleCreateProject(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	return s.handleCreateProjectImpl(ctx, request)
 }
 
 func (s *MCPServer) handleModifyModule(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

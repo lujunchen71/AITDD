@@ -79,7 +79,7 @@ func formatValue(val interface{}) string {
 		}
 		return v
 	case nil:
-		return ""
+		return "null"
 	case bool:
 		return fmt.Sprintf("%v", v)
 	case float64, float32, int, int64, int32:
@@ -1149,73 +1149,155 @@ func (s *MCPServer) handleQueryFileCodePathTreeImpl(ctx context.Context, request
 // - locked: 是否被锁定 (只读)
 // - version: 版本号 (只读，用于乐观锁)
 
-// handleQueryModuleImpl 查询模块信息
+// QueryItem 查询项结构
+type QueryItem struct {
+	PathName string
+	Fields   []string
+}
+
+// handleQueryModuleImpl 批量查询模块信息
 // 参数:
-//   - pathName: 模块路径名称 (必填)，格式: "项目名/模块名"
-//   - fields: 要查询的字段列表 (可选)，不填则返回所有字段
-// 可查询字段: pathName, name, description, status, prompt, upstreamContractSummary, downstreamContractSummary, testCoverage, locked, version
+//   - queries: 查询数组，每项包含 {pathName: string, fields?: string[]}
+// 每个路径可以指定不同的查询字段，输出按路径层级组织
 func (s *MCPServer) handleQueryModuleImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	pathName, ok := getParam(request, "pathName")
-	if !ok || pathName == "" {
-		return mcp.NewToolResultText("缺少 pathName 参数"), nil
+	// 获取 queries 参数
+	queriesVal, ok := getParamAny(request, "queries")
+	if !ok || queriesVal == nil {
+		return mcp.NewToolResultText("缺少 queries 参数"), nil
 	}
 
-	// 获取可选的 fields 参数
-	var fields []string
-	if fieldsVal, ok := getParamAny(request, "fields"); ok {
-		if fieldsArr, ok := fieldsVal.([]interface{}); ok {
-			for _, f := range fieldsArr {
-				if fStr, ok := f.(string); ok {
-					fields = append(fields, fStr)
+	// 解析 queries 数组
+	var queries []QueryItem
+	if queriesArr, ok := queriesVal.([]interface{}); ok {
+		if len(queriesArr) == 0 {
+			return mcp.NewToolResultText("queries 数组不能为空"), nil
+		}
+		for _, q := range queriesArr {
+			if qMap, ok := q.(map[string]interface{}); ok {
+				query := QueryItem{}
+				if pathName, ok := qMap["pathName"].(string); ok {
+					query.PathName = pathName
 				}
+				if fieldsVal, ok := qMap["fields"].([]interface{}); ok {
+					for _, f := range fieldsVal {
+						if fStr, ok := f.(string); ok {
+							query.Fields = append(query.Fields, fStr)
+						}
+					}
+				}
+				queries = append(queries, query)
 			}
 		}
 	}
 
-	// 调用 API 获取模块数据
-	url := fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), pathName)
-	resp, err := http.Get(url)
-	if err != nil {
-		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 404 {
-		return mcp.NewToolResultText(fmt.Sprintf("未找到模块: %s", pathName)), nil
+	if len(queries) == 0 {
+		return mcp.NewToolResultText("未能解析有效的查询项"), nil
 	}
 
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
+	// 批量查询并构建路径树
+	type ModuleResult struct {
+		PathName string
+		Data     map[string]interface{}
+		Fields   []string
+		Error    string
 	}
 
-	// 从 API 响应中提取模块数据
-	var moduleData map[string]interface{}
-	if data, ok := result["data"].(map[string]interface{}); ok {
-		if m, ok := data["module"].(map[string]interface{}); ok {
-			moduleData = m
-		} else {
-			moduleData = data
+	results := make([]ModuleResult, 0, len(queries))
+	for _, query := range queries {
+		result := ModuleResult{
+			PathName: query.PathName,
+			Fields:   query.Fields,
+		}
+
+		// 调用 API 获取模块数据
+		url := fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), query.PathName)
+		resp, err := http.Get(url)
+		if err != nil {
+			result.Error = "请求失败：" + err.Error()
+			results = append(results, result)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == 404 {
+			result.Error = fmt.Sprintf("未找到模块: %s", query.PathName)
+			results = append(results, result)
+			continue
+		}
+
+		var apiResult map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&apiResult); err != nil {
+			result.Error = "解析失败：" + err.Error()
+			results = append(results, result)
+			continue
+		}
+
+		// 从 API 响应中提取模块数据
+		var moduleData map[string]interface{}
+		if data, ok := apiResult["data"].(map[string]interface{}); ok {
+			if m, ok := data["module"].(map[string]interface{}); ok {
+				moduleData = m
+			} else {
+				moduleData = data
+			}
+		}
+		if moduleData == nil {
+			if m, ok := apiResult["module"].(map[string]interface{}); ok {
+				moduleData = m
+			}
+		}
+		if moduleData == nil {
+			moduleData = apiResult
+		}
+
+		result.Data = moduleData
+		results = append(results, result)
+	}
+
+	// 构建树形输出
+	// 按路径层级组织: project -> module
+	tree := make(map[string]map[string]ModuleResult)
+	for _, r := range results {
+		parts := strings.Split(r.PathName, "/")
+		if len(parts) >= 2 {
+			project := parts[0]
+			module := parts[1]
+			if tree[project] == nil {
+				tree[project] = make(map[string]ModuleResult)
+			}
+			tree[project][module] = r
 		}
 	}
-	if moduleData == nil {
-		if m, ok := result["module"].(map[string]interface{}); ok {
-			moduleData = m
+
+	// 格式化输出（使用代码块格式保留缩进）
+	var output strings.Builder
+	output.WriteString("```yaml\n")
+	for projectName, modules := range tree {
+		output.WriteString(fmt.Sprintf("%s:\n", projectName))
+		for moduleName, result := range modules {
+			output.WriteString(fmt.Sprintf("  %s:\n", moduleName))
+			if result.Error != "" {
+				output.WriteString(fmt.Sprintf("    error: %s\n", result.Error))
+			} else if result.Data != nil {
+				// 输出 pathName
+				output.WriteString(fmt.Sprintf("    pathName: \"%s\"\n", result.PathName))
+				// 根据字段过滤输出
+				if len(result.Fields) > 0 {
+					for _, field := range result.Fields {
+						if val, ok := result.Data[field]; ok {
+							output.WriteString(fmt.Sprintf("    %s: %s\n", field, formatValueYAML(val, "    ")))
+						}
+					}
+				} else {
+					// 输出所有字段
+					output.WriteString(formatNodeByType(result.Data, "module"))
+				}
+			}
 		}
 	}
-	if moduleData == nil {
-		moduleData = result
-	}
+	output.WriteString("```")
 
-	// 格式化输出
-	var yamlOutput string
-	if len(fields) > 0 {
-		yamlOutput = formatNodeFields(moduleData, fields)
-	} else {
-		yamlOutput = formatNodeByType(moduleData, "module")
-	}
-
-	return mcp.NewToolResultText(yamlOutput), nil
+	return mcp.NewToolResultText(output.String()), nil
 }
 
 // Task 可查询字段:
@@ -1235,71 +1317,204 @@ func (s *MCPServer) handleQueryModuleImpl(ctx context.Context, request mcp.CallT
 // - locked: 是否被锁定 (只读)
 // - version: 版本号 (只读，用于乐观锁)
 
-// handleQueryTaskImpl 查询任务信息
+// handleQueryTaskImpl 批量查询任务信息
 // 参数:
-//   - pathName: 任务路径名称 (必填)，格式: "项目名/模块名/任务名"
-//   - fields: 要查询的字段列表 (可选)，不填则返回所有字段
-// 可查询字段: pathName, name, description, status, prompt, upstreamContractDetail, downstreamContractDetail, tests, testResult, codePaths, bugLog, humanAssistance, issueDetails, locked, version
+//   - queries: 查询数组，每项包含 {pathName: string, fields?: string[]}
+// 注意：只能传任务路径（包含两个斜杠），不支持传模块路径查询所有子任务
+// 每个路径可以指定不同的查询字段，输出按路径层级组织
 func (s *MCPServer) handleQueryTaskImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	pathName, ok := getParam(request, "pathName")
-	if !ok || pathName == "" {
-		return mcp.NewToolResultText("缺少 pathName 参数"), nil
+	// 获取 queries 参数
+	queriesVal, ok := getParamAny(request, "queries")
+	if !ok || queriesVal == nil {
+		return mcp.NewToolResultText("缺少 queries 参数"), nil
 	}
 
-	// 获取可选的 fields 参数
-	var fields []string
-	if fieldsVal, ok := getParamAny(request, "fields"); ok {
-		if fieldsArr, ok := fieldsVal.([]interface{}); ok {
-			for _, f := range fieldsArr {
-				if fStr, ok := f.(string); ok {
-					fields = append(fields, fStr)
+	// 解析 queries 数组
+	var queries []QueryItem
+	if queriesArr, ok := queriesVal.([]interface{}); ok {
+		if len(queriesArr) == 0 {
+			return mcp.NewToolResultText("queries 数组不能为空"), nil
+		}
+		for _, q := range queriesArr {
+			if qMap, ok := q.(map[string]interface{}); ok {
+				query := QueryItem{}
+				if pathName, ok := qMap["pathName"].(string); ok {
+					// 验证路径格式：必须包含两个斜杠（任务路径）
+					if strings.Count(pathName, "/") < 2 {
+						continue // 跳过无效的任务路径
+					}
+					query.PathName = pathName
+				}
+				if fieldsVal, ok := qMap["fields"].([]interface{}); ok {
+					for _, f := range fieldsVal {
+						if fStr, ok := f.(string); ok {
+							query.Fields = append(query.Fields, fStr)
+						}
+					}
+				}
+				if query.PathName != "" {
+					queries = append(queries, query)
 				}
 			}
 		}
 	}
 
-	// 调用 API 获取任务数据
-	url := fmt.Sprintf("%s/tasks/by-path/%s", s.getApiURL(), pathName)
-	resp, err := http.Get(url)
-	if err != nil {
-		return mcp.NewToolResultText("请求失败：" + err.Error()), nil
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 404 {
-		return mcp.NewToolResultText(fmt.Sprintf("未找到任务: %s", pathName)), nil
+	if len(queries) == 0 {
+		return mcp.NewToolResultText("未能解析有效的查询项（任务路径必须包含两个斜杠）"), nil
 	}
 
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return mcp.NewToolResultText("解析失败：" + err.Error()), nil
+	// 批量查询并构建结果
+	type TaskResult struct {
+		PathName string
+		Data     map[string]interface{}
+		Fields   []string
+		Error    string
 	}
 
-	// 从 API 响应中提取任务数据
-	var taskData map[string]interface{}
-	if data, ok := result["data"].(map[string]interface{}); ok {
-		if t, ok := data["task"].(map[string]interface{}); ok {
-			taskData = t
+	results := make([]TaskResult, 0, len(queries))
+	for _, query := range queries {
+		result := TaskResult{
+			PathName: query.PathName,
+			Fields:   query.Fields,
+		}
+
+		// 调用 API 获取任务数据
+		url := fmt.Sprintf("%s/tasks/by-path/%s", s.getApiURL(), query.PathName)
+		resp, err := http.Get(url)
+		if err != nil {
+			result.Error = "请求失败：" + err.Error()
+			results = append(results, result)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == 404 {
+			result.Error = fmt.Sprintf("未找到任务: %s", query.PathName)
+			results = append(results, result)
+			continue
+		}
+
+		var apiResult map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&apiResult); err != nil {
+			result.Error = "解析失败：" + err.Error()
+			results = append(results, result)
+			continue
+		}
+
+		// 从 API 响应中提取任务数据
+		var taskData map[string]interface{}
+		if data, ok := apiResult["data"].(map[string]interface{}); ok {
+			if t, ok := data["task"].(map[string]interface{}); ok {
+				taskData = t
+			} else {
+				taskData = data
+			}
+		}
+		if taskData == nil {
+			if t, ok := apiResult["task"].(map[string]interface{}); ok {
+				taskData = t
+			}
+		}
+		if taskData == nil {
+			taskData = apiResult
+		}
+
+		result.Data = taskData
+		results = append(results, result)
+	}
+
+	// 构建树形输出
+	// 按路径层级组织: project -> module -> task
+	tree := make(map[string]map[string]map[string]TaskResult)
+	for _, r := range results {
+		parts := strings.Split(r.PathName, "/")
+		if len(parts) >= 3 {
+			project := parts[0]
+			module := parts[1]
+			task := parts[2]
+			if tree[project] == nil {
+				tree[project] = make(map[string]map[string]TaskResult)
+			}
+			if tree[project][module] == nil {
+				tree[project][module] = make(map[string]TaskResult)
+			}
+			tree[project][module][task] = r
+		}
+	}
+
+	// 格式化输出（使用代码块格式保留缩进）
+	var output strings.Builder
+	output.WriteString("```yaml\n")
+	for projectName, modules := range tree {
+		output.WriteString(fmt.Sprintf("%s:\n", projectName))
+		for moduleName, tasks := range modules {
+			output.WriteString(fmt.Sprintf("  %s:\n", moduleName))
+			for taskName, result := range tasks {
+				output.WriteString(fmt.Sprintf("    %s:\n", taskName))
+				if result.Error != "" {
+					output.WriteString(fmt.Sprintf("      error: %s\n", result.Error))
+				} else if result.Data != nil {
+					// 输出 pathName
+					output.WriteString(fmt.Sprintf("      pathName: \"%s\"\n", result.PathName))
+					// 根据字段过滤输出
+					if len(result.Fields) > 0 {
+						for _, field := range result.Fields {
+							if val, ok := result.Data[field]; ok {
+								output.WriteString(fmt.Sprintf("      %s: %s\n", field, formatValueYAML(val, "      ")))
+							}
+						}
+					} else {
+						// 输出所有字段
+						output.WriteString(formatNodeByTypeWithIndent(result.Data, "task", "      "))
+					}
+				}
+			}
+		}
+	}
+	output.WriteString("```")
+
+	return mcp.NewToolResultText(output.String()), nil
+}
+
+// formatNodeByTypeWithIndent 按节点类型格式化输出，带缩进
+func formatNodeByTypeWithIndent(data map[string]interface{}, nodeType string, indent string) string {
+	var sb strings.Builder
+
+	switch nodeType {
+	case "task":
+		// Task 输出格式
+		if modulePathName, ok := data["modulePathName"]; ok {
+			sb.WriteString(fmt.Sprintf("%smodulePathName: %s\n", indent, formatValue(modulePathName)))
+		}
+		sb.WriteString(fmt.Sprintf("%sname: %s\n", indent, formatValue(data["name"])))
+		sb.WriteString(fmt.Sprintf("%sdescription: %s\n", indent, formatValue(data["description"])))
+		sb.WriteString(fmt.Sprintf("%sstatus: %s\n", indent, formatValue(data["status"])))
+		sb.WriteString(fmt.Sprintf("%sprompt: %s\n", indent, formatValue(data["prompt"])))
+		// 契约字段使用多行 YAML 格式
+		sb.WriteString(fmt.Sprintf("%supstreamContractDetail:%s\n", indent, formatValueYAML(data["upstreamContractDetail"], indent)))
+		sb.WriteString(fmt.Sprintf("%sdownstreamContractDetail:%s\n", indent, formatValueYAML(data["downstreamContractDetail"], indent)))
+		sb.WriteString(fmt.Sprintf("%stests: %s\n", indent, formatValue(data["tests"])))
+		sb.WriteString(fmt.Sprintf("%stestResult: %s\n", indent, formatValue(data["testResult"])))
+		sb.WriteString(fmt.Sprintf("%scodePaths: %s\n", indent, formatValue(data["codePaths"])))
+		sb.WriteString(fmt.Sprintf("%sbugLog: %s\n", indent, formatValue(data["bugLog"])))
+		sb.WriteString(fmt.Sprintf("%shumanAssistance: %s\n", indent, formatValue(data["humanAssistance"])))
+		if locked, ok := data["locked"]; ok {
+			sb.WriteString(fmt.Sprintf("%slocked: %v\n", indent, locked))
 		} else {
-			taskData = data
+			sb.WriteString(fmt.Sprintf("%slocked: false\n", indent))
+		}
+		if lockedBy, ok := data["lockedBy"]; ok && lockedBy != nil {
+			sb.WriteString(fmt.Sprintf("%slockedBy: %s\n", indent, formatValue(lockedBy)))
+		}
+		if version, ok := data["version"]; ok {
+			sb.WriteString(fmt.Sprintf("%sversion: %v\n", indent, version))
+		}
+	default:
+		// 默认输出所有字段
+		for key, val := range data {
+			sb.WriteString(fmt.Sprintf("%s%s: %s\n", indent, key, formatValue(val)))
 		}
 	}
-	if taskData == nil {
-		if t, ok := result["task"].(map[string]interface{}); ok {
-			taskData = t
-		}
-	}
-	if taskData == nil {
-		taskData = result
-	}
 
-	// 格式化输出
-	var yamlOutput string
-	if len(fields) > 0 {
-		yamlOutput = formatNodeFields(taskData, fields)
-	} else {
-		yamlOutput = formatNodeByType(taskData, "task")
-	}
-
-	return mcp.NewToolResultText(yamlOutput), nil
+	return sb.String()
 }
