@@ -1426,9 +1426,9 @@ func (s *MCPServer) handleUnlockResourceImpl(ctx context.Context, request mcp.Ca
 type CompileIssue struct {
 	RuleID           string `json:"ruleId"`
 	RuleName         string `json:"ruleName"`
-	ResourceType     string `json:"resourceType"` // module, task
-	ResourceName     string `json:"resourceName"`
-	ResourcePathName string `json:"resourcePathName"`
+	ResourceType     string `json:"resourceType,omitempty"` // module, task
+	ResourceName     string `json:"resourceName,omitempty"`
+	ResourcePathName string `json:"resourcePathName,omitempty"`
 	Message          string `json:"message"`
 	Suggestion       string `json:"suggestion"`
 	Severity         string `json:"severity"` // error, warning
@@ -1633,6 +1633,9 @@ func (s *MCPServer) compileStaticProject(projectPathName string, includeWarnings
 
 	// E-S-09: 检查模块跨模块依赖
 	s.checkModuleCrossDependency(allTasks, modules, result)
+
+	// E-S-10: 检查孤立任务
+	s.checkOrphanTask(allTasks, result)
 
 	// 如果编译成功，更新任务依赖关系到数据库
 	if result.ErrorCount == 0 {
@@ -2454,17 +2457,18 @@ func (s *MCPServer) checkContractConsistency(allTasks []map[string]interface{}, 
 
 			if !foundMatch {
 				// 找不到匹配的上游任务，报错
+				contractJSON, _ := json.Marshal(map[string]string{
+					"label":        upstreamItem.Label,
+					"contract_api": upstreamItem.ContractAPI,
+					"from":         upstreamItem.From,
+				})
 				result.Errors = append(result.Errors, CompileIssue{
-					RuleID:           "E-S-07",
-					RuleName:         "契约不一致-反向",
-					ResourceType:     "task",
-					ResourceName:     taskName,
-					ResourcePathName: taskPathName,
-					Message:          fmt.Sprintf("任务 [%s] 的上游契约条目 '%s' 在上游任务的下游契约中未找到匹配项",
-						taskName, upstreamItem.Label),
-					Suggestion:       fmt.Sprintf("期望格式: {\"label\": \"%s\", \"contract_api\": \"%s\", \"from\": \"%s\"}",
-						upstreamItem.Label, upstreamItem.ContractAPI, upstreamItem.From),
-					Severity:         "error",
+					RuleID:       "E-S-07",
+					RuleName:     "任务契约不一致",
+					ResourceType: "task",
+					Message:      fmt.Sprintf("任务[%s] 上游契约条目 %s 未找到提供该接口的上游任务", taskName, string(contractJSON)),
+					Suggestion:   "请检查契约定义是否正确，确保上下游任务的契约条目（label, contract_api, from）完全一致",
+					Severity:     "error",
 				})
 			}
 		}
@@ -2517,17 +2521,18 @@ func (s *MCPServer) checkContractConsistency(allTasks []map[string]interface{}, 
 
 			if !foundMatch {
 				// 找不到匹配的下游任务，报错
+				contractJSON, _ := json.Marshal(map[string]string{
+					"label":        downstreamItem.Label,
+					"contract_api": downstreamItem.ContractAPI,
+					"from":         taskPathName,
+				})
 				result.Errors = append(result.Errors, CompileIssue{
-					RuleID:           "E-S-07",
-					RuleName:         "契约不一致-正向",
-					ResourceType:     "task",
-					ResourceName:     taskName,
-					ResourcePathName: taskPathName,
-					Message:          fmt.Sprintf("任务 [%s] 的下游契约条目 '%s' 未找到消费该接口的下游任务",
-						taskName, downstreamItem.Label),
-					Suggestion:       fmt.Sprintf("期望格式: {\"label\": \"%s\", \"contract_api\": \"%s\", \"from\": \"%s\"}，需要在下游任务的上游契约中有相同条目",
-						downstreamItem.Label, downstreamItem.ContractAPI, taskPathName),
-					Severity:         "error",
+					RuleID:       "E-S-07",
+					RuleName:     "任务契约不一致",
+					ResourceType: "task",
+					Message:      fmt.Sprintf("任务[%s] 下游契约条目 %s 未找到消费该接口的下游任务", taskName, string(contractJSON)),
+					Suggestion:   "请检查契约定义是否正确，确保上下游任务的契约条目（label, contract_api, from）完全一致",
+					Severity:     "error",
 				})
 			}
 		}
@@ -3326,4 +3331,101 @@ func findModuleByTaskIdentifier(taskIdentifier string, taskToModule map[string]s
 	}
 
 	return ""
+}
+
+// checkOrphanTask 检查孤立任务 (E-S-10)
+// 规则：任务必须有上游依赖或下游被依赖（除非是项目的起点/终点任务）
+// 孤立任务定义：没有任何上游契约引用，也没有任何下游契约被引用的任务
+func (s *MCPServer) checkOrphanTask(allTasks []map[string]interface{}, result *CompileStaticResult) {
+	// 如果只有一个任务，跳过检查
+	if len(allTasks) <= 1 {
+		return
+	}
+
+	// 构建任务路径到任务的映射
+	taskPathToTask := make(map[string]map[string]interface{})
+	for _, task := range allTasks {
+		taskPathName, _ := task["pathName"].(string)
+		if taskPathName != "" {
+			taskPathToTask[taskPathName] = task
+		}
+	}
+
+	// 收集所有被引用的任务路径（作为上游被依赖）
+	referencedAsUpstream := make(map[string]bool)
+	// 收集所有引用其他任务的任务路径（有下游契约被消费）
+	referencedAsDownstream := make(map[string]bool)
+
+	for _, task := range allTasks {
+		taskPathName, _ := task["pathName"].(string)
+		if taskPathName == "" {
+			continue
+		}
+
+		// 检查上游契约 - 当前任务依赖哪些上游任务
+		upstreamContractStr, _ := task["upstreamContractDetail"].(string)
+		if upstreamContractStr != "" {
+			var upstreamContract ContractDetail
+			if err := json.Unmarshal([]byte(upstreamContractStr), &upstreamContract); err == nil {
+				for _, item := range upstreamContract.List {
+					if item.From != "" {
+						// item.From是上游任务的路径
+						referencedAsUpstream[item.From] = true
+					}
+				}
+			}
+		}
+
+		// 检查下游契约 - 当前任务被哪些下游任务依赖
+		downstreamContractStr, _ := task["downstreamContractDetail"].(string)
+		if downstreamContractStr != "" {
+			var downstreamContract ContractDetail
+			if err := json.Unmarshal([]byte(downstreamContractStr), &downstreamContract); err == nil {
+				if len(downstreamContract.List) > 0 {
+					// 有下游契约定义，说明可能被下游任务引用
+					// 注意：这里只是定义了下游契约，实际是否被引用需要看其他任务的上游契约
+					// 但如果定义了下游契约，说明这个任务有输出，不是孤立的
+					referencedAsDownstream[taskPathName] = true
+				}
+			}
+		}
+
+		// 如果任务有上游契约引用，说明它参与了依赖链
+		if upstreamContractStr != "" {
+			var upstreamContract ContractDetail
+			if err := json.Unmarshal([]byte(upstreamContractStr), &upstreamContract); err == nil {
+				if len(upstreamContract.List) > 0 {
+					referencedAsDownstream[taskPathName] = true
+				}
+			}
+		}
+	}
+
+	// 检查每个任务是否孤立
+	for _, task := range allTasks {
+		taskPathName, _ := task["pathName"].(string)
+		taskName, _ := task["name"].(string)
+		if taskPathName == "" {
+			continue
+		}
+
+		// 检查是否有上游依赖（被其他任务作为上游）
+		hasUpstreamRef := referencedAsUpstream[taskPathName]
+		// 检查是否有下游引用（引用了其他任务或有下游契约定义）
+		hasDownstreamRef := referencedAsDownstream[taskPathName]
+
+		// 如果既没有上游引用，也没有下游引用，则是孤立任务
+		if !hasUpstreamRef && !hasDownstreamRef {
+			result.Errors = append(result.Errors, CompileIssue{
+				RuleID:           RuleOrphanTask,
+				RuleName:         "孤立任务错误",
+				ResourceType:     "task",
+				ResourceName:     taskName,
+				ResourcePathName: taskPathName,
+				Message:          fmt.Sprintf("任务 [%s] 没有任何上下游依赖关系，属于孤立任务", taskName),
+				Suggestion:       "请检查该任务的契约定义，确认是否需要与其他任务建立依赖关系",
+				Severity:         "error",
+			})
+		}
+	}
 }

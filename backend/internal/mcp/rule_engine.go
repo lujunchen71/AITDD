@@ -144,6 +144,7 @@ func (e *RuleEngine) getDefaultConfig() *RuleConfig {
 					{ID: "S-06", Name: "模块描述完整性", Description: "检查模块是否有描述信息", Severity: "warning", Enabled: true},
 					{ID: "S-07", Name: "模块提示词完整性", Description: "检查模块是否有提示词", Severity: "info", Enabled: true},
 					{ID: "E-S-09", Name: "模块循环引用错误", Description: "检测跨模块任务引用形成的循环依赖", Severity: "error", Enabled: true},
+					{ID: "E-S-10", Name: "孤立任务错误", Description: "检测没有任何上下游依赖关系的孤立任务", Severity: "error", Enabled: true},
 				},
 			},
 			"dynamic": {
@@ -645,6 +646,7 @@ func (e *RuleEngine) SaveRule(rule map[string]interface{}) error {
 // 规则常量
 const (
 	RuleModuleCircularReference = "E-S-09" // 模块循环引用错误
+	RuleOrphanTask              = "E-S-10" // 孤立任务错误
 )
 
 // CrossModuleReference 跨模块引用详情
