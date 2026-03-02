@@ -58,17 +58,17 @@
           {
             "label": "获取中央widget用于添加子组件",
             "contract_api": "get_central_widget() -> QWidget",
-            "from": "task-main-window"
+            "from": "PYQT6Calculator/主界面模块/主窗口框架"
           },
           {
             "label": "获取主布局用于添加其他布局",
             "contract_api": "get_main_layout() -> QVBoxLayout",
-            "from": "task-main-window"
+            "from": "PYQT6Calculator/主界面模块/主窗口框架"
           },
           {
             "label": "设置窗口样式",
             "contract_api": "set_window_style(style_sheet: str)",
-            "from": "task-main-window"
+            "from": "PYQT6Calculator/主界面模块/主窗口框架"
           }
         ]
       },
@@ -104,12 +104,12 @@
       "status": "completed",
       "prompt": "创建DisplayWidget类继承自QWidget。\n\n要求：\n1. 使用QLabel显示表达式和结果\n2. 表达式行：显示用户输入，右对齐，灰色字体\n3. 结果行：显示计算结果，右对齐，大号白色字体\n4. 支持clear()方法清空显示\n5. 支持setExpression(text)设置表达式\n6. 支持setResult(text)设置结果\n\n输出文件：src/ui/display.py",
       "upstreamContractDetail": {
-        "title": "依赖 *task-main-window 提供",
+        "title": "依赖 *PYQT6Calculator/mod-ui-main/task-main-window 提供",
         "list": [
           {
             "label": "将显示屏添加到布局顶部",
             "contract_api": "get_main_layout() -> QVBoxLayout",
-            "from": "task-main-window"
+            "from": "PYQT6Calculator/主界面模块/主窗口框架"
           }
         ]
       },
@@ -119,22 +119,22 @@
           {
             "label": "清空表达式和结果",
             "contract_api": "clear()",
-            "from": "task-display"
+            "from": "PYQT6Calculator/主界面模块/显示屏组件"
           },
           {
             "label": "设置表达式文本",
             "contract_api": "setExpression(text: str)",
-            "from": "task-display"
+            "from": "PYQT6Calculator/主界面模块/显示屏组件"
           },
           {
             "label": "设置结果文本",
             "contract_api": "setResult(text: str)",
-            "from": "task-display"
+            "from": "PYQT6Calculator/主界面模块/显示屏组件"
           },
           {
             "label": "获取显示组件",
             "contract_api": "get_display_widget() -> QWidget",
-            "from": "task-display"
+            "from": "PYQT6Calculator/主界面模块/显示屏组件"
           }
         ]
       },
@@ -170,17 +170,17 @@
       "status": "ready",
       "prompt": "创建ButtonPanel类继承自QWidget。\n\n要求：\n1. 使用QGridLayout创建4x5按钮网格\n2. 数字按钮0-9\n3. 运算符按钮：+、-、*、/、=、.\n4. 功能按钮：C(清除)、CE(清除所有)、退格\n5. 按钮点击发送button_clicked信号\n6. 按钮样式：圆角、渐变背景、悬停效果\n\n输出文件：src/ui/buttons.py",
       "upstreamContractDetail": {
-        "title": "依赖 *task-main-window 和 *task-display 提供",
+        "title": "依赖 *PYQT6Calculator/mod-ui-main/task-main-window 和 *PYQT6Calculator/mod-ui-main/task-display 提供",
         "list": [
           {
             "label": "将按钮面板添加到布局中",
             "contract_api": "get_main_layout() -> QVBoxLayout",
-            "from": "task-main-window"
+            "from": "PYQT6Calculator/主界面模块/主窗口框架"
           },
           {
             "label": "点击按钮时更新表达式显示",
             "contract_api": "setExpression(text: str)",
-            "from": "task-display"
+            "from": "PYQT6Calculator/主界面模块/显示屏组件"
           }
         ]
       },
@@ -190,17 +190,17 @@
           {
             "label": "按钮点击信号，传递按钮文本",
             "contract_api": "button_clicked: Signal(str)",
-            "from": "task-buttons"
+            "from": "PYQT6Calculator/主界面模块/按钮面板"
           },
           {
             "label": "获取按钮面板组件",
             "contract_api": "get_button_panel() -> QWidget",
-            "from": "task-buttons"
+            "from": "PYQT6Calculator/主界面模块/按钮面板"
           },
           {
             "label": "设置按钮启用状态",
             "contract_api": "set_button_enabled(text: str, enabled: bool)",
-            "from": "task-buttons"
+            "from": "PYQT6Calculator/主界面模块/按钮面板"
           }
         ]
       },
@@ -232,17 +232,17 @@
       "status": "ready",
       "prompt": "创建ScientificButtonPanel类继承自QWidget。\n\n要求：\n1. 科学函数按钮：sin、cos、tan、log、ln、sqrt、pow、factorial\n2. 常量按钮：π、e\n3. 括号按钮：(、)\n4. 使用QGridLayout布局\n5. 按钮点击发送sci_button_clicked信号\n6. 支持角度/弧度切换\n\n输出文件：src/ui/scientific_buttons.py",
       "upstreamContractDetail": {
-        "title": "依赖 *task-mode-switch 提供",
+        "title": "依赖 *PYQT6Calculator/mod-ui-scientific/task-mode-switch 提供",
         "list": [
           {
             "label": "模式切换时显示/隐藏科学按钮",
             "contract_api": "mode_changed: Signal(str)",
-            "from": "task-mode-switch"
+            "from": "PYQT6Calculator/科学计算界面/模式切换器"
           },
           {
             "label": "获取模式面板",
             "contract_api": "get_mode_panel() -> QWidget",
-            "from": "task-mode-switch"
+            "from": "PYQT6Calculator/科学计算界面/模式切换器"
           }
         ]
       },
@@ -252,17 +252,17 @@
           {
             "label": "科学按钮点击信号",
             "contract_api": "sci_button_clicked: Signal(str)",
-            "from": "task-sci-buttons"
+            "from": "PYQT6Calculator/科学计算界面/科学计算按钮组"
           },
           {
             "label": "设置角度/弧度模式",
             "contract_api": "set_angle_mode(is_degree: bool)",
-            "from": "task-sci-buttons"
+            "from": "PYQT6Calculator/科学计算界面/科学计算按钮组"
           },
           {
             "label": "获取科学按钮面板",
             "contract_api": "get_panel() -> QWidget",
-            "from": "task-sci-buttons"
+            "from": "PYQT6Calculator/科学计算界面/科学计算按钮组"
           }
         ]
       },
@@ -294,17 +294,17 @@
       "status": "ready",
       "prompt": "创建ModeSwitcher类继承自QWidget。\n\n要求：\n1. 使用QComboBox或切换按钮实现模式选择\n2. 两种模式：standard(标准)、scientific(科学)\n3. 模式切换时发送mode_changed信号\n4. 保存当前模式到配置\n\n输出文件：src/ui/mode_switch.py",
       "upstreamContractDetail": {
-        "title": "依赖 *task-main-window 和 *task-buttons 提供",
+        "title": "依赖 *PYQT6Calculator/mod-ui-main/task-main-window 和 *PYQT6Calculator/mod-ui-main/task-buttons 提供",
         "list": [
           {
             "label": "将模式切换器添加到布局",
             "contract_api": "get_main_layout() -> QVBoxLayout",
-            "from": "task-main-window"
+            "from": "PYQT6Calculator/主界面模块/主窗口框架"
           },
           {
             "label": "模式切换时可能需要禁用某些按钮",
             "contract_api": "set_button_enabled(text: str, enabled: bool)",
-            "from": "task-buttons"
+            "from": "PYQT6Calculator/主界面模块/按钮面板"
           }
         ]
       },
@@ -314,17 +314,17 @@
           {
             "label": "模式切换信号",
             "contract_api": "mode_changed: Signal(str)",
-            "from": "task-mode-switch"
+            "from": "PYQT6Calculator/科学计算界面/模式切换器"
           },
           {
             "label": "获取当前模式",
             "contract_api": "get_current_mode() -> str",
-            "from": "task-mode-switch"
+            "from": "PYQT6Calculator/科学计算界面/模式切换器"
           },
           {
             "label": "设置模式",
             "contract_api": "set_mode(mode: str)",
-            "from": "task-mode-switch"
+            "from": "PYQT6Calculator/科学计算界面/模式切换器"
           }
         ]
       },
@@ -365,17 +365,17 @@
           {
             "label": "计算表达式并返回结果",
             "contract_api": "calculate(expression: str) -> str",
-            "from": "task-basic-calc"
+            "from": "PYQT6Calculator/计算核心模块/基础运算器"
           },
           {
             "label": "验证表达式是否有效",
             "contract_api": "validate_expression(expression: str) -> bool",
-            "from": "task-basic-calc"
+            "from": "PYQT6Calculator/计算核心模块/基础运算器"
           },
           {
             "label": "获取最后一次计算结果",
             "contract_api": "get_last_result() -> str",
-            "from": "task-basic-calc"
+            "from": "PYQT6Calculator/计算核心模块/基础运算器"
           }
         ]
       },
@@ -421,12 +421,12 @@
       "status": "in_progress",
       "prompt": "创建ExpressionParser类。\n\n要求：\n1. 解析字符串表达式为抽象语法树\n2. 支持括号嵌套\n3. 支持科学计数法\n4. 支持负数\n5. 验证表达式语法\n6. 提供parse(expression: str) -> AST方法\n\n输出文件：src/core/parser.py",
       "upstreamContractDetail": {
-        "title": "依赖 *task-basic-calc 提供",
+        "title": "依赖 *PYQT6Calculator/mod-calc-core/task-basic-calc 提供",
         "list": [
           {
             "label": "验证表达式格式",
             "contract_api": "validate_expression(expression: str) -> bool",
-            "from": "task-basic-calc"
+            "from": "PYQT6Calculator/计算核心模块/基础运算器"
           }
         ]
       },
@@ -436,17 +436,17 @@
           {
             "label": "解析表达式返回语法树",
             "contract_api": "parse(expression: str) -> AST",
-            "from": "task-expression-parser"
+            "from": "PYQT6Calculator/计算核心模块/表达式解析器"
           },
           {
             "label": "检查表达式是否有效",
             "contract_api": "is_valid() -> bool",
-            "from": "task-expression-parser"
+            "from": "PYQT6Calculator/计算核心模块/表达式解析器"
           },
           {
             "label": "获取解析错误信息",
             "contract_api": "get_error() -> str",
-            "from": "task-expression-parser"
+            "from": "PYQT6Calculator/计算核心模块/表达式解析器"
           }
         ]
       },
@@ -482,17 +482,17 @@
       "status": "ready",
       "prompt": "创建ScientificCalculator类继承自BasicCalculator。\n\n要求：\n1. 三角函数：sin、cos、tan（支持角度和弧度）\n2. 反三角函数：asin、acos、atan\n3. 对数函数：log10、log(ln)\n4. 幂运算：pow、sqrt\n5. 阶乘：factorial\n6. 常量：π、e\n\n输出文件：src/core/scientific_calc.py",
       "upstreamContractDetail": {
-        "title": "依赖 *task-basic-calc 和 *task-expression-parser 提供",
+        "title": "依赖 *PYQT6Calculator/mod-calc-core/task-basic-calc 和 *PYQT6Calculator/mod-calc-core/task-expression-parser 提供",
         "list": [
           {
             "label": "基础运算功能",
             "contract_api": "calculate(expression: str) -> str",
-            "from": "task-basic-calc"
+            "from": "PYQT6Calculator/计算核心模块/基础运算器"
           },
           {
             "label": "解析科学计算表达式",
             "contract_api": "parse(expression: str) -> AST",
-            "from": "task-expression-parser"
+            "from": "PYQT6Calculator/计算核心模块/表达式解析器"
           }
         ]
       },
@@ -502,17 +502,17 @@
           {
             "label": "执行科学计算",
             "contract_api": "calculate_scientific(func: str, value: float) -> float",
-            "from": "task-sci-calc"
+            "from": "PYQT6Calculator/计算核心模块/科学计算函数"
           },
           {
             "label": "设置角度模式",
             "contract_api": "set_angle_mode(mode: str)",
-            "from": "task-sci-calc"
+            "from": "PYQT6Calculator/计算核心模块/科学计算函数"
           },
           {
             "label": "获取常量字典",
             "contract_api": "get_constants() -> dict",
-            "from": "task-sci-calc"
+            "from": "PYQT6Calculator/计算核心模块/科学计算函数"
           }
         ]
       },
@@ -552,12 +552,12 @@
       "status": "ready",
       "prompt": "创建HistoryStorage类。\n\n要求：\n1. 使用SQLite或JSON文件存储历史记录\n2. 每条记录包含：表达式、结果、时间戳\n3. 支持分页查询\n4. 支持按日期范围筛选\n5. 支持清除历史\n6. 最大存储1000条记录\n\n输出文件：src/data/history_storage.py",
       "upstreamContractDetail": {
-        "title": "依赖 *task-basic-calc 提供",
+        "title": "依赖 *PYQT6Calculator/mod-calc-core/task-basic-calc 提供",
         "list": [
           {
             "label": "获取计算结果用于存储",
             "contract_api": "get_last_result() -> str",
-            "from": "task-basic-calc"
+            "from": "PYQT6Calculator/计算核心模块/基础运算器"
           }
         ]
       },
@@ -567,22 +567,22 @@
           {
             "label": "添加历史记录",
             "contract_api": "add_record(expression: str, result: str)",
-            "from": "task-history-storage"
+            "from": "PYQT6Calculator/历史记录模块/历史存储服务"
           },
           {
             "label": "获取历史列表",
             "contract_api": "get_history(limit: int, offset: int) -> List[Record]",
-            "from": "task-history-storage"
+            "from": "PYQT6Calculator/历史记录模块/历史存储服务"
           },
           {
             "label": "清除所有历史",
             "contract_api": "clear_history()",
-            "from": "task-history-storage"
+            "from": "PYQT6Calculator/历史记录模块/历史存储服务"
           },
           {
             "label": "搜索历史",
             "contract_api": "search_history(keyword: str) -> List[Record]",
-            "from": "task-history-storage"
+            "from": "PYQT6Calculator/历史记录模块/历史存储服务"
           }
         ]
       },
@@ -618,22 +618,22 @@
       "status": "ready",
       "prompt": "创建HistoryPanel类继承自QWidget。\n\n要求：\n1. 使用QListWidget显示历史记录\n2. 每条记录显示：表达式 = 结果\n3. 双击记录可将表达式复制到输入框\n4. 支持滚动加载更多\n5. 提供清除按钮\n6. 支持搜索过滤\n\n输出文件：src/ui/history_panel.py",
       "upstreamContractDetail": {
-        "title": "依赖 *task-history-storage 和 *task-display 提供",
+        "title": "依赖 *PYQT6Calculator/历史记录模块/历史存储服务 和 *PYQT6Calculator/主界面模块/显示屏组件 提供",
         "list": [
           {
             "label": "获取历史数据",
             "contract_api": "get_history(limit: int, offset: int) -> List[Record]",
-            "from": "task-history-storage"
+            "from": "PYQT6Calculator/历史记录模块/历史存储服务"
           },
           {
             "label": "搜索历史",
             "contract_api": "search_history(keyword: str) -> List[Record]",
-            "from": "task-history-storage"
+            "from": "PYQT6Calculator/历史记录模块/历史存储服务"
           },
           {
             "label": "双击历史时设置表达式",
             "contract_api": "setExpression(text: str)",
-            "from": "task-display"
+            "from": "PYQT6Calculator/主界面模块/显示屏组件"
           }
         ]
       },
@@ -643,17 +643,17 @@
           {
             "label": "刷新历史列表",
             "contract_api": "refresh()",
-            "from": "task-history-panel"
+            "from": "PYQT6Calculator/历史记录模块/历史记录面板"
           },
           {
             "label": "选择历史记录信号",
             "contract_api": "history_selected: Signal(str)",
-            "from": "task-history-panel"
+            "from": "PYQT6Calculator/历史记录模块/历史记录面板"
           },
           {
             "label": "获取历史面板组件",
             "contract_api": "get_panel() -> QWidget",
-            "from": "task-history-panel"
+            "from": "PYQT6Calculator/历史记录模块/历史记录面板"
           }
         ]
       },
@@ -685,17 +685,17 @@
       "status": "ready",
       "prompt": "创建SettingsDialog类继承自QDialog。\n\n要求：\n1. 主题选择：亮色/暗色\n2. 计算精度设置：小数位数\n3. 角度模式默认值：角度/弧度\n4. 历史记录开关\n5. 使用QSettings保存配置\n6. 应用/取消按钮\n\n输出文件：src/ui/settings_dialog.py",
       "upstreamContractDetail": {
-        "title": "依赖 *task-mode-switch 和 *task-sci-calc 提供",
+        "title": "依赖 *PYQT6Calculator/科学计算界面/模式切换器 和 *PYQT6Calculator/计算核心模块/科学计算函数 提供",
         "list": [
           {
             "label": "设置默认模式",
             "contract_api": "set_mode(mode: str)",
-            "from": "task-mode-switch"
+            "from": "PYQT6Calculator/科学计算界面/模式切换器"
           },
           {
             "label": "设置默认角度模式",
             "contract_api": "set_angle_mode(mode: str)",
-            "from": "task-sci-calc"
+            "from": "PYQT6Calculator/计算核心模块/科学计算函数"
           }
         ]
       },
@@ -705,17 +705,17 @@
           {
             "label": "获取当前主题",
             "contract_api": "get_theme() -> str",
-            "from": "task-settings-dialog"
+            "from": "PYQT6Calculator/配置管理模块/设置对话框"
           },
           {
             "label": "获取计算精度",
             "contract_api": "get_precision() -> int",
-            "from": "task-settings-dialog"
+            "from": "PYQT6Calculator/配置管理模块/设置对话框"
           },
           {
             "label": "设置变更信号",
             "contract_api": "settings_changed: Signal()",
-            "from": "task-settings-dialog"
+            "from": "PYQT6Calculator/配置管理模块/设置对话框"
           }
         ]
       },
@@ -756,32 +756,32 @@
           {
             "label": "获取配置项",
             "contract_api": "get(key: str, default: Any) -> Any",
-            "from": "task-config-persist"
+            "from": "PYQT6Calculator/配置管理模块/配置持久化"
           },
           {
             "label": "设置配置项",
             "contract_api": "set(key: str, value: Any)",
-            "from": "task-config-persist"
+            "from": "PYQT6Calculator/配置管理模块/配置持久化"
           },
           {
             "label": "保存配置到文件",
             "contract_api": "save()",
-            "from": "task-config-persist"
+            "from": "PYQT6Calculator/配置管理模块/配置持久化"
           },
           {
             "label": "从文件加载配置",
             "contract_api": "load()",
-            "from": "task-config-persist"
+            "from": "PYQT6Calculator/配置管理模块/配置持久化"
           },
           {
             "label": "导出配置",
             "contract_api": "export_config(path: str)",
-            "from": "task-config-persist"
+            "from": "PYQT6Calculator/配置管理模块/配置持久化"
           },
           {
             "label": "导入配置",
             "contract_api": "import_config(path: str)",
-            "from": "task-config-persist"
+            "from": "PYQT6Calculator/配置管理模块/配置持久化"
           }
         ]
       },

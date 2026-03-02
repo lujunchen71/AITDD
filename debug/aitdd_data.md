@@ -99,7 +99,7 @@
 |--------|------|------|------|
 | label | string | 是 | 接口用途描述 |
 | contract_api | string | 是 | 函数签名 |
-| from | string | 否 | 标明该 API 来自哪个 task_id，方便 AI 在数据库中查找对应代码位置 |
+| from | string | 是 | 标明该 API 来自哪个任务的 pathName，用于契约匹配检查 |
 
 #### 结构定义
 
@@ -110,7 +110,7 @@
     {
       "label": "接口用途描述",
       "contract_api": "函数签名",
-      "from": "task-xxx"  // 新增：标明该 API 来自哪个 task_id
+      "from": "项目名/模块名/任务名"  // pathName 格式，标明该 API 来自哪个任务
     }
   ]
 }
@@ -125,12 +125,12 @@
     {
       "label": "将按钮面板添加到布局中",
       "contract_api": "get_main_layout() -> QVBoxLayout",
-      "from": "task-main-window"
+      "from": "PYQT6Calculator/mod-ui-main/task-main-window"
     },
     {
       "label": "点击按钮时更新表达式显示",
       "contract_api": "setExpression(text: str)",
-      "from": "task-main-window"
+      "from": "PYQT6Calculator/mod-ui-main/task-main-window"
     }
   ]
 }
@@ -153,7 +153,7 @@
 |--------|------|------|------|
 | label | string | 是 | 接口用途描述 |
 | contract_api | string | 是 | 函数签名或信号定义 |
-| from | string | 否 | 标明该 API 来自哪个 task_id（对于 downstream 通常为当前任务） |
+| from | string | 是 | 标明该 API 来自哪个任务的 pathName（对于 downstream 通常为当前任务自己的 pathName） |
 
 #### 结构定义
 
@@ -164,8 +164,9 @@
     {
       "label": "接口用途描述",
       "contract_api": "函数签名或信号定义",
-      "from": "task-xxx"  // 新增：标明该 API 来自哪个 task_id
-    }
+      "from": "项目名/模块名/任务名"  // pathName 格式，当前任务自己的 pathName
+    },
+    ...
   ]
 }
 ```
@@ -179,18 +180,14 @@
     {
       "label": "按钮点击信号，传递按钮文本",
       "contract_api": "button_clicked: Signal(str)",
-      "from": "task-buttons"
+      "from": "PYQT6Calculator/mod-ui-main/task-buttons"
     },
     {
       "label": "获取按钮面板组件",
       "contract_api": "get_button_panel() -> QWidget",
-      "from": "task-buttons"
+      "from": "PYQT6Calculator/mod-ui-main/task-buttons"
     },
-    {
-      "label": "设置按钮启用状态",
-      "contract_api": "set_button_enabled(text: str, enabled: bool)",
-      "from": "task-buttons"
-    }
+    ...
   ]
 }
 ```
@@ -229,10 +226,7 @@
     "target": "验证按钮点击信号是否正确发送",
     "api": "test_button_click_signal()"
   },
-  {
-    "target": "验证所有按钮是否正确初始化并显示",
-    "api": "test_button_initialization()"
-  }
+  ...
 ]
 ```
 
@@ -403,7 +397,7 @@ get_history(limit: int, offset: int) -> List[Record]
           {
             "label": "获取主布局",
             "contract_api": "get_main_layout() -> QVBoxLayout",
-            "from": "task-main-window"
+            "from": "项目名称/主界面模块/主窗口框架"
           }
         ]
       },
@@ -432,7 +426,7 @@ get_history(limit: int, offset: int) -> List[Record]
           {
             "label": "将按钮面板添加到布局中",
             "contract_api": "get_main_layout() -> QVBoxLayout",
-            "from": "task-main-window"
+            "from": "项目名称/主界面模块/主窗口框架"
           }
         ]
       },
@@ -442,7 +436,7 @@ get_history(limit: int, offset: int) -> List[Record]
           {
             "label": "按钮点击信号",
             "contract_api": "button_clicked: Signal(str)",
-            "from": "task-buttons"
+            "from": "项目名称/主界面模块/按钮面板s"
           }
         ]
       },
@@ -469,72 +463,6 @@ get_history(limit: int, offset: int) -> List[Record]
   ]
 }
 ```
-
-### 单个任务示例
-
-如果只需要查看单个任务的详细结构：
-
-```json
-{
-  "id": "task-buttons",
-  "name": "按钮面板",
-  "description": "创建计算器按钮网格布局，包含数字按钮和运算符按钮",
-  "moduleId": "mod-ui-main",
-  "status": "ready",
-  "prompt": "创建ButtonPanel类继承自QWidget。\n\n要求：\n1. 使用QGridLayout创建4x5按钮网格\n2. 数字按钮0-9\n3. 运算符按钮：+、-、*、/、=、.\n4. 功能按钮：C(清除)、CE(清除所有)、退格\n5. 按钮点击发送button_clicked信号\n\n输出文件：src/ui/buttons.py",
-  "upstreamContractDetail": {
-    "title": "依赖 *task-main-window 提供",
-    "list": [
-      {
-        "label": "将按钮面板添加到布局中",
-        "contract_api": "get_main_layout() -> QVBoxLayout",
-        "from": "task-main-window"
-      },
-      {
-        "label": "点击按钮时更新表达式显示",
-        "contract_api": "setExpression(text: str)",
-        "from": "task-display"
-      }
-    ]
-  },
-  "downstreamContractDetail": {
-    "title": "为下游任务提供以下接口",
-    "list": [
-      {
-        "label": "按钮点击信号，传递按钮文本",
-        "contract_api": "button_clicked: Signal(str)",
-        "from": "task-buttons"
-      },
-      {
-        "label": "获取按钮面板组件",
-        "contract_api": "get_button_panel() -> QWidget",
-        "from": "task-buttons"
-      },
-      {
-        "label": "设置按钮启用状态",
-        "contract_api": "set_button_enabled(text: str, enabled: bool)",
-        "from": "task-buttons"
-      }
-    ]
-  },
-  "tests": [
-    {
-      "target": "验证按钮网格布局是否正确创建4x5结构",
-      "api": "test_button_grid_layout()"
-    },
-    {
-      "target": "验证按钮点击信号是否正确发送",
-      "api": "test_button_click_signal()"
-    }
-  ],
-  "test_result": [],
-  "codePaths": "[\"src/ui/buttons.py\"]",
-  "bug_log": "",
-  "humanAssistance": "{}",
-  "issue_details": ""
-}
-```
-
 ## 字段对照表
 
 ### 任务字段一览
@@ -562,7 +490,7 @@ get_history(limit: int, offset: int) -> List[Record]
 |--------|------|------|------|
 | label | string | 是 | 接口用途描述 |
 | contract_api | string | 是 | 函数签名或信号定义 |
-| from | string | 否 | 标明该 API 来自哪个 task_id，方便 AI 在数据库中查找对应代码位置 |
+| from | string | 是 | 标明该 API 来自哪个任务的 pathName，用于契约匹配检查 |
 
 ## AI生成指南
 
@@ -587,7 +515,7 @@ get_history(limit: int, offset: int) -> List[Record]
 
 - [ ] upstreamContractDetail 包含 title 和 list 两个字段
 - [ ] downstreamContractDetail 包含 title 和 list 两个字段
-- [ ] list 中每项包含 label、contract_api 和可选的 from 字段
+- [ ] list 中每项包含 label、contract_api 和必填的 from 字段（pathName 格式）
 - [ ] tests 数组中每项包含 target 和 api 两个字段
 - [ ] test_result 为字符串数组（可为空）
 - [ ] bug_log 为字符串（可为空）

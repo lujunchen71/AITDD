@@ -279,11 +279,16 @@ func (s *MCPServer) checkDownstreamContract(task map[string]interface{}, taskPat
 
 #### 2.2.3 E-S-07: 契约一致性检查
 
-> **核心原则**：只需要检查上游方向，不需要双向检查（上游→下游 和 下游→上游 是重复的）
+> **核心原则**：需要双向检查
+>
+> - **反向检查（上游→下游）**：验证"我依赖的人是否承认依赖关系"
+> - **正向检查（下游→上游）**：验证"依赖我的人是否声明了依赖关系"
+>
+> 两者的检查目的不同，不能互相替代。
 
 ##### 检查逻辑说明
 
-对于每个任务，遍历其上游契约列表 `upstreamContractDetail.list` 中的每一条契约：
+**反向检查（上游→下游）**：遍历每个任务的上游契约列表 `upstreamContractDetail.list`
 
 ```
 对于当前任务的每一条上游契约 item:
@@ -295,6 +300,23 @@ func (s *MCPServer) checkDownstreamContract(task map[string]interface{}, taskPat
        - downstreamItem.contract_api == item.contract_api
        - downstreamItem.from == item.from（都表示契约来源）
     4. 如果找不到匹配项，则报错：契约不一致
+```
+
+**正向检查（下游→上游）**：遍历每个任务的下游契约列表 `downstreamContractDetail.list`
+
+> **重要**：下游契约的 `from` 字段表示**当前任务自己**的 pathName，不是下游任务的 pathName。
+> 因此正向检查需要遍历所有任务，找到上游契约中 `from` 字段等于当前任务 pathName 的任务（即依赖当前任务的下游任务）。
+
+```
+对于当前任务 A 的每一条下游契约 item:
+    1. item.from = A（当前任务自己的 pathName，表示这条契约由 A 提供）
+    2. 遍历所有任务，找到上游契约中 from = A 的任务（即依赖 A 的下游任务）
+    3. 在这些下游任务的上游契约中查找匹配项：
+       是否存在一条契约 upstreamItem，满足：
+       - upstreamItem.label == item.label
+       - upstreamItem.contract_api == item.contract_api
+       - upstreamItem.from == A（当前任务的 pathName）
+    4. 如果找不到匹配项，则报错：下游任务未声明对当前任务的依赖
 ```
 
 ##### 示例
@@ -326,8 +348,9 @@ func (s *MCPServer) checkDownstreamContract(task map[string]interface{}, taskPat
 ##### 代码实现
 
 ```go
-// checkContractConsistency 检查契约一致性
-// 只检查上游方向：遍历每个任务的上游契约，在上游任务的下游契约中查找匹配
+// checkContractConsistency 检查契约一致性（双向检查）
+// 反向检查：遍历每个任务的上游契约，在上游任务的下游契约中查找匹配
+// 正向检查：遍历每个任务的下游契约，在下游任务的上游契约中查找匹配
 // 需要在所有任务数据加载完成后执行
 func (s *MCPServer) checkContractConsistency(allTasks []map[string]interface{}, result *CompileStaticResult) {
     // 构建任务路径到任务的映射
@@ -337,7 +360,8 @@ func (s *MCPServer) checkContractConsistency(allTasks []map[string]interface{}, 
         taskMap[pathName] = task
     }
 
-    // 遍历所有任务，检查每个任务的上游契约
+    // ==================== 反向检查（上游→下游）====================
+    // 验证"我依赖的人是否承认依赖关系"
     for _, task := range allTasks {
         taskName, _ := task["name"].(string)
         taskPathName, _ := task["pathName"].(string)
@@ -384,11 +408,11 @@ func (s *MCPServer) checkContractConsistency(allTasks []map[string]interface{}, 
             }
 
             // 3. 在上游任务的下游契约列表中查找匹配项
-            if !checkContractMatch(upstreamTask, upstreamItem) {
+            if !checkContractMatchInDownstream(upstreamTask, upstreamItem) {
                 // 4. 找不到匹配项，报错
                 result.Errors = append(result.Errors, CompileIssue{
                     RuleID:           "E-S-07",
-                    RuleName:         "契约不一致",
+                    RuleName:         "契约不一致-反向",
                     ResourceType:     "task",
                     ResourceName:     taskName,
                     ResourcePathName: taskPathName,
@@ -401,6 +425,108 @@ func (s *MCPServer) checkContractConsistency(allTasks []map[string]interface{}, 
             }
         }
     }
+
+    // ==================== 正向检查（下游→上游）====================
+    // 验证"依赖我的人是否声明了依赖关系"
+    // 重要：下游契约的 from 字段表示当前任务自己的 pathName，不是下游任务的 pathName
+    // 因此需要遍历所有任务，找到上游契约中 from 字段等于当前任务 pathName 的任务
+    for _, task := range allTasks {
+        taskName, _ := task["name"].(string)
+        taskPathName, _ := task["pathName"].(string)
+
+        downstreamContractStr, _ := task["downstreamContractDetail"].(string)
+        if downstreamContractStr == "" {
+            continue
+        }
+
+        var downstreamContract ContractDetail
+        if err := json.Unmarshal([]byte(downstreamContractStr), &downstreamContract); err != nil {
+            continue // 格式错误已在E-S-06中报告
+        }
+
+        // 跳过末尾任务（title 为 "end"）
+        if downstreamContract.Title == "end" {
+            continue
+        }
+
+        // 遍历下游契约列表中的每一条契约
+        for _, downstreamItem := range downstreamContract.List {
+            // 验证 from 字段是否为当前任务的 pathName
+            // 下游契约的 from 字段应该等于当前任务的 pathName
+            if downstreamItem.From != taskPathName {
+                // from 字段不是当前任务，记录警告（这可能是一个配置错误）
+                result.Warnings = append(result.Warnings, CompileIssue{
+                    RuleID:           "W-S-07",
+                    RuleName:         "下游契约from字段异常",
+                    ResourceType:     "task",
+                    ResourceName:     taskName,
+                    ResourcePathName: taskPathName,
+                    Message:          fmt.Sprintf("任务 [%s] 的下游契约条目 '%s' 的 from 字段 '%s' 不等于当前任务 pathName '%s'",
+                        taskName, downstreamItem.Label, downstreamItem.From, taskPathName),
+                    Suggestion:       "下游契约的 from 字段应该等于当前任务的 pathName",
+                    Severity:         "warning",
+                })
+            }
+            
+            // 遍历所有任务，找到上游契约中 from 字段等于当前任务 pathName 的任务
+            // 这些任务就是依赖当前任务的下游任务
+            foundDownstreamTask := false
+            for _, potentialDownstreamTask := range allTasks {
+                // 跳过自己
+                potentialTaskPathName, _ := potentialDownstreamTask["pathName"].(string)
+                if potentialTaskPathName == taskPathName {
+                    continue
+                }
+                
+                // 检查该任务的上游契约中是否有 from = 当前任务 pathName 的条目
+                if checkTaskHasUpstreamContractFrom(potentialDownstreamTask, taskPathName) {
+                    // 找到了依赖当前任务的下游任务
+                    foundDownstreamTask = true
+                    
+                    // 在该下游任务的上游契约中查找匹配项
+                    if !checkContractMatchInUpstream(potentialDownstreamTask, downstreamItem, taskPathName) {
+                        // 找不到匹配项，报错
+                        downstreamTaskName, _ := potentialDownstreamTask["name"].(string)
+                        result.Errors = append(result.Errors, CompileIssue{
+                            RuleID:           "E-S-07",
+                            RuleName:         "契约不一致-正向",
+                            ResourceType:     "task",
+                            ResourceName:     taskName,
+                            ResourcePathName: taskPathName,
+                            Message:          fmt.Sprintf("任务 [%s] 的下游契约条目 '%s' 在下游任务 '%s' 的上游契约中未找到匹配项",
+                                taskName, downstreamItem.Label, downstreamTaskName),
+                            Suggestion:       fmt.Sprintf("下游任务 [%s] 需要添加上游依赖: {\"label\": \"%s\", \"contract_api\": \"%s\", \"from\": \"%s\"}",
+                                downstreamTaskName, downstreamItem.Label, downstreamItem.ContractAPI, taskPathName),
+                            Severity:         "error",
+                        })
+                    }
+                }
+            }
+            
+            // 如果没有找到任何依赖当前任务的下游任务，记录信息（这可能是正常的，比如任务是末尾任务）
+            _ = foundDownstreamTask // 用于调试，不强制要求有下游任务
+        }
+    }
+}
+
+// checkTaskHasUpstreamContractFrom 检查任务的上游契约中是否有 from 字段等于指定 pathName 的条目
+func checkTaskHasUpstreamContractFrom(task map[string]interface{}, fromPathName string) bool {
+    upstreamContractStr, _ := task["upstreamContractDetail"].(string)
+    if upstreamContractStr == "" {
+        return false
+    }
+
+    var upstreamContract ContractDetail
+    if err := json.Unmarshal([]byte(upstreamContractStr), &upstreamContract); err != nil {
+        return false
+    }
+
+    for _, item := range upstreamContract.List {
+        if item.From == fromPathName {
+            return true
+        }
+    }
+    return false
 }
 
 // findTaskPathByName 根据任务名称或路径查找任务路径
@@ -432,13 +558,13 @@ func findTaskPathByName(taskMap map[string]map[string]interface{}, from string, 
     return ""
 }
 
-// checkContractMatch 检查契约条目是否在上游任务的下游契约中存在匹配
+// checkContractMatchInDownstream 检查契约条目是否在上游任务的下游契约中存在匹配（反向检查用）
 // 参数:
 //   - upstreamTask: 上游任务数据
 //   - item: 当前任务的上游契约条目（来自 upstreamContractDetail.list）
 // 返回值:
 //   - bool: true 表示找到匹配，false 表示未找到匹配
-func checkContractMatch(upstreamTask map[string]interface{}, item ContractDetailItem) bool {
+func checkContractMatchInDownstream(upstreamTask map[string]interface{}, item ContractDetailItem) bool {
     downstreamContractStr, _ := upstreamTask["downstreamContractDetail"].(string)
     if downstreamContractStr == "" {
         return false
@@ -458,6 +584,40 @@ func checkContractMatch(upstreamTask map[string]interface{}, item ContractDetail
         if item.Label == downstreamItem.Label &&
            item.ContractAPI == downstreamItem.ContractAPI &&
            item.From == downstreamItem.From {
+            return true
+        }
+    }
+
+    return false
+}
+
+// checkContractMatchInUpstream 检查契约条目是否在下游任务的上游契约中存在匹配（正向检查用）
+// 参数:
+//   - downstreamTask: 下游任务数据
+//   - item: 当前任务的下游契约条目（来自 downstreamContractDetail.list）
+//   - currentTaskPathName: 当前任务的 pathName（用于匹配 from 字段）
+// 返回值:
+//   - bool: true 表示找到匹配，false 表示未找到匹配
+func checkContractMatchInUpstream(downstreamTask map[string]interface{}, item ContractDetailItem, currentTaskPathName string) bool {
+    upstreamContractStr, _ := downstreamTask["upstreamContractDetail"].(string)
+    if upstreamContractStr == "" {
+        return false
+    }
+
+    var upstreamContract ContractDetail
+    if err := json.Unmarshal([]byte(upstreamContractStr), &upstreamContract); err != nil {
+        return false
+    }
+
+    // 在下游任务的上游契约列表中查找匹配项
+    // 三个字段必须全部匹配：
+    // 1. label 必须完全相同
+    // 2. contract_api 必须完全相同
+    // 3. from 必须等于当前任务的 pathName（因为 from 表示契约来源）
+    for _, upstreamItem := range upstreamContract.List {
+        if item.Label == upstreamItem.Label &&
+           item.ContractAPI == upstreamItem.ContractAPI &&
+           upstreamItem.From == currentTaskPathName {
             return true
         }
     }
@@ -1342,6 +1502,7 @@ func TestCheckContractConsistency(t *testing.T) {
 | E-S-06 | 下游契约检查 | Task | downstreamContractDetail 格式或内容错误 |
 | E-S-07 | 契约一致性 | Task | 上下游契约不匹配 |
 | E-S-08 | 状态异常 | Task | completed 状态但存在 bug |
+| E-S-09 | 模块循环引用错误 | Project/Module | 跨模块任务引用形成循环依赖 |
 
 ### 6.2 警告规则 (Warning)
 
@@ -1353,6 +1514,7 @@ func TestCheckContractConsistency(t *testing.T) {
 | W-S-04 | 末任务存在下游输出 | Task | title="end" 但 list 非空 |
 | W-S-05 | 上游任务未找到 | Task | from 字段引用的任务不存在 |
 | W-S-06 | 任务列表解析失败 | Module | API返回格式异常 |
+| W-S-07 | 下游契约from字段异常 | Task | 下游契约的 from 字段不等于当前任务的 pathName |
 
 ---
 
@@ -1393,7 +1555,8 @@ flowchart TD
     C --> W[收集所有任务]
     W --> X[检查 E-S-07: 契约一致性]
     
-    X --> Y[更新统计计数]
+    X --> X2[检查 E-S-09: 模块循环引用]
+    X2 --> Y[更新统计计数]
     Y --> Z[生成输出报告]
     Z --> AA[返回结果]
 ```
@@ -1472,9 +1635,13 @@ flowchart TD
 
 #### 8.1.1 核心原则
 
-> **只需要检查上游方向，不需要双向检查**
+> **需要双向检查**
 >
-> 原因：上游→下游 和 下游→上游 是重复的检查，只需遍历每个任务的上游契约，在上游任务的下游契约中查找匹配即可。
+> 契约一致性检查必须进行双向验证，因为单向检查无法发现所有不一致情况：
+> - **反向检查（上游→下游）**：遍历任务的上游契约，验证上游任务的下游契约中有对应声明
+> - **正向检查（下游→上游）**：遍历任务的下游契约，验证下游任务的上游契约中有对应引用
+>
+> 两者的检查目的不同，不能互相替代。
 
 #### 8.1.2 检查场景
 
@@ -1489,9 +1656,15 @@ flowchart TD
     │                      │                      │
 ```
 
-检查时只需：
-- 检查 B 的上游契约是否在 A 的下游契约中找到匹配
-- 检查 C 的上游契约是否在 B 的下游契约中找到匹配
+**双向检查说明：**
+
+1. **反向检查（上游→下游）**：验证"我依赖的人是否承认依赖关系"
+   - 检查 B 的上游契约是否在 A 的下游契约中找到匹配
+   - 检查 C 的上游契约是否在 B 的下游契约中找到匹配
+
+2. **正向检查（下游→上游）**：验证"依赖我的人是否声明了依赖关系"
+   - 检查 B 的下游契约是否在 C 的上游契约中找到匹配
+   - 检查 A 的下游契约是否在 B 的上游契约中找到匹配
 
 #### 8.1.3 契约数据结构
 
@@ -1542,6 +1715,8 @@ flowchart TD
 
 #### 8.1.4 检查逻辑
 
+**反向检查（上游→下游）**：验证"我依赖的人是否承认依赖关系"
+
 ```
 对于任务 B 的每一条上游契约 item:
     1. 获取 item.from（表示该契约来自哪个上游任务，如 "task-history-storage"）
@@ -1552,6 +1727,22 @@ flowchart TD
        - downstreamItem.contract_api == item.contract_api
        - downstreamItem.from == item.from（都表示契约来源）
     4. 如果找不到匹配项，则报错：契约不一致
+```
+
+**正向检查（下游→上游）**：验证"依赖我的人是否声明了依赖关系"
+
+> **重要**：下游契约的 `from` 字段表示**当前任务自己**的 pathName，不是下游任务的 pathName。
+
+```
+对于当前任务 A 的每一条下游契约 item:
+    1. item.from = A（当前任务自己的 pathName，表示这条契约由 A 提供）
+    2. 遍历所有任务，找到上游契约中 from = A 的任务（即依赖 A 的下游任务）
+    3. 在这些下游任务的上游契约中查找匹配项：
+       是否存在一条契约 upstreamItem，满足：
+       - upstreamItem.label == item.label
+       - upstreamItem.contract_api == item.contract_api
+       - upstreamItem.from == A（当前任务的 pathName）
+    4. 如果找不到匹配项，则报错：下游任务未声明对当前任务的依赖
 ```
 
 #### 8.1.5 匹配规则
@@ -1609,12 +1800,75 @@ flowchart TD
 
 #### 8.1.8 错误信息格式
 
-如果任务 B 的某条上游契约在上游任务中找不到匹配：
+**反向检查错误**（上游任务的下游契约缺少声明）：
 
 ```
-E-S-07: 契约不一致 - 任务 "task-history-panel" 的上游契约 "获取历史数据" 在上游任务 "task-history-storage" 的下游契约中未找到匹配项
+E-S-07: 契约不一致-反向 - 任务 "task-history-panel" 的上游契约 "获取历史数据" 在上游任务 "task-history-storage" 的下游契约中未找到匹配项
 期望格式: {"label": "获取历史数据", "contract_api": "get_history(...)", "from": "task-history-storage"}
 ```
+
+**正向检查错误**（下游任务的上游契约缺少声明）：
+
+```
+E-S-07: 契约不一致-正向 - 任务 "task-history-storage" 的下游契约条目 "获取历史数据" 在下游任务 "task-history-panel" 的上游契约中未找到匹配项
+下游任务 [task-history-panel] 需要添加上游依赖: {"label": "获取历史数据", "contract_api": "get_history(...)", "from": "task-history-storage"}
+```
+
+#### 8.1.9 为什么双向检查是必要的
+
+**场景说明**：假设有一个计算器项目，包含三个任务：
+
+```
+任务 A（计算接口）→ 任务 B（数字解析）
+                 → 任务 C（运算执行）
+```
+
+**问题数据**：
+
+任务 A（task-calculator-provider）的下游契约声明了要为 B 和 C 提供接口：
+```json
+{
+  "downstreamContractDetail": {
+    "title": "为下游任务提供接口",
+    "list": [
+      { "label": "数字解析", "contract_api": "parse_number(str) -> float", "from": "task-calculator-provider" },
+      { "label": "运算执行", "contract_api": "calculate(op, a, b) -> float", "from": "task-calculator-provider" }
+    ]
+  }
+}
+```
+
+> **注意**：下游契约的 `from` 字段等于当前任务 A 的 pathName（`task-calculator-provider`），表示这些接口由 A 提供。
+
+但任务 B（task-number-parser）和 C（task-calculator）的上游契约**漏写**了对 A 的引用：
+```json
+// task-number-parser 的上游契约（错误：缺少对 A 的引用）
+{
+  "upstreamContractDetail": {
+    "title": "start",  // 错误：应该是依赖 task-calculator-provider
+    "list": []
+  }
+}
+```
+
+**单向检查的问题**：
+
+如果只进行反向检查（上游→下游）：
+1. 检查任务 B 的上游契约 → 标记为 "start"，跳过检查
+2. 检查任务 C 的上游契约 → 标记为 "start"，跳过检查
+3. **结果**：检查通过，但实际上数据不一致！
+
+**双向检查的正确结果**：
+
+增加正向检查（下游→上游）：
+1. 遍历任务 A 的下游契约，`from` 字段为 `task-calculator-provider`（A 自己）
+2. 遍历所有任务，找到上游契约中 `from = task-calculator-provider` 的任务（即依赖 A 的下游任务）
+3. 发现任务 B 和 C 的上游契约中都没有 `from = task-calculator-provider` 的条目
+4. **结果**：正确发现数据不一致！
+
+> **正向检查的关键**：下游契约的 `from` 字段是当前任务自己的 pathName，需要通过遍历所有任务的上游契约来找到依赖当前任务的下游任务。
+
+**结论**：反向检查验证"我依赖的人承认依赖"，正向检查验证"依赖我的人声明了依赖"。两者检查的是不同方向的问题，不能互相替代。
 
 ### 8.2 契约数据格式示例
 
@@ -1744,6 +1998,136 @@ E-S-07: 契约不一致 - 任务 "task-history-panel" 的上游契约 "获取历
   "static": ["静态编译错误1", "静态编译错误2"],
   "dynamic": ["AI推理错误1"]
 }
+```
+
+### 8.4 模块循环引用检查规则详解（E-S-09）
+
+#### 8.4.1 核心原则
+
+在多模块项目中，跨模块的任务引用必须保持单向传递，避免形成循环依赖。循环引用会导致：
+- 编译顺序无法确定
+- 任务执行死锁
+- 模块间耦合度过高
+
+#### 8.4.2 检查场景
+
+假设存在两个模块 X 和 Y：
+
+**模块 X 的任务链：**
+```
+A → B → C
+```
+
+**模块 Y 的任务链：**
+```
+D → E → F
+```
+
+#### 8.4.3 正确的跨模块引用（单向传递）
+
+当跨模块任务引用形成单向依赖时，称为 **X → Y**：
+
+```
+模块X: A → B → C
+         ↓     ↓
+模块Y: D → E → F
+```
+
+示例引用：
+- A → E（X 的任务引用 Y 的任务）
+- C → D（X 的任务引用 Y 的任务）
+- A → F（X 的任务引用 Y 的任务）
+
+这种情况下，所有跨模块引用都是从 X 模块指向 Y 模块，方向一致，**检查通过**。
+
+#### 8.4.4 错误的循环引用
+
+当出现双向跨模块引用时，形成循环依赖：
+
+```
+模块X: A → B → C
+         ↓     ↑
+模块Y: D → E → F
+```
+
+示例引用：
+- A → E（X → Y 的引用）
+- D → B（Y → X 的引用）
+
+这种情况下：
+- X 模块的任务 A 依赖 Y 模块的任务 E
+- Y 模块的任务 D 依赖 X 模块的任务 B
+
+两个模块之间形成了循环引用，**检查失败**，报告 E-S-09 错误。
+
+#### 8.4.5 解决方案
+
+当检测到循环引用时，推荐引入第三方模块 W 作为共享依赖：
+
+```
+         模块W（共享层）
+          ↑    ↑
+          │    │
+模块X: A → B → C    模块Y: D → E → F
+```
+
+将循环依赖的任务共同提取到 W 模块中，X 和 Y 都依赖 W，从而打破循环。
+
+#### 8.4.6 检测算法
+
+1. 构建模块间依赖图：
+   - 遍历所有任务的 codePaths
+   - 识别跨模块引用
+   - 记录引用方向（X → Y 或 Y → X）
+
+2. 检测循环：
+   - 对于任意两个模块 X 和 Y
+   - 如果同时存在 X → Y 和 Y → X 的引用
+   - 则报告 E-S-09 错误
+
+3. 错误信息格式：
+```json
+{
+  "ruleId": "E-S-09",
+  "ruleName": "模块循环引用错误",
+  "severity": "error",
+  "details": {
+    "moduleX": "模块X名称",
+    "moduleY": "模块Y名称",
+    "xToYReferences": [
+      {"task": "A", "references": "E"}
+    ],
+    "yToXReferences": [
+      {"task": "D", "references": "B"}
+    ],
+    "suggestion": "建议引入第三方共享模块来打破循环依赖"
+  }
+}
+```
+
+#### 8.4.7 示例验证过程
+
+**输入数据：**
+- 模块 X（ID: 1）包含任务 A（ID: 101）、B（ID: 102）、C（ID: 103）
+- 模块 Y（ID: 2）包含任务 D（ID: 201）、E（ID: 202）、F（ID: 203）
+
+**任务依赖关系：**
+- 任务 A 的 codePaths 包含任务 E 的引用
+- 任务 D 的 codePaths 包含任务 B 的引用
+
+**检测过程：**
+1. 分析任务 A：发现跨模块引用 101 → 202（X → Y）
+2. 分析任务 D：发现跨模块引用 201 → 102（Y → X）
+3. 构建模块依赖图：X ↔ Y（双向）
+4. 检测到循环依赖
+
+**输出结果：**
+```
+[E-S-09] 模块循环引用错误
+- 模块 "X" 和模块 "Y" 之间存在循环引用
+- X → Y 引用：A → E
+- Y → X 引用：D → B
+- 建议：引入共享模块来打破循环依赖
 ```
 
 ---

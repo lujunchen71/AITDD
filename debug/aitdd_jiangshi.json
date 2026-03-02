@@ -79,27 +79,27 @@
           {
             "label": "获取 canvas DOM 元素",
             "contract_api": "getCanvas() -> HTMLCanvasElement",
-            "from": "task-canvas"
+            "from": "Plants vs Zombies Web Game/核心引擎/创建游戏画布"
           },
           {
             "label": "获取 2d 渲染上下文",
             "contract_api": "getContext() -> CanvasRenderingContext2D",
-            "from": "task-canvas"
+            "from": "Plants vs Zombies Web Game/核心引擎/创建游戏画布"
           },
           {
             "label": "获取画布宽度",
             "contract_api": "getWidth() -> number",
-            "from": "task-canvas"
+            "from": "Plants vs Zombies Web Game/核心引擎/创建游戏画布"
           },
           {
             "label": "获取画布高度",
             "contract_api": "getHeight() -> number",
-            "from": "task-canvas"
+            "from": "Plants vs Zombies Web Game/核心引擎/创建游戏画布"
           },
           {
             "label": "清除画布",
             "contract_api": "clear()",
-            "from": "task-canvas"
+            "from": "Plants vs Zombies Web Game/核心引擎/创建游戏画布"
           }
         ]
       },
@@ -136,22 +136,22 @@
           {
             "label": "注册更新回调",
             "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           },
           {
             "label": "注册渲染回调",
             "contract_api": "registerRender(callback: () => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           },
           {
             "label": "开始游戏循环",
             "contract_api": "start()",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           },
           {
             "label": "停止游戏循环",
             "contract_api": "stop()",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           }
         ]
       },
@@ -184,12 +184,12 @@
           {
             "label": "获取画布宽度",
             "contract_api": "getWidth() -> number",
-            "from": "task-canvas"
+            "from": "Plants vs Zombies Web Game/核心引擎/创建游戏画布"
           },
           {
             "label": "获取画布高度",
             "contract_api": "getHeight() -> number",
-            "from": "task-canvas"
+            "from": "Plants vs Zombies Web Game/核心引擎/创建游戏画布"
           }
         ]
       },
@@ -199,27 +199,27 @@
           {
             "label": "根据坐标获取单元格行列",
             "contract_api": "getCellAt(x: number, y: number) -> {row: number, col: number} | null",
-            "from": "task-grid"
+            "from": "Plants vs Zombies Web Game/核心引擎/网格系统"
           },
           {
             "label": "获取单元格边界",
             "contract_api": "getCellBounds(row: number, col: number) -> {x: number, y: number, width: number, height: number}",
-            "from": "task-grid"
+            "from": "Plants vs Zombies Web Game/核心引擎/网格系统"
           },
           {
             "label": "获取总行数",
             "contract_api": "getRows() -> number",
-            "from": "task-grid"
+            "from": "Plants vs Zombies Web Game/核心引擎/网格系统"
           },
           {
             "label": "获取总列数",
             "contract_api": "getCols() -> number",
-            "from": "task-grid"
+            "from": "Plants vs Zombies Web Game/核心引擎/网格系统"
           },
           {
             "label": "获取单元格中心点",
             "contract_api": "getCellCenter(row: number, col: number) -> {x: number, y: number}",
-            "from": "task-grid"
+            "from": "Plants vs Zombies Web Game/核心引擎/网格系统"
           }
         ]
       },
@@ -256,27 +256,27 @@
           {
             "label": "植物基类构造函数",
             "contract_api": "constructor(row: number, col: number, hp: number, attack: number, attackSpeed: number)",
-            "from": "task-plant-base"
+            "from": "Plants vs Zombies Web Game/植物模块/植物基类"
           },
           {
             "label": "植物受伤方法",
             "contract_api": "takeDamage(amount: number) -> boolean",
-            "from": "task-plant-base"
+            "from": "Plants vs Zombies Web Game/植物模块/植物基类"
           },
           {
             "label": "更新方法",
             "contract_api": "update(deltaTime: number)",
-            "from": "task-plant-base"
+            "from": "Plants vs Zombies Web Game/植物模块/植物基类"
           },
           {
             "label": "渲染方法",
             "contract_api": "render(ctx: CanvasRenderingContext2D)",
-            "from": "task-plant-base"
+            "from": "Plants vs Zombies Web Game/植物模块/植物基类"
           },
           {
             "label": "获取行列",
             "contract_api": "getRow() -> number, getCol() -> number",
-            "from": "task-plant-base"
+            "from": "Plants vs Zombies Web Game/植物模块/植物基类"
           }
         ]
       },
@@ -313,32 +313,32 @@
           {
             "label": "僵尸基类构造函数",
             "contract_api": "constructor(row: number, hp: number, attack: number, speed: number)",
-            "from": "task-zombie-base"
+            "from": "Plants vs Zombies Web Game/僵尸模块/僵尸基类"
           },
           {
             "label": "受伤方法",
             "contract_api": "takeDamage(amount: number) -> boolean",
-            "from": "task-zombie-base"
+            "from": "Plants vs Zombies Web Game/僵尸模块/僵尸基类"
           },
           {
             "label": "更新方法",
             "contract_api": "update(deltaTime: number, plants: PlantBase[])",
-            "from": "task-zombie-base"
+            "from": "Plants vs Zombies Web Game/僵尸模块/僵尸基类"
           },
           {
             "label": "渲染方法",
             "contract_api": "render(ctx: CanvasRenderingContext2D)",
-            "from": "task-zombie-base"
+            "from": "Plants vs Zombies Web Game/僵尸模块/僵尸基类"
           },
           {
             "label": "获取行",
             "contract_api": "getRow() -> number",
-            "from": "task-zombie-base"
+            "from": "Plants vs Zombies Web Game/僵尸模块/僵尸基类"
           },
           {
             "label": "获取列位置（像素）",
             "contract_api": "getCol() -> number",
-            "from": "task-zombie-base"
+            "from": "Plants vs Zombies Web Game/僵尸模块/僵尸基类"
           }
         ]
       },
@@ -371,12 +371,12 @@
           {
             "label": "注册更新回调",
             "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           },
           {
             "label": "注册渲染回调",
             "contract_api": "registerRender(callback: () => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           }
         ]
       },
@@ -386,37 +386,37 @@
           {
             "label": "添加阳光到管理器",
             "contract_api": "addSun(sun: Sun)",
-            "from": "task-sun"
+            "from": "Plants vs Zombies Web Game/阳光模块/阳光系统"
           },
           {
             "label": "尝试收集阳光",
             "contract_api": "tryCollectSun(x: number, y: number) -> number | null",
-            "from": "task-sun"
+            "from": "Plants vs Zombies Web Game/阳光模块/阳光系统"
           },
           {
             "label": "获取当前阳光数量",
             "contract_api": "getSunCount() -> number",
-            "from": "task-sun"
+            "from": "Plants vs Zombies Web Game/阳光模块/阳光系统"
           },
           {
             "label": "增加阳光数量",
             "contract_api": "addSunCount(amount: number)",
-            "from": "task-sun"
+            "from": "Plants vs Zombies Web Game/阳光模块/阳光系统"
           },
           {
             "label": "消耗阳光（减少）",
             "contract_api": "spendSun(amount: number) -> boolean",
-            "from": "task-sun"
+            "from": "Plants vs Zombies Web Game/阳光模块/阳光系统"
           },
           {
             "label": "阳光管理器更新",
             "contract_api": "update(deltaTime: number)",
-            "from": "task-sun"
+            "from": "Plants vs Zombies Web Game/阳光模块/阳光系统"
           },
           {
             "label": "阳光管理器渲染",
             "contract_api": "render(ctx: CanvasRenderingContext2D)",
-            "from": "task-sun"
+            "from": "Plants vs Zombies Web Game/阳光模块/阳光系统"
           }
         ]
       },
@@ -449,27 +449,27 @@
           {
             "label": "植物基类构造函数",
             "contract_api": "constructor(row: number, col: number, hp: number, attack: number, attackSpeed: number)",
-            "from": "task-plant-base"
+            "from": "Plants vs Zombies Web Game/植物模块/植物基类"
           },
           {
             "label": "添加阳光到管理器",
             "contract_api": "addSun(sun: Sun)",
-            "from": "task-sun"
+            "from": "Plants vs Zombies Web Game/阳光模块/阳光系统"
           },
           {
             "label": "注册更新回调",
             "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           },
           {
             "label": "注册渲染回调",
             "contract_api": "registerRender(callback: () => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           },
           {
             "label": "获取单元格中心点",
             "contract_api": "getCellCenter(row: number, col: number) -> {x: number, y: number}",
-            "from": "task-grid"
+            "from": "Plants vs Zombies Web Game/核心引擎/网格系统"
           }
         ]
       },
@@ -479,7 +479,7 @@
           {
             "label": "向日葵构造函数",
             "contract_api": "constructor(row: number, col: number)",
-            "from": "task-sunflower"
+            "from": "Plants vs Zombies Web Game/植物模块/向日葵植物"
           }
         ]
       },
@@ -512,27 +512,27 @@
           {
             "label": "植物基类构造函数",
             "contract_api": "constructor(row: number, col: number, hp: number, attack: number, attackSpeed: number)",
-            "from": "task-plant-base"
+            "from": "Plants vs Zombies Web Game/植物模块/植物基类"
           },
           {
             "label": "添加豌豆到碰撞检测",
             "contract_api": "addPea(pea: Pea)",
-            "from": "task-collision"
+            "from": "Plants vs Zombies Web Game/碰撞检测模块/碰撞检测管理"
           },
           {
             "label": "注册更新回调",
             "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           },
           {
             "label": "注册渲染回调",
             "contract_api": "registerRender(callback: () => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           },
           {
             "label": "获取单元格中心点",
             "contract_api": "getCellCenter(row: number, col: number) -> {x: number, y: number}",
-            "from": "task-grid"
+            "from": "Plants vs Zombies Web Game/核心引擎/网格系统"
           }
         ]
       },
@@ -542,7 +542,7 @@
           {
             "label": "豌豆射手构造函数",
             "contract_api": "constructor(row: number, col: number)",
-            "from": "task-peashooter"
+            "from": "Plants vs Zombies Web Game/植物模块/豌豆射手植物"
           }
         ]
       },
@@ -575,17 +575,17 @@
           {
             "label": "僵尸基类构造函数",
             "contract_api": "constructor(row: number, hp: number, attack: number, speed: number)",
-            "from": "task-zombie-base"
+            "from": "Plants vs Zombies Web Game/僵尸模块/僵尸基类"
           },
           {
             "label": "注册更新回调",
             "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           },
           {
             "label": "注册渲染回调",
             "contract_api": "registerRender(callback: () => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           }
         ]
       },
@@ -595,7 +595,7 @@
           {
             "label": "普通僵尸构造函数",
             "contract_api": "constructor(row: number)",
-            "from": "task-normal-zombie"
+            "from": "Plants vs Zombies Web Game/僵尸模块/普通僵尸"
           }
         ]
       },
@@ -628,7 +628,7 @@
           {
             "label": "注册更新回调",
             "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           }
         ]
       },
@@ -638,37 +638,37 @@
           {
             "label": "添加豌豆",
             "contract_api": "addPea(pea: Pea)",
-            "from": "task-collision"
+            "from": "Plants vs Zombies Web Game/碰撞检测模块/碰撞检测管理"
           },
           {
             "label": "添加僵尸",
             "contract_api": "addZombie(zombie: ZombieBase)",
-            "from": "task-collision"
+            "from": "Plants vs Zombies Web Game/碰撞检测模块/碰撞检测管理"
           },
           {
             "label": "添加植物",
             "contract_api": "addPlant(plant: PlantBase)",
-            "from": "task-collision"
+            "from": "Plants vs Zombies Web Game/碰撞检测模块/碰撞检测管理"
           },
           {
             "label": "移除植物",
             "contract_api": "removePlant(plant: PlantBase)",
-            "from": "task-collision"
+            "from": "Plants vs Zombies Web Game/碰撞检测模块/碰撞检测管理"
           },
           {
             "label": "获取所有僵尸",
             "contract_api": "getZombies() -> ZombieBase[]",
-            "from": "task-collision"
+            "from": "Plants vs Zombies Web Game/碰撞检测模块/碰撞检测管理"
           },
           {
             "label": "获取所有植物",
             "contract_api": "getPlants() -> PlantBase[]",
-            "from": "task-collision"
+            "from": "Plants vs Zombies Web Game/碰撞检测模块/碰撞检测管理"
           },
           {
             "label": "更新碰撞",
             "contract_api": "update(deltaTime: number)",
-            "from": "task-collision"
+            "from": "Plants vs Zombies Web Game/碰撞检测模块/碰撞检测管理"
           }
         ]
       },
@@ -701,37 +701,37 @@
           {
             "label": "根据坐标获取单元格",
             "contract_api": "getCellAt(x: number, y: number) -> {row: number, col: number} | null",
-            "from": "task-grid"
+            "from": "Plants vs Zombies Web Game/核心引擎/网格系统"
           },
           {
             "label": "获取当前阳光数量",
             "contract_api": "getSunCount() -> number",
-            "from": "task-sun"
+            "from": "Plants vs Zombies Web Game/阳光模块/阳光系统"
           },
           {
             "label": "消耗阳光",
             "contract_api": "spendSun(amount: number) -> boolean",
-            "from": "task-sun"
+            "from": "Plants vs Zombies Web Game/阳光模块/阳光系统"
           },
           {
             "label": "添加植物到碰撞检测",
             "contract_api": "addPlant(plant: PlantBase)",
-            "from": "task-collision"
+            "from": "Plants vs Zombies Web Game/碰撞检测模块/碰撞检测管理"
           },
           {
             "label": "获取 canvas 元素以添加事件监听",
             "contract_api": "getCanvas() -> HTMLCanvasElement",
-            "from": "task-canvas"
+            "from": "Plants vs Zombies Web Game/核心引擎/创建游戏画布"
           },
           {
             "label": "向日葵构造函数",
             "contract_api": "constructor(row: number, col: number)",
-            "from": "task-sunflower"
+            "from": "Plants vs Zombies Web Game/植物模块/向日葵植物"
           },
           {
             "label": "豌豆射手构造函数",
             "contract_api": "constructor(row: number, col: number)",
-            "from": "task-peashooter"
+            "from": "Plants vs Zombies Web Game/植物模块/豌豆射手植物"
           }
         ]
       },
@@ -741,7 +741,7 @@
           {
             "label": "注册可种植植物类型",
             "contract_api": "registerPlantType(name: string, cost: number, plantClass: Function)",
-            "from": "task-planting"
+            "from": "Plants vs Zombies Web Game/植物模块/种植逻辑"
           }
         ]
       },
@@ -774,12 +774,12 @@
           {
             "label": "尝试收集阳光",
             "contract_api": "tryCollectSun(x: number, y: number) -> number | null",
-            "from": "task-sun"
+            "from": "Plants vs Zombies Web Game/阳光模块/阳光系统"
           },
           {
             "label": "获取 canvas 元素以添加事件监听",
             "contract_api": "getCanvas() -> HTMLCanvasElement",
-            "from": "task-canvas"
+            "from": "Plants vs Zombies Web Game/核心引擎/创建游戏画布"
           }
         ]
       },
@@ -812,27 +812,27 @@
           {
             "label": "注册更新回调",
             "contract_api": "registerUpdate(callback: (deltaTime: number) => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           },
           {
             "label": "添加僵尸到碰撞检测",
             "contract_api": "addZombie(zombie: ZombieBase)",
-            "from": "task-collision"
+            "from": "Plants vs Zombies Web Game/碰撞检测模块/碰撞检测管理"
           },
           {
             "label": "普通僵尸构造函数",
             "contract_api": "constructor(row: number)",
-            "from": "task-normal-zombie"
+            "from": "Plants vs Zombies Web Game/僵尸模块/普通僵尸"
           },
           {
             "label": "设置游戏状态",
             "contract_api": "setState(state: string)",
-            "from": "task-game-state"
+            "from": "Plants vs Zombies Web Game/游戏状态模块/游戏状态管理"
           },
           {
             "label": "获取总行数",
             "contract_api": "getRows() -> number",
-            "from": "task-grid"
+            "from": "Plants vs Zombies Web Game/核心引擎/网格系统"
           }
         ]
       },
@@ -842,12 +842,12 @@
           {
             "label": "开始关卡",
             "contract_api": "startLevel(level: number)",
-            "from": "task-level-manager"
+            "from": "Plants vs Zombies Web Game/关卡模块/关卡管理器"
           },
           {
             "label": "获取当前波次信息",
             "contract_api": "getWaveInfo() -> object",
-            "from": "task-level-manager"
+            "from": "Plants vs Zombies Web Game/关卡模块/关卡管理器"
           }
         ]
       },
@@ -880,22 +880,22 @@
           {
             "label": "注册渲染回调",
             "contract_api": "registerRender(callback: () => void)",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           },
           {
             "label": "获取当前阳光数量",
             "contract_api": "getSunCount() -> number",
-            "from": "task-sun"
+            "from": "Plants vs Zombies Web Game/阳光模块/阳光系统"
           },
           {
             "label": "获取当前波次信息",
             "contract_api": "getWaveInfo() -> object",
-            "from": "task-level-manager"
+            "from": "Plants vs Zombies Web Game/关卡模块/关卡管理器"
           },
           {
             "label": "获取游戏状态",
             "contract_api": "getState() -> string",
-            "from": "task-game-state"
+            "from": "Plants vs Zombies Web Game/游戏状态模块/游戏状态管理"
           }
         ]
       },
@@ -905,7 +905,7 @@
           {
             "label": "HUD 渲染方法",
             "contract_api": "render(ctx: CanvasRenderingContext2D)",
-            "from": "task-hud"
+            "from": "Plants vs Zombies Web Game/用户界面模块/HUD界面"
           }
         ]
       },
@@ -938,7 +938,7 @@
           {
             "label": "停止游戏循环",
             "contract_api": "stop()",
-            "from": "task-game-loop"
+            "from": "Plants vs Zombies Web Game/核心引擎/游戏循环"
           }
         ]
       },
@@ -948,12 +948,12 @@
           {
             "label": "设置游戏状态",
             "contract_api": "setState(state: string)",
-            "from": "task-game-state"
+            "from": "Plants vs Zombies Web Game/游戏状态模块/游戏状态管理"
           },
           {
             "label": "获取游戏状态",
             "contract_api": "getState() -> string",
-            "from": "task-game-state"
+            "from": "Plants vs Zombies Web Game/游戏状态模块/游戏状态管理"
           }
         ]
       },

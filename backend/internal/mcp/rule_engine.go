@@ -143,6 +143,7 @@ func (e *RuleEngine) getDefaultConfig() *RuleConfig {
 					{ID: "S-05", Name: "代码路径声明", Description: "检查任务是否声明了代码路径", Severity: "info", Enabled: true},
 					{ID: "S-06", Name: "模块描述完整性", Description: "检查模块是否有描述信息", Severity: "warning", Enabled: true},
 					{ID: "S-07", Name: "模块提示词完整性", Description: "检查模块是否有提示词", Severity: "info", Enabled: true},
+					{ID: "E-S-09", Name: "模块循环引用错误", Description: "检测跨模块任务引用形成的循环依赖", Severity: "error", Enabled: true},
 				},
 			},
 			"dynamic": {
@@ -635,4 +636,267 @@ func (e *RuleEngine) SaveRule(rule map[string]interface{}) error {
 	}
 
 	return nil
+}
+
+// =============================================
+// E-S-09: 模块循环引用错误检测
+// =============================================
+
+// 规则常量
+const (
+	RuleModuleCircularReference = "E-S-09" // 模块循环引用错误
+)
+
+// CrossModuleReference 跨模块引用详情
+type CrossModuleReference struct {
+	SourceTask string `json:"sourceTask"` // 源任务名称或路径
+	TargetTask string `json:"targetTask"` // 目标任务名称或路径
+}
+
+// CircularReferenceDetail 循环引用详情
+type CircularReferenceDetail struct {
+	ModuleX        string                 `json:"moduleX"`        // 模块X名称
+	ModuleY        string                 `json:"moduleY"`        // 模块Y名称
+	XToYReferences []CrossModuleReference `json:"xToYReferences"` // X→Y的引用列表
+	YToXReferences []CrossModuleReference `json:"yToXReferences"` // Y→X的引用列表
+	Suggestion     string                 `json:"suggestion"`     // 解决建议
+}
+
+// ModuleReferenceInfo 模块引用信息（用于内部计算）
+type ModuleReferenceInfo struct {
+	ModulePathName string                 // 模块路径名
+	ModuleName     string                 // 模块名称
+	Tasks          []TaskReferenceInfo    // 任务列表
+}
+
+// TaskReferenceInfo 任务引用信息
+type TaskReferenceInfo struct {
+	TaskPathName string   // 任务路径名
+	TaskName     string   // 任务名称
+	CodePaths    []string // 代码路径列表
+}
+
+// CheckModuleCircularReferenceResult 模块循环引用检查结果
+type CheckModuleCircularReferenceResult struct {
+	HasCircularReference bool                       `json:"hasCircularReference"` // 是否存在循环引用
+	CircularPairs        []CircularReferenceDetail `json:"circularPairs"`        // 循环引用对列表
+}
+
+// CheckModuleCircularReference 检查模块间的循环引用
+// 参数：modulesData - 模块数据列表，每个模块需包含 pathName, name, tasks 字段
+// 返回：检测到的循环引用错误列表
+func (e *RuleEngine) CheckModuleCircularReference(modulesData []map[string]interface{}) *CheckModuleCircularReferenceResult {
+	result := &CheckModuleCircularReferenceResult{
+		HasCircularReference: false,
+		CircularPairs:        []CircularReferenceDetail{},
+	}
+
+	if len(modulesData) < 2 {
+		// 少于两个模块不可能存在循环引用
+		return result
+	}
+
+	// 1. 构建模块信息列表
+	moduleInfos := e.buildModuleReferenceInfos(modulesData)
+
+	// 2. 构建模块间引用关系图
+	// key: "模块X路径/模块Y路径", value: 引用列表
+	referenceGraph := e.buildModuleReferenceGraph(moduleInfos)
+
+	// 3. 检测循环引用
+	e.detectCircularReferences(moduleInfos, referenceGraph, result)
+
+	return result
+}
+
+// buildModuleReferenceInfos 构建模块引用信息列表
+func (e *RuleEngine) buildModuleReferenceInfos(modulesData []map[string]interface{}) []ModuleReferenceInfo {
+	moduleInfos := make([]ModuleReferenceInfo, 0, len(modulesData))
+
+	for _, moduleData := range modulesData {
+		modulePathName := getString(moduleData, "pathName")
+		moduleName := getString(moduleData, "name")
+
+		moduleInfo := ModuleReferenceInfo{
+			ModulePathName: modulePathName,
+			ModuleName:     moduleName,
+			Tasks:          []TaskReferenceInfo{},
+		}
+
+		// 提取任务信息
+		tasks := getArray(moduleData, "tasks")
+		for _, taskInterface := range tasks {
+			if task, ok := taskInterface.(map[string]interface{}); ok {
+				taskInfo := TaskReferenceInfo{
+					TaskPathName: getString(task, "pathName"),
+					TaskName:     getString(task, "name"),
+					CodePaths:    parseCodePaths(task),
+				}
+				moduleInfo.Tasks = append(moduleInfo.Tasks, taskInfo)
+			}
+		}
+
+		moduleInfos = append(moduleInfos, moduleInfo)
+	}
+
+	return moduleInfos
+}
+
+// buildModuleReferenceGraph 构建模块间引用关系图
+// 返回: map[key]value 其中 key 为 "源模块路径->目标模块路径"，value 为引用详情列表
+func (e *RuleEngine) buildModuleReferenceGraph(moduleInfos []ModuleReferenceInfo) map[string][]CrossModuleReference {
+	referenceGraph := make(map[string][]CrossModuleReference)
+
+	// 构建模块路径到模块信息的映射
+	modulePathMap := make(map[string]ModuleReferenceInfo)
+	for _, moduleInfo := range moduleInfos {
+		modulePathMap[moduleInfo.ModulePathName] = moduleInfo
+	}
+
+	// 遍历所有模块的所有任务，分析跨模块引用
+	for _, sourceModule := range moduleInfos {
+		for _, task := range sourceModule.Tasks {
+			for _, codePath := range task.CodePaths {
+				// 检查 codePath 是否指向其他模块的任务
+				targetModulePath := e.findTargetModulePath(codePath, sourceModule.ModulePathName, modulePathMap)
+				if targetModulePath != "" && targetModulePath != sourceModule.ModulePathName {
+					// 发现跨模块引用
+					key := sourceModule.ModulePathName + "->" + targetModulePath
+					referenceGraph[key] = append(referenceGraph[key], CrossModuleReference{
+						SourceTask: task.TaskPathName,
+						TargetTask: codePath,
+					})
+				}
+			}
+		}
+	}
+
+	return referenceGraph
+}
+
+// findTargetModulePath 查找 codePath 指向的目标模块路径
+func (e *RuleEngine) findTargetModulePath(codePath string, sourceModulePath string, modulePathMap map[string]ModuleReferenceInfo) string {
+	// codePath 可能是任务路径，格式为 "项目/模块/任务"
+	// 需要提取其中的模块路径
+
+	// 遍历所有模块，检查 codePath 是否以某个模块路径开头
+	for targetModulePath := range modulePathMap {
+		if targetModulePath != sourceModulePath {
+			// 检查 codePath 是否属于目标模块
+			// 可能的情况：
+			// 1. codePath 是完整任务路径，包含模块路径
+			// 2. codePath 是相对路径或任务名称
+			if e.isCodePathBelongsToModule(codePath, targetModulePath, modulePathMap[targetModulePath]) {
+				return targetModulePath
+			}
+		}
+	}
+
+	return ""
+}
+
+// isCodePathBelongsToModule 检查 codePath 是否属于指定模块
+func (e *RuleEngine) isCodePathBelongsToModule(codePath string, modulePath string, moduleInfo ModuleReferenceInfo) bool {
+	// 1. 检查 codePath 是否以模块路径开头（完整路径）
+	if len(codePath) > len(modulePath) && codePath[:len(modulePath)] == modulePath {
+		return true
+	}
+
+	// 2. 检查 codePath 是否匹配模块中的某个任务名称
+	for _, task := range moduleInfo.Tasks {
+		if task.TaskName == codePath || task.TaskPathName == codePath {
+			return true
+		}
+	}
+
+	return false
+}
+
+// detectCircularReferences 检测循环引用
+func (e *RuleEngine) detectCircularReferences(moduleInfos []ModuleReferenceInfo, referenceGraph map[string][]CrossModuleReference, result *CheckModuleCircularReferenceResult) {
+	// 检查所有模块对之间是否存在双向引用
+	for i := 0; i < len(moduleInfos); i++ {
+		for j := i + 1; j < len(moduleInfos); j++ {
+			moduleX := moduleInfos[i]
+			moduleY := moduleInfos[j]
+
+			keyXToY := moduleX.ModulePathName + "->" + moduleY.ModulePathName
+			keyYToX := moduleY.ModulePathName + "->" + moduleX.ModulePathName
+
+			xToYRefs, hasXToY := referenceGraph[keyXToY]
+			yToXRefs, hasYToX := referenceGraph[keyYToX]
+
+			// 如果同时存在 X→Y 和 Y→X 的引用，则存在循环引用
+			if hasXToY && hasYToX {
+				result.HasCircularReference = true
+				result.CircularPairs = append(result.CircularPairs, CircularReferenceDetail{
+					ModuleX:        moduleX.ModuleName,
+					ModuleY:        moduleY.ModuleName,
+					XToYReferences: xToYRefs,
+					YToXReferences: yToXRefs,
+					Suggestion:     "建议引入第三方共享模块来打破循环依赖",
+				})
+			}
+		}
+	}
+}
+
+// parseCodePaths 解析任务的 codePaths 字段
+func parseCodePaths(task map[string]interface{}) []string {
+	codePaths := getArray(task, "codePaths")
+	if len(codePaths) == 0 {
+		// 尝试从字符串解析
+		codePathsStr := getString(task, "codePaths")
+		if codePathsStr != "" && codePathsStr != "[]" && codePathsStr != "null" {
+			var paths []string
+			if err := json.Unmarshal([]byte(codePathsStr), &paths); err == nil {
+				return paths
+			}
+		}
+	}
+
+	// 转换为字符串数组
+	result := make([]string, 0, len(codePaths))
+	for _, path := range codePaths {
+		if str, ok := path.(string); ok && str != "" {
+			result = append(result, str)
+		}
+	}
+	return result
+}
+
+// GenerateCircularReferenceReport 生成循环引用检查报告（Markdown格式）
+func (result *CheckModuleCircularReferenceResult) GenerateCircularReferenceReport() string {
+	if !result.HasCircularReference {
+		return "## 模块循环引用检查\n\n✅ 未检测到模块间的循环引用\n"
+	}
+
+	var report string
+	report += "## 模块循环引用检查\n\n"
+	report += fmt.Sprintf("❌ 检测到 %d 对模块存在循环引用\n\n", len(result.CircularPairs))
+
+	for i, pair := range result.CircularPairs {
+		report += fmt.Sprintf("### 循环引用 #%d\n\n", i+1)
+		report += fmt.Sprintf("**模块**: \"%s\" ↔ \"%s\"\n\n", pair.ModuleX, pair.ModuleY)
+
+		if len(pair.XToYReferences) > 0 {
+			report += fmt.Sprintf("**%s → %s 引用**:\n", pair.ModuleX, pair.ModuleY)
+			for _, ref := range pair.XToYReferences {
+				report += fmt.Sprintf("- 任务 \"%s\" → 任务 \"%s\"\n", ref.SourceTask, ref.TargetTask)
+			}
+			report += "\n"
+		}
+
+		if len(pair.YToXReferences) > 0 {
+			report += fmt.Sprintf("**%s → %s 引用**:\n", pair.ModuleY, pair.ModuleX)
+			for _, ref := range pair.YToXReferences {
+				report += fmt.Sprintf("- 任务 \"%s\" → 任务 \"%s\"\n", ref.SourceTask, ref.TargetTask)
+			}
+			report += "\n"
+		}
+
+		report += fmt.Sprintf("**建议**: %s\n\n", pair.Suggestion)
+	}
+
+	return report
 }

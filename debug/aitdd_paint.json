@@ -59,22 +59,22 @@
           {
             "label": "获取中央widget用于添加画布",
             "contract_api": "get_central_widget() -> QWidget",
-            "from": "task-main-window"
+            "from": "AITDD Painter/主界面模块/主窗口框架"
           },
           {
             "label": "获取菜单栏",
             "contract_api": "get_menu_bar() -> QMenuBar",
-            "from": "task-main-window"
+            "from": "AITDD Painter/主界面模块/主窗口框架"
           },
           {
             "label": "获取状态栏",
             "contract_api": "get_status_bar() -> QStatusBar",
-            "from": "task-main-window"
+            "from": "AITDD Painter/主界面模块/主窗口框架"
           },
           {
             "label": "设置状态栏消息",
             "contract_api": "set_status_message(msg: str)",
-            "from": "task-main-window"
+            "from": "AITDD Painter/主界面模块/主窗口框架"
           }
         ]
       },
@@ -124,27 +124,27 @@
           {
             "label": "任务数据模型",
             "contract_api": "TaskData类",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           },
           {
             "label": "模块数据模型",
             "contract_api": "ModuleData类",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           },
           {
             "label": "依赖关系数据模型",
             "contract_api": "DependencyData类",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           },
           {
             "label": "项目数据模型",
             "contract_api": "ProjectData类",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           },
           {
             "label": "所有类支持序列化和反序列化",
             "contract_api": "to_dict(), from_dict()",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           }
         ]
       },
@@ -190,12 +190,12 @@
           {
             "label": "任务、模块、依赖、项目数据类",
             "contract_api": "TaskData, ModuleData, DependencyData, ProjectData",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           },
           {
             "label": "序列化方法",
             "contract_api": "to_dict(), from_dict()",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           }
         ]
       },
@@ -205,32 +205,32 @@
           {
             "label": "添加模块节点",
             "contract_api": "add_module(data: ModuleData) -> ModuleNode",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           },
           {
             "label": "添加任务节点",
             "contract_api": "add_task(data: TaskData) -> TaskNode",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           },
           {
             "label": "添加依赖连线",
             "contract_api": "add_dependency(data: DependencyData) -> DependencyLine",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           },
           {
             "label": "导出为JSON",
             "contract_api": "to_json() -> dict",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           },
           {
             "label": "从JSON导入",
             "contract_api": "from_json(data: dict)",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           },
           {
             "label": "数据变更信号",
             "contract_api": "data_changed: Signal",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           }
         ]
       },
@@ -279,12 +279,12 @@
           {
             "label": "TaskScene场景类用于设置到视图中",
             "contract_api": "TaskScene",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           },
           {
             "label": "节点和连线管理功能",
             "contract_api": "add_module(), add_task(), add_dependency()",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           }
         ]
       },
@@ -294,22 +294,22 @@
           {
             "label": "放大视图",
             "contract_api": "zoom_in()",
-            "from": "task-canvas-view"
+            "from": "AITDD Painter/画布模块/画布视图"
           },
           {
             "label": "缩小视图",
             "contract_api": "zoom_out()",
-            "from": "task-canvas-view"
+            "from": "AITDD Painter/画布模块/画布视图"
           },
           {
             "label": "重置视图到初始状态",
             "contract_api": "reset_view()",
-            "from": "task-canvas-view"
+            "from": "AITDD Painter/画布模块/画布视图"
           },
           {
             "label": "自适应内容大小",
             "contract_api": "fit_to_content()",
-            "from": "task-canvas-view"
+            "from": "AITDD Painter/画布模块/画布视图"
           }
         ]
       },
@@ -358,12 +358,12 @@
           {
             "label": "ModuleData数据类",
             "contract_api": "ModuleData",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           },
           {
             "label": "包含name, description, status, color等属性",
             "contract_api": "ModuleData属性",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           }
         ]
       },
@@ -373,17 +373,17 @@
           {
             "label": "获取/设置模块数据",
             "contract_api": "data: ModuleData",
-            "from": "task-module-node"
+            "from": "AITDD Painter/节点组件模块/模块节点组件"
           },
           {
             "label": "更新节点外观",
             "contract_api": "update_appearance()",
-            "from": "task-module-node"
+            "from": "AITDD Painter/节点组件模块/模块节点组件"
           },
           {
             "label": "位置变化时通知场景更新连线",
             "contract_api": "itemChange()",
-            "from": "task-module-node"
+            "from": "AITDD Painter/节点组件模块/模块节点组件"
           }
         ]
       },
@@ -428,12 +428,12 @@
           {
             "label": "TaskData数据类",
             "contract_api": "TaskData",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           },
           {
             "label": "包含name, description, status等属性",
             "contract_api": "TaskData属性",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           }
         ]
       },
@@ -443,17 +443,17 @@
           {
             "label": "获取/设置任务数据",
             "contract_api": "data: TaskData",
-            "from": "task-task-node"
+            "from": "AITDD Painter/节点组件模块/任务节点组件"
           },
           {
             "label": "更新节点外观",
             "contract_api": "update_appearance()",
-            "from": "task-task-node"
+            "from": "AITDD Painter/节点组件模块/任务节点组件"
           },
           {
             "label": "状态颜色映射",
             "contract_api": "status_colors: Dict",
-            "from": "task-task-node"
+            "from": "AITDD Painter/节点组件模块/任务节点组件"
           }
         ]
       },
@@ -498,17 +498,17 @@
           {
             "label": "TaskNode类用于获取节点位置",
             "contract_api": "TaskNode",
-            "from": "task-task-node"
+            "from": "AITDD Painter/节点组件模块/任务节点组件"
           },
           {
             "label": "获取节点边界",
             "contract_api": "sceneBoundingRect()",
-            "from": "task-task-node"
+            "from": "AITDD Painter/节点组件模块/任务节点组件"
           },
           {
             "label": "DependencyData数据类",
             "contract_api": "DependencyData",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           }
         ]
       },
@@ -518,22 +518,22 @@
           {
             "label": "源任务节点",
             "contract_api": "source: TaskNode",
-            "from": "task-dependency-line"
+            "from": "AITDD Painter/节点组件模块/依赖连线组件"
           },
           {
             "label": "目标任务节点",
             "contract_api": "target: TaskNode",
-            "from": "task-dependency-line"
+            "from": "AITDD Painter/节点组件模块/依赖连线组件"
           },
           {
             "label": "更新连线位置",
             "contract_api": "update_line()",
-            "from": "task-dependency-line"
+            "from": "AITDD Painter/节点组件模块/依赖连线组件"
           },
           {
             "label": "依赖数据",
             "contract_api": "data: DependencyData",
-            "from": "task-dependency-line"
+            "from": "AITDD Painter/节点组件模块/依赖连线组件"
           }
         ]
       },
@@ -574,12 +574,12 @@
           {
             "label": "主窗口布局用于添加属性面板",
             "contract_api": "主窗口布局",
-            "from": "task-main-window"
+            "from": "AITDD Painter/主界面模块/主窗口框架"
           },
           {
             "label": "TaskData, ModuleData数据类",
             "contract_api": "TaskData, ModuleData",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           }
         ]
       },
@@ -589,17 +589,17 @@
           {
             "label": "设置当前编辑的节点",
             "contract_api": "set_item(item)",
-            "from": "task-property-panel"
+            "from": "AITDD Painter/主界面模块/属性面板"
           },
           {
             "label": "清空所有字段",
             "contract_api": "clear_fields()",
-            "from": "task-property-panel"
+            "from": "AITDD Painter/主界面模块/属性面板"
           },
           {
             "label": "属性变更信号",
             "contract_api": "property_changed: Signal",
-            "from": "task-property-panel"
+            "from": "AITDD Painter/主界面模块/属性面板"
           }
         ]
       },
@@ -644,12 +644,12 @@
           {
             "label": "主窗口布局用于添加工具面板",
             "contract_api": "主窗口布局",
-            "from": "task-main-window"
+            "from": "AITDD Painter/主界面模块/主窗口框架"
           },
           {
             "label": "统计信息（模块数、任务数、依赖数）",
             "contract_api": "场景统计信息",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           }
         ]
       },
@@ -659,37 +659,37 @@
           {
             "label": "更新统计信息",
             "contract_api": "update_stats(modules, tasks, deps)",
-            "from": "task-tool-panel"
+            "from": "AITDD Painter/主界面模块/工具面板"
           },
           {
             "label": "添加模块信号",
             "contract_api": "add_module_clicked: Signal",
-            "from": "task-tool-panel"
+            "from": "AITDD Painter/主界面模块/工具面板"
           },
           {
             "label": "添加任务信号",
             "contract_api": "add_task_clicked: Signal",
-            "from": "task-tool-panel"
+            "from": "AITDD Painter/主界面模块/工具面板"
           },
           {
             "label": "连接模式切换信号",
             "contract_api": "connection_mode_toggled: Signal",
-            "from": "task-tool-panel"
+            "from": "AITDD Painter/主界面模块/工具面板"
           },
           {
             "label": "保存信号",
             "contract_api": "save_clicked: Signal",
-            "from": "task-tool-panel"
+            "from": "AITDD Painter/主界面模块/工具面板"
           },
           {
             "label": "加载信号",
             "contract_api": "load_clicked: Signal",
-            "from": "task-tool-panel"
+            "from": "AITDD Painter/主界面模块/工具面板"
           },
           {
             "label": "同步信号",
             "contract_api": "sync_clicked: Signal",
-            "from": "task-tool-panel"
+            "from": "AITDD Painter/主界面模块/工具面板"
           }
         ]
       },
@@ -730,12 +730,12 @@
           {
             "label": "TaskData, ModuleData, DependencyData, ProjectData数据类",
             "contract_api": "TaskData, ModuleData, DependencyData, ProjectData",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           },
           {
             "label": "to_json()方法获取可序列化数据",
             "contract_api": "to_json()",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           }
         ]
       },
@@ -745,17 +745,17 @@
           {
             "label": "同步所有数据",
             "contract_api": "sync_all(data: dict) -> Tuple[bool, str]",
-            "from": "task-sync-service"
+            "from": "AITDD Painter/同步服务模块/同步服务"
           },
           {
             "label": "获取当前项目ID",
             "contract_api": "get_project_id() -> str",
-            "from": "task-sync-service"
+            "from": "AITDD Painter/同步服务模块/同步服务"
           },
           {
             "label": "最后的错误信息",
             "contract_api": "last_error: str",
-            "from": "task-sync-service"
+            "from": "AITDD Painter/同步服务模块/同步服务"
           }
         ]
       },
@@ -804,12 +804,12 @@
           {
             "label": "数据模型类",
             "contract_api": "数据模型类",
-            "from": "task-data-models"
+            "from": "AITDD Painter/数据模型模块/数据模型定义"
           },
           {
             "label": "相同的数据格式规范",
             "contract_api": "数据格式规范",
-            "from": "task-sync-service"
+            "from": "AITDD Painter/同步服务模块/同步服务"
           }
         ]
       },
@@ -819,17 +819,17 @@
           {
             "label": "导入所有数据",
             "contract_api": "import_all(data: dict) -> Tuple[bool, str]",
-            "from": "task-db-import"
+            "from": "AITDD Painter/同步服务模块/数据库直接导入"
           },
           {
             "label": "检查数据库",
             "contract_api": "check_database_exists() -> bool",
-            "from": "task-db-import"
+            "from": "AITDD Painter/同步服务模块/数据库直接导入"
           },
           {
             "label": "最后的错误信息",
             "contract_api": "last_error: str",
-            "from": "task-db-import"
+            "from": "AITDD Painter/同步服务模块/数据库直接导入"
           }
         ]
       },
@@ -878,17 +878,17 @@
           {
             "label": "connection_mode_toggled信号",
             "contract_api": "connection_mode_toggled: Signal",
-            "from": "task-tool-panel"
+            "from": "AITDD Painter/主界面模块/工具面板"
           },
           {
             "label": "add_dependency()方法",
             "contract_api": "add_dependency()",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           },
           {
             "label": "DependencyLine类",
             "contract_api": "DependencyLine",
-            "from": "task-dependency-line"
+            "from": "AITDD Painter/节点组件模块/依赖连线组件"
           }
         ]
       },
@@ -898,17 +898,17 @@
           {
             "label": "切换连接模式",
             "contract_api": "toggle_connection_mode(enabled: bool)",
-            "from": "task-connection-mode"
+            "from": "AITDD Painter/主界面模块/连接模式交互"
           },
           {
             "label": "处理节点点击",
             "contract_api": "on_node_clicked(node)",
-            "from": "task-connection-mode"
+            "from": "AITDD Painter/主界面模块/连接模式交互"
           },
           {
             "label": "创建依赖",
             "contract_api": "create_dependency(source, target)",
-            "from": "task-connection-mode"
+            "from": "AITDD Painter/主界面模块/连接模式交互"
           }
         ]
       },
@@ -957,17 +957,17 @@
           {
             "label": "to_json()方法",
             "contract_api": "to_json()",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           },
           {
             "label": "from_json()方法",
             "contract_api": "from_json()",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           },
           {
             "label": "update_stats()方法",
             "contract_api": "update_stats()",
-            "from": "task-tool-panel"
+            "from": "AITDD Painter/主界面模块/工具面板"
           }
         ]
       },
@@ -977,17 +977,17 @@
           {
             "label": "保存JSON文件",
             "contract_api": "_save_json()",
-            "from": "task-json-io"
+            "from": "AITDD Painter/主界面模块/JSON导入导出"
           },
           {
             "label": "加载JSON文件",
             "contract_api": "_load_json()",
-            "from": "task-json-io"
+            "from": "AITDD Painter/主界面模块/JSON导入导出"
           },
           {
             "label": "当前文件路径",
             "contract_api": "current_file: str",
-            "from": "task-json-io"
+            "from": "AITDD Painter/主界面模块/JSON导入导出"
           }
         ]
       },
@@ -1032,32 +1032,32 @@
           {
             "label": "场景管理",
             "contract_api": "task-canvas-scene",
-            "from": "task-canvas-scene"
+            "from": "AITDD Painter/画布模块/画布场景"
           },
           {
             "label": "视图交互",
             "contract_api": "task-canvas-view",
-            "from": "task-canvas-view"
+            "from": "AITDD Painter/画布模块/画布视图"
           },
           {
             "label": "工具面板",
             "contract_api": "task-tool-panel",
-            "from": "task-tool-panel"
+            "from": "AITDD Painter/主界面模块/工具面板"
           },
           {
             "label": "属性面板",
             "contract_api": "task-property-panel",
-            "from": "task-property-panel"
+            "from": "AITDD Painter/主界面模块/属性面板"
           },
           {
             "label": "同步服务",
             "contract_api": "task-sync-service",
-            "from": "task-sync-service"
+            "from": "AITDD Painter/同步服务模块/同步服务"
           },
           {
             "label": "数据库导入",
             "contract_api": "task-db-import",
-            "from": "task-db-import"
+            "from": "AITDD Painter/同步服务模块/数据库直接导入"
           }
         ]
       },
@@ -1067,22 +1067,22 @@
           {
             "label": "启动入口",
             "contract_api": "main()",
-            "from": "task-integration"
+            "from": "AITDD Painter/主界面模块/主窗口集成"
           },
           {
             "label": "完整的用户交互流程",
             "contract_api": "用户交互",
-            "from": "task-integration"
+            "from": "AITDD Painter/主界面模块/主窗口集成"
           },
           {
             "label": "数据持久化",
             "contract_api": "数据持久化",
-            "from": "task-integration"
+            "from": "AITDD Painter/主界面模块/主窗口集成"
           },
           {
             "label": "与AITDD系统集成",
             "contract_api": "系统集成",
-            "from": "task-integration"
+            "from": "AITDD Painter/主界面模块/主窗口集成"
           }
         ]
       },

@@ -1628,6 +1628,9 @@ func (s *MCPServer) compileStaticProject(projectPathName string, includeWarnings
 	// 执行契约一致性检查
 	s.checkContractConsistency(allTasks, result)
 
+	// E-S-09: 检查模块循环引用
+	s.checkModuleCircularReference(allTasks, modules, result)
+
 	// E-S-09: 检查模块跨模块依赖
 	s.checkModuleCrossDependency(allTasks, modules, result)
 
@@ -2329,13 +2332,13 @@ func findTaskPathByName(taskMap map[string]map[string]interface{}, from string, 
 	return ""
 }
 
-// checkContractMatch 检查契约条目是否在上游任务的下游契约中存在匹配
+// checkContractMatchInDownstream 检查契约条目是否在上游任务的下游契约中存在匹配（反向检查）
 // 参数:
 //   - upstreamTask: 上游任务数据
 //   - item: 当前任务的上游契约条目（来自 upstreamContractDetail.list）
 // 返回值:
 //   - bool: true 表示找到匹配，false 表示未找到匹配
-func checkContractMatch(upstreamTask map[string]interface{}, item ContractDetailItem) bool {
+func checkContractMatchInDownstream(upstreamTask map[string]interface{}, item ContractDetailItem) bool {
 	downstreamContractStr, _ := upstreamTask["downstreamContractDetail"].(string)
 	if downstreamContractStr == "" {
 		return false
@@ -2362,8 +2365,44 @@ func checkContractMatch(upstreamTask map[string]interface{}, item ContractDetail
 	return false
 }
 
+// checkContractMatchInUpstream 检查契约条目是否在下游任务的上游契约中存在匹配（正向检查）
+// 参数:
+//   - downstreamTask: 下游任务数据
+//   - item: 当前任务的下游契约条目（来自 downstreamContractDetail.list）
+//   - currentTaskPathName: 当前任务的 pathName（用于匹配 from 字段）
+// 返回值:
+//   - bool: true 表示找到匹配，false 表示未找到匹配
+func checkContractMatchInUpstream(downstreamTask map[string]interface{}, item ContractDetailItem, currentTaskPathName string) bool {
+	upstreamContractStr, _ := downstreamTask["upstreamContractDetail"].(string)
+	if upstreamContractStr == "" {
+		return false
+	}
+
+	var upstreamContract ContractDetail
+	if err := json.Unmarshal([]byte(upstreamContractStr), &upstreamContract); err != nil {
+		return false
+	}
+
+	// 在下游任务的上游契约列表中查找匹配项
+	// 三个字段必须全部匹配：
+	// 1. label 必须完全相同
+	// 2. contract_api 必须完全相同
+	// 3. upstreamItem.From 必须等于当前任务的 pathName（因为 from 表示契约来源）
+	for _, upstreamItem := range upstreamContract.List {
+		if item.Label == upstreamItem.Label &&
+			item.ContractAPI == upstreamItem.ContractAPI &&
+			upstreamItem.From == currentTaskPathName {
+			return true
+		}
+	}
+
+	return false
+}
+
 // checkContractConsistency 检查契约一致性 (E-S-07)
-// 只检查上游方向：遍历每个任务的上游契约，在上游任务的下游契约中查找匹配
+// 执行双向检查：
+// 1. 反向检查：遍历每个任务的上游契约，在上游任务的下游契约中查找匹配
+// 2. 正向检查：遍历每个任务的下游契约，在下游任务的上游契约中查找匹配
 // 需要在所有任务数据加载完成后执行
 func (s *MCPServer) checkContractConsistency(allTasks []map[string]interface{}, result *CompileStaticResult) {
 	// 构建任务路径到任务的映射
@@ -2373,6 +2412,7 @@ func (s *MCPServer) checkContractConsistency(allTasks []map[string]interface{}, 
 		taskMap[pathName] = task
 	}
 
+	// ==================== 反向检查 ====================
 	// 遍历所有任务，检查每个任务的上游契约
 	for _, task := range allTasks {
 		taskName, _ := task["name"].(string)
@@ -2395,43 +2435,98 @@ func (s *MCPServer) checkContractConsistency(allTasks []map[string]interface{}, 
 
 		// 遍历上游契约列表中的每一条契约
 		for _, upstreamItem := range upstreamContract.List {
-			// 1. 获取 item.from，找到对应的上游任务
-			upstreamTaskPathName := upstreamItem.From
-
-			// 2. 查找上游任务
-			upstreamTask, exists := taskMap[upstreamTaskPathName]
-			if !exists {
-				// 尝试使用辅助函数查找（支持任务名称匹配）
-				upstreamTaskPath := findTaskPathByName(taskMap, upstreamTaskPathName, taskPathName)
-				if upstreamTaskPath == "" {
-					result.Warnings = append(result.Warnings, CompileIssue{
-						RuleID:           "W-S-05",
-						RuleName:         "上游任务未找到",
-						ResourceType:     "task",
-						ResourceName:     taskName,
-						ResourcePathName: taskPathName,
-						Message:          fmt.Sprintf("任务 [%s] 引用的上游任务 '%s' 不存在", taskName, upstreamItem.From),
-						Suggestion:       "请检查 from 字段是否正确",
-						Severity:         "warning",
-					})
+			// 反向检查：当前任务的上游契约 {from: 上游任务, label: X}
+			// 查找上游任务时，不应该使用 from 字段，而是应该遍历所有任务，找到下游契约中有匹配项的任务
+			foundMatch := false
+			for _, potentialUpstreamTask := range allTasks {
+				// 跳过自己
+				potentialPathName, _ := potentialUpstreamTask["pathName"].(string)
+				if potentialPathName == taskPathName {
 					continue
 				}
-				upstreamTask = taskMap[upstreamTaskPath]
+
+				// 检查该任务的下游契约是否有匹配项
+				if checkContractMatchInDownstream(potentialUpstreamTask, upstreamItem) {
+					foundMatch = true
+					break
+				}
 			}
 
-			// 3. 在上游任务的下游契约列表中查找匹配项
-			if !checkContractMatch(upstreamTask, upstreamItem) {
-				// 4. 找不到匹配项，报错
+			if !foundMatch {
+				// 找不到匹配的上游任务，报错
 				result.Errors = append(result.Errors, CompileIssue{
 					RuleID:           "E-S-07",
-					RuleName:         "契约不一致",
+					RuleName:         "契约不一致-反向",
 					ResourceType:     "task",
 					ResourceName:     taskName,
 					ResourcePathName: taskPathName,
-					Message:          fmt.Sprintf("任务 [%s] 的上游契约条目 '%s' 在上游任务 '%s' 的下游契约中未找到匹配项",
-						taskName, upstreamItem.Label, upstreamItem.From),
+					Message:          fmt.Sprintf("任务 [%s] 的上游契约条目 '%s' 在上游任务的下游契约中未找到匹配项",
+						taskName, upstreamItem.Label),
 					Suggestion:       fmt.Sprintf("期望格式: {\"label\": \"%s\", \"contract_api\": \"%s\", \"from\": \"%s\"}",
 						upstreamItem.Label, upstreamItem.ContractAPI, upstreamItem.From),
+					Severity:         "error",
+				})
+			}
+		}
+	}
+
+	// ==================== 正向检查 ====================
+	// 遍历所有任务，检查每个任务的下游契约
+	// 下游契约的 from 字段表示当前任务自己（提供接口的任务）
+	// 需要在消费该接口的下游任务的上游契约中找到匹配项
+	for _, task := range allTasks {
+		taskName, _ := task["name"].(string)
+		taskPathName, _ := task["pathName"].(string)
+
+		downstreamContractStr, _ := task["downstreamContractDetail"].(string)
+		if downstreamContractStr == "" {
+			continue
+		}
+
+		var downstreamContract ContractDetail
+		if err := json.Unmarshal([]byte(downstreamContractStr), &downstreamContract); err != nil {
+			continue // 格式错误已在E-S-05中报告
+		}
+
+		// 跳过末尾任务（title 为 "end"）
+		if downstreamContract.Title == "end" {
+			continue
+		}
+
+		// 遍历下游契约列表中的每一条契约
+		for _, downstreamItem := range downstreamContract.List {
+			// 正向检查：当前任务的下游契约 {from: 当前任务, label: X}
+			// 需要在所有任务中找到上游契约中有匹配项的下游任务
+			// 下游任务的上游契约应该是 {from: 当前任务, label: X}
+			
+			// 遍历所有任务，查找上游契约中有匹配项的任务（下游任务）
+			foundMatch := false
+			for _, potentialDownstreamTask := range allTasks {
+				// 跳过自己
+				potentialPathName, _ := potentialDownstreamTask["pathName"].(string)
+				if potentialPathName == taskPathName {
+					continue
+				}
+
+				// 检查该任务的上游契约是否有匹配项
+				if checkContractMatchInUpstream(potentialDownstreamTask, downstreamItem, taskPathName) {
+					foundMatch = true
+					break
+				}
+			}
+
+			if !foundMatch {
+				// 找不到匹配的下游任务，报错
+				result.Errors = append(result.Errors, CompileIssue{
+					RuleID:           "E-S-07",
+					RuleName:         "契约不一致-正向",
+					ResourceType:     "task",
+					ResourceName:     taskName,
+					ResourcePathName: taskPathName,
+					Message:          fmt.Sprintf("任务 [%s] 的下游契约条目 '%s' 未找到消费该接口的下游任务",
+						taskName, downstreamItem.Label),
+					Suggestion:       fmt.Sprintf("期望格式: {\"label\": \"%s\", \"contract_api\": \"%s\", \"from\": \"%s\"}，需要在下游任务的上游契约中有相同条目",
+						downstreamItem.Label, downstreamItem.ContractAPI, taskPathName),
 					Severity:         "error",
 				})
 			}
@@ -3103,4 +3198,132 @@ func (s *MCPServer) checkModuleCrossDependency(allTasks []map[string]interface{}
 			})
 		}
 	}
+}
+
+// checkModuleCircularReference 检查模块间循环引用 (E-S-09)
+// 规则：跨模块任务引用不能形成循环依赖
+// 例如：模块X任务A → 模块Y任务E 和 模块Y任务D → 模块X任务B 形成循环
+func (s *MCPServer) checkModuleCircularReference(allTasks []map[string]interface{}, modules []map[string]interface{}, result *CompileStaticResult) {
+	// 如果少于两个模块，不可能存在循环引用
+	if len(modules) < 2 {
+		return
+	}
+
+	// 构建任务路径到模块路径的映射
+	taskToModule := make(map[string]string)
+	taskNameToPath := make(map[string]string)
+	for _, task := range allTasks {
+		taskPathName, _ := task["pathName"].(string)
+		taskName, _ := task["name"].(string)
+		if taskPathName == "" {
+			continue
+		}
+		// 模块路径是任务路径的前两部分
+		parts := strings.Split(taskPathName, "/")
+		if len(parts) >= 2 {
+			modulePath := parts[0] + "/" + parts[1]
+			taskToModule[taskPathName] = modulePath
+		}
+		if taskName != "" {
+			taskNameToPath[taskName] = taskPathName
+		}
+	}
+
+	// 构建模块路径到模块名称的映射
+	modulePathToName := make(map[string]string)
+	for _, module := range modules {
+		modulePathName, _ := module["pathName"].(string)
+		moduleName, _ := module["name"].(string)
+		modulePathToName[modulePathName] = moduleName
+	}
+
+	// 记录模块间的引用关系
+	// key: "源模块路径->目标模块路径", value: 引用列表
+	moduleReferences := make(map[string][]CrossModuleReference)
+
+	// 遍历所有任务，分析跨模块引用
+	for _, task := range allTasks {
+		taskPathName, _ := task["pathName"].(string)
+		currentModulePath := taskToModule[taskPathName]
+		if currentModulePath == "" {
+			continue
+		}
+
+		// 检查上游契约中的跨模块引用
+		upstreamContractStr, _ := task["upstreamContractDetail"].(string)
+		if upstreamContractStr != "" {
+			var upstreamContract ContractDetail
+			if err := json.Unmarshal([]byte(upstreamContractStr), &upstreamContract); err == nil {
+				for _, item := range upstreamContract.List {
+					upstreamTaskPath := item.From
+					if upstreamTaskPath == "" {
+						continue
+					}
+
+					// 查找上游任务所属模块
+					upstreamModulePath := findModuleByTaskIdentifier(upstreamTaskPath, taskToModule, taskNameToPath, currentModulePath)
+
+					// 如果上游任务属于不同模块，则记录引用（方向：上游模块 → 当前模块）
+					if upstreamModulePath != "" && upstreamModulePath != currentModulePath {
+						key := upstreamModulePath + "->" + currentModulePath
+						moduleReferences[key] = append(moduleReferences[key], CrossModuleReference{
+							SourceTask: upstreamTaskPath,
+							TargetTask: taskPathName,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	// 检测循环引用：检查所有模块对之间是否存在双向引用
+	for i := 0; i < len(modules); i++ {
+		for j := i + 1; j < len(modules); j++ {
+			moduleXPathName, _ := modules[i]["pathName"].(string)
+			moduleYPathName, _ := modules[j]["pathName"].(string)
+			moduleXName, _ := modules[i]["name"].(string)
+			moduleYName, _ := modules[j]["name"].(string)
+
+			keyXToY := moduleXPathName + "->" + moduleYPathName
+			keyYToX := moduleYPathName + "->" + moduleXPathName
+
+			xToYRefs, hasXToY := moduleReferences[keyXToY]
+			yToXRefs, hasYToX := moduleReferences[keyYToX]
+
+			// 如果同时存在 X→Y 和 Y→X 的引用，则存在循环引用
+			if hasXToY && hasYToX {
+				result.Errors = append(result.Errors, CompileIssue{
+					RuleID:           RuleModuleCircularReference,
+					RuleName:         "模块循环引用错误",
+					ResourceType:     "module",
+					ResourceName:     moduleXName + " <-> " + moduleYName,
+					ResourcePathName: moduleXPathName + " <-> " + moduleYPathName,
+					Message:          fmt.Sprintf("模块 [%s] 和模块 [%s] 之间存在循环引用（%s → %s: %d条, %s → %s: %d条）", moduleXName, moduleYName, moduleXName, moduleYName, len(xToYRefs), moduleYName, moduleXName, len(yToXRefs)),
+					Suggestion:       "建议引入第三方共享模块来打破循环依赖",
+					Severity:         "error",
+				})
+			}
+		}
+	}
+}
+
+// findModuleByTaskIdentifier 根据任务标识符查找所属模块路径
+func findModuleByTaskIdentifier(taskIdentifier string, taskToModule map[string]string, taskNameToPath map[string]string, currentModulePath string) string {
+	// 1. 首先尝试直接匹配任务路径
+	if modulePath, exists := taskToModule[taskIdentifier]; exists {
+		return modulePath
+	}
+
+	// 2. 尝试按任务名称匹配
+	if taskPath, exists := taskNameToPath[taskIdentifier]; exists {
+		return taskToModule[taskPath]
+	}
+
+	// 3. 尝试在当前模块内构建完整路径
+	possiblePath := currentModulePath + "/" + taskIdentifier
+	if modulePath, exists := taskToModule[possiblePath]; exists {
+		return modulePath
+	}
+
+	return ""
 }
