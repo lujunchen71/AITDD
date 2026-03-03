@@ -1440,50 +1440,48 @@ type CompileIssueResource struct {
 	PathName string `json:"pathName"` // 资源路径
 }
 
-// CompileIssueGroup 按规则分组的编译问题
-type CompileIssueGroup struct {
-	RuleID       string                 `json:"ruleId"`       // 规则ID
-	RuleName     string                 `json:"ruleName"`     // 规则名称
-	ResourceType string                 `json:"resourceType"` // module, task
-	Resources    []CompileIssueResource `json:"resources"`    // 受影响的资源列表
-	Message      string                 `json:"message"`      // 通用消息
-	Suggestion   string                 `json:"suggestion"`   // 建议操作
+// CompileStaticIssue 单个编译问题
+type CompileStaticIssue struct {
+	RuleId     string `json:"ruleId"`
+	RuleName   string `json:"ruleName"`
+	Message    string `json:"message"`
+	Suggestion string `json:"suggestion"`
 }
 
-// CompileIssueGroupsByType 按资源类型分组的编译问题
-type CompileIssueGroupsByType struct {
-	Module []CompileIssueGroup `json:"module,omitempty"`
-	Task   []CompileIssueGroup `json:"task,omitempty"`
+// CompileStaticResourceIssues 资源的错误和警告
+type CompileStaticResourceIssues struct {
+	Error   []CompileStaticIssue `json:"error,omitempty"`
+	Warning []CompileStaticIssue `json:"warning,omitempty"`
 }
 
 // CompileStaticResult 静态编译结果（内部使用）
 type CompileStaticResult struct {
-	Success         bool            `json:"success"`
-	TotalModules    int             `json:"totalModules"`
-	TotalTasks      int             `json:"totalTasks"`
-	CompletedTasks  int             `json:"completedTasks"`
-	InProgressTasks int             `json:"inProgressTasks"`
-	ReadyTasks      int             `json:"readyTasks"`
-	ErrorCount      int             `json:"errorCount"`
-	WarningCount    int             `json:"warningCount"`
-	Errors          []CompileIssue  `json:"errors"`
-	Warnings        []CompileIssue  `json:"warnings"`
+	Success         bool           `json:"success"`
+	TotalModules    int            `json:"totalModules"`
+	TotalTasks      int            `json:"totalTasks"`
+	CompletedTasks  int            `json:"completedTasks"`
+	InProgressTasks int            `json:"inProgressTasks"`
+	ReadyTasks      int            `json:"readyTasks"`
+	ErrorCount      int            `json:"errorCount"`
+	WarningCount    int            `json:"warningCount"`
+	Errors          []CompileIssue `json:"errors"`
+	Warnings        []CompileIssue `json:"warnings"`
 }
 
-// CompileStaticOutput 静态编译输出（用于JSON输出）
+// CompileStaticOutput 静态编译输出
 type CompileStaticOutput struct {
-	Success         bool                     `json:"success"`
-	PathName        string                   `json:"pathName,omitempty"`
-	TotalModules    int                      `json:"totalModules"`
-	TotalTasks      int                      `json:"totalTasks"`
-	CompletedTasks  int                      `json:"completedTasks"`
-	InProgressTasks int                      `json:"inProgressTasks"`
-	ReadyTasks      int                      `json:"readyTasks"`
-	ErrorCount      int                      `json:"errorCount"`
-	WarningCount    int                      `json:"warningCount"`
-	Errors          CompileIssueGroupsByType `json:"errors,omitempty"`
-	Warnings        CompileIssueGroupsByType `json:"warnings,omitempty"`
-	Message         string                   `json:"message"`
+	Success         bool                                  `json:"success"`
+	PathName        string                                `json:"pathName,omitempty"`
+	TotalModules    int                                   `json:"totalModules"`
+	TotalTasks      int                                   `json:"totalTasks"`
+	CompletedTasks  int                                   `json:"completedTasks"`
+	InProgressTasks int                                   `json:"inProgressTasks"`
+	ReadyTasks      int                                   `json:"readyTasks"`
+	ErrorCount      int                                   `json:"errorCount"`
+	WarningCount    int                                   `json:"warningCount"`
+	Module          map[string]CompileStaticResourceIssues `json:"module,omitempty"`
+	Task            map[string]CompileStaticResourceIssues `json:"task,omitempty"`
+	Message         string                                `json:"message"`
 }
 
 // ContractDetailItem 契约条目
@@ -1510,71 +1508,66 @@ func (b *BugLog) HasErrors() bool {
 	return len(b.Static) > 0 || len(b.Dynamic) > 0
 }
 
-// groupCompileIssuesByTypeAndRule 按资源类型和规则ID分组编译问题
-func groupCompileIssuesByTypeAndRule(issues []CompileIssue) CompileIssueGroupsByType {
-	result := CompileIssueGroupsByType{
-		Module: []CompileIssueGroup{},
-		Task:   []CompileIssueGroup{},
+// groupIssuesByResource 按资源路径分组编译问题
+func groupIssuesByResource(errors, warnings []CompileIssue) (map[string]CompileStaticResourceIssues, map[string]CompileStaticResourceIssues) {
+	modules := make(map[string]CompileStaticResourceIssues)
+	tasks := make(map[string]CompileStaticResourceIssues)
+
+	// 处理错误
+	for _, issue := range errors {
+		issueItem := CompileStaticIssue{
+			RuleId:     issue.RuleID,
+			RuleName:   issue.RuleName,
+			Message:    issue.Message,
+			Suggestion: issue.Suggestion,
+		}
+
+		path := issue.ResourcePathName
+		if issue.ResourceType == "module" {
+			existing := modules[path]
+			existing.Error = append(existing.Error, issueItem)
+			modules[path] = existing
+		} else if issue.ResourceType == "task" {
+			existing := tasks[path]
+			existing.Error = append(existing.Error, issueItem)
+			tasks[path] = existing
+		}
 	}
 
-	// 先按 resourceType 分组
-	moduleIssues := make(map[string][]CompileIssue)
-	taskIssues := make(map[string][]CompileIssue)
+	// 处理警告
+	for _, issue := range warnings {
+		issueItem := CompileStaticIssue{
+			RuleId:     issue.RuleID,
+			RuleName:   issue.RuleName,
+			Message:    issue.Message,
+			Suggestion: issue.Suggestion,
+		}
 
-	for _, issue := range issues {
-		switch issue.ResourceType {
-		case "module":
-			moduleIssues[issue.RuleID] = append(moduleIssues[issue.RuleID], issue)
-		case "task":
-			taskIssues[issue.RuleID] = append(taskIssues[issue.RuleID], issue)
+		path := issue.ResourcePathName
+		if issue.ResourceType == "module" {
+			existing := modules[path]
+			existing.Warning = append(existing.Warning, issueItem)
+			modules[path] = existing
+		} else if issue.ResourceType == "task" {
+			existing := tasks[path]
+			existing.Warning = append(existing.Warning, issueItem)
+			tasks[path] = existing
 		}
 	}
 
-	// 转换模块问题为分组格式
-	for ruleID, issueList := range moduleIssues {
-		if len(issueList) == 0 {
-			continue
+	// 删除没有问题的资源
+	for path, issues := range modules {
+		if len(issues.Error) == 0 && len(issues.Warning) == 0 {
+			delete(modules, path)
 		}
-		group := CompileIssueGroup{
-			RuleID:       ruleID,
-			RuleName:     issueList[0].RuleName,
-			ResourceType: "module",
-			Resources:    []CompileIssueResource{},
-			Message:      issueList[0].Message,
-			Suggestion:   issueList[0].Suggestion,
+	}
+	for path, issues := range tasks {
+		if len(issues.Error) == 0 && len(issues.Warning) == 0 {
+			delete(tasks, path)
 		}
-		for _, issue := range issueList {
-			group.Resources = append(group.Resources, CompileIssueResource{
-				Name:     issue.ResourceName,
-				PathName: issue.ResourcePathName,
-			})
-		}
-		result.Module = append(result.Module, group)
 	}
 
-	// 转换任务问题为分组格式
-	for ruleID, issueList := range taskIssues {
-		if len(issueList) == 0 {
-			continue
-		}
-		group := CompileIssueGroup{
-			RuleID:       ruleID,
-			RuleName:     issueList[0].RuleName,
-			ResourceType: "task",
-			Resources:    []CompileIssueResource{},
-			Message:      issueList[0].Message,
-			Suggestion:   issueList[0].Suggestion,
-		}
-		for _, issue := range issueList {
-			group.Resources = append(group.Resources, CompileIssueResource{
-				Name:     issue.ResourceName,
-				PathName: issue.ResourcePathName,
-			})
-		}
-		result.Task = append(result.Task, group)
-	}
-
-	return result
+	return modules, tasks
 }
 
 // handleCompileStaticImpl 静态编译
@@ -1615,7 +1608,17 @@ func (s *MCPServer) handleCompileStaticImpl(ctx context.Context, request mcp.Cal
 	result.WarningCount = len(result.Warnings)
 	result.Success = result.ErrorCount == 0
 
-	// 构建输出（使用新的分组格式）
+	// 使用新的分组函数按资源路径分组
+	modules, tasks := groupIssuesByResource(result.Errors, result.Warnings)
+
+	// 构建输出
+	var message string
+	if result.Success {
+		message = "静态编译通过"
+	} else {
+		message = fmt.Sprintf("静态编译失败，发现 %d 个错误", result.ErrorCount)
+	}
+
 	output := CompileStaticOutput{
 		Success:         result.Success,
 		PathName:        pathName,
@@ -1626,18 +1629,9 @@ func (s *MCPServer) handleCompileStaticImpl(ctx context.Context, request mcp.Cal
 		ReadyTasks:      result.ReadyTasks,
 		ErrorCount:      result.ErrorCount,
 		WarningCount:    result.WarningCount,
-		Errors:          groupCompileIssuesByTypeAndRule(result.Errors),
-		Message:         "",
-	}
-
-	if includeWarnings {
-		output.Warnings = groupCompileIssuesByTypeAndRule(result.Warnings)
-	}
-
-	if result.Success {
-		output.Message = "静态编译通过"
-	} else {
-		output.Message = fmt.Sprintf("静态编译失败，发现 %d 个错误", result.ErrorCount)
+		Module:          modules,
+		Task:            tasks,
+		Message:         message,
 	}
 
 	// 序列化为JSON输出
