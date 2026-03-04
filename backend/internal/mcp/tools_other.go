@@ -2826,6 +2826,8 @@ type CompileDynamicError struct {
 
 // handleCompileDynamicImpl 动态编译
 // 执行实际编译，运行测试，验证契约，生成编译产物
+// 支持三种分析类型：task（任务）、module（模块）、project（项目）
+// 编译完成后可选择性地执行AI分析
 func (s *MCPServer) handleCompileDynamicImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	pathName, ok := getParam(request, "pathName")
 	if !ok || pathName == "" {
@@ -2840,6 +2842,9 @@ func (s *MCPServer) handleCompileDynamicImpl(ctx context.Context, request mcp.Ca
 	if !validateContracts {
 		validateContracts = true // 默认验证契约
 	}
+
+	// 是否执行AI分析（通过参数控制）
+	runAIAnalysis, _ := getParamBool(request, "runAIAnalysis")
 
 	startTime := time.Now()
 	result := &CompileDynamicResult{
@@ -2929,87 +2934,233 @@ func (s *MCPServer) handleCompileDynamicImpl(ctx context.Context, request mcp.Ca
 		}
 	}
 
+	// 如果启用了AI分析，则在编译完成后执行AI分析
+	if runAIAnalysis && len(tasks) > 0 {
+		output.WriteString("\n## AI分析结果\n\n")
+		aiAnalysisResult := s.runCompileAIAnalysis(ctx, pathName, tasks)
+		output.WriteString(aiAnalysisResult)
+	}
+
+	// 如果传入了sub_agent_config和qa_config，则使用RunAIAnalysisForCompile执行AI分析
+	// 直接传递 tasks 列表，不再依赖数字 ID
+	subAgentConfigRaw, hasSubAgentConfig := getParamAny(request, "sub_agent_config")
+	qaConfigRaw, hasQAConfig := getParamAny(request, "qa_config")
+	if hasSubAgentConfig && hasQAConfig && subAgentConfigRaw != nil && qaConfigRaw != nil {
+		projectName, _ := getParam(request, "project_name")
+		if projectName == "" {
+			projectName = pathName
+		}
+
+		output.WriteString("\n## AI设计合理性分析\n\n")
+		aiReport, err := RunAIAnalysisForCompile(ctx, projectName, subAgentConfigRaw, qaConfigRaw, tasks)
+		if err != nil {
+			output.WriteString(fmt.Sprintf("AI分析出错: %v\n", err))
+		} else {
+			output.WriteString(aiReport)
+		}
+	}
+
 	return mcp.NewToolResultText(output.String()), nil
 }
 
+// runCompileAIAnalysis 在编译完成后执行AI分析
+// 根据pathName的层级自动确定分析类型（task/module/project）
+// pathName: 任务/模块/项目路径名
+// tasks: 已编译的任务列表
+func (s *MCPServer) runCompileAIAnalysis(ctx context.Context, pathName string, tasks []map[string]interface{}) string {
+	var analysisOutput strings.Builder
+
+	// 根据pathName层级确定分析类型
+	parts := strings.Split(pathName, "/")
+	var analysisType string
+	switch len(parts) {
+	case 1:
+		analysisType = QuestionTypeProject
+	case 2:
+		analysisType = QuestionTypeModule
+	default:
+		analysisType = QuestionTypeTask
+	}
+
+	s.logger.Info("开始编译后AI分析", map[string]interface{}{
+		"path_name":     pathName,
+		"analysis_type": analysisType,
+		"task_count":    len(tasks),
+	})
+
+	// 收集任务ID列表
+	taskIDs := make([]uint, 0, len(tasks))
+	for _, task := range tasks {
+		if idRaw, ok := task["id"]; ok {
+			switch id := idRaw.(type) {
+			case float64:
+				taskIDs = append(taskIDs, uint(id))
+			case int:
+				taskIDs = append(taskIDs, uint(id))
+			case uint:
+				taskIDs = append(taskIDs, id)
+			}
+		}
+	}
+
+	if len(taskIDs) == 0 {
+		analysisOutput.WriteString("(没有找到有效的任务ID，跳过AI分析)\n")
+		return analysisOutput.String()
+	}
+
+	// 创建AI分析服务
+	aiService := NewAIAnalysisService(s.getApiURL())
+
+	// 执行分析
+	analysisResults, aggregated, err := aiService.AnalyzeMultiple(ctx, taskIDs, analysisType, DefaultAnalysisOptions())
+	if err != nil {
+		analysisOutput.WriteString(fmt.Sprintf("AI分析失败: %s\n", err.Error()))
+		return analysisOutput.String()
+	}
+
+	// 格式化输出
+	if aggregated != nil {
+		analysisOutput.WriteString(fmt.Sprintf("分析类型: %s\n", analysisType))
+		analysisOutput.WriteString(fmt.Sprintf("分析目标数: %d\n", aggregated.TotalResults))
+		analysisOutput.WriteString(fmt.Sprintf("平均质量分: %.1f\n", aggregated.AvgScore))
+		analysisOutput.WriteString(fmt.Sprintf("最高分: %d, 最低分: %d\n", aggregated.HighScore, aggregated.LowScore))
+		analysisOutput.WriteString(fmt.Sprintf("发现问题总数: %d\n", len(aggregated.Issues)))
+
+		if len(aggregated.IssuesBySeverity) > 0 {
+			analysisOutput.WriteString("问题分布: ")
+			for severity, count := range aggregated.IssuesBySeverity {
+				analysisOutput.WriteString(fmt.Sprintf("%s:%d ", severity, count))
+			}
+			analysisOutput.WriteString("\n")
+		}
+	}
+
+	if len(analysisResults) > 0 && len(analysisResults[0].Issues) > 0 {
+		topIssues := analysisResults[0].Issues
+		if len(topIssues) > 5 {
+			topIssues = topIssues[:5]
+		}
+		analysisOutput.WriteString("\n主要问题（前5条）:\n")
+		for _, issue := range topIssues {
+			analysisOutput.WriteString(fmt.Sprintf("  [%s] %s\n", issue.Severity, issue.Description))
+		}
+	}
+
+	return analysisOutput.String()
+}
+
 // getTasksInDependencyOrder 获取按依赖顺序排序的任务列表
+// API 响应格式：
+//   - GET /modules?projectPathName={name} → {"data": {"modules": [...]}}
+//   - GET /modules/by-path/{pathName}     → {"data": {"module": {...}}}
+//   - GET /modules/{id}/tasks             → {"data": {"tasks": [...]}}
+//   - GET /tasks/by-path/{pathName}       → {"data": {"task": {...}}}
 func (s *MCPServer) getTasksInDependencyOrder(pathName string) ([]map[string]interface{}, error) {
 	pathParts := strings.Split(pathName, "/")
 	var tasks []map[string]interface{}
 
 	if len(pathParts) == 1 {
 		// 项目级别：获取所有任务
-		// 获取项目下所有模块
-		modulesResp, err := http.Get(fmt.Sprintf("%s/projects/by-path/%s/modules", s.getApiURL(), pathName))
+		// 使用正确的 API: GET /modules?projectPathName={name}
+		modulesResp, err := http.Get(fmt.Sprintf("%s/modules?projectPathName=%s", s.getApiURL(), pathName))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("获取模块列表失败: %w", err)
 		}
 		defer modulesResp.Body.Close()
 
-		var modulesData struct {
-			Data []map[string]interface{} `json:"data"`
+		// 响应格式: {"data": {"modules": [...], "total": N}}
+		var modulesResult struct {
+			Data struct {
+				Modules []map[string]interface{} `json:"modules"`
+			} `json:"data"`
 		}
-		if err := json.NewDecoder(modulesResp.Body).Decode(&modulesData); err != nil {
-			return nil, err
+		if err := json.NewDecoder(modulesResp.Body).Decode(&modulesResult); err != nil {
+			return nil, fmt.Errorf("解析模块列表失败: %w", err)
 		}
 
 		// 获取每个模块的任务
-		for _, module := range modulesData.Data {
+		for _, module := range modulesResult.Data.Modules {
 			moduleID, _ := module["id"].(string)
+			if moduleID == "" {
+				continue
+			}
 			tasksResp, err := http.Get(fmt.Sprintf("%s/modules/%s/tasks", s.getApiURL(), moduleID))
 			if err != nil {
 				continue
 			}
 			defer tasksResp.Body.Close()
 
-			var tasksData struct {
-				Data []map[string]interface{} `json:"data"`
+			// 响应格式: {"data": {"tasks": [...], "total": N}}
+			var tasksResult struct {
+				Data struct {
+					Tasks []map[string]interface{} `json:"tasks"`
+				} `json:"data"`
 			}
-			if err := json.NewDecoder(tasksResp.Body).Decode(&tasksData); err != nil {
+			if err := json.NewDecoder(tasksResp.Body).Decode(&tasksResult); err != nil {
 				continue
 			}
-			tasks = append(tasks, tasksData.Data...)
+			tasks = append(tasks, tasksResult.Data.Tasks...)
 		}
 	} else if len(pathParts) == 2 {
 		// 模块级别：获取模块下所有任务
+		// 使用 GET /modules/by-path/{pathName} 获取模块信息
 		moduleResp, err := http.Get(fmt.Sprintf("%s/modules/by-path/%s", s.getApiURL(), pathName))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("获取模块信息失败: %w", err)
 		}
 		defer moduleResp.Body.Close()
 
-		var module map[string]interface{}
-		if err := json.NewDecoder(moduleResp.Body).Decode(&module); err != nil {
-			return nil, err
+		// 响应格式: {"data": {"module": {...}}}
+		var moduleResult struct {
+			Data struct {
+				Module map[string]interface{} `json:"module"`
+			} `json:"data"`
+		}
+		if err := json.NewDecoder(moduleResp.Body).Decode(&moduleResult); err != nil {
+			return nil, fmt.Errorf("解析模块信息失败: %w", err)
 		}
 
-		moduleID, _ := module["id"].(string)
+		moduleID, _ := moduleResult.Data.Module["id"].(string)
+		if moduleID == "" {
+			return nil, fmt.Errorf("无法获取模块ID，pathName: %s", pathName)
+		}
+
 		tasksResp, err := http.Get(fmt.Sprintf("%s/modules/%s/tasks", s.getApiURL(), moduleID))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("获取任务列表失败: %w", err)
 		}
 		defer tasksResp.Body.Close()
 
-		var tasksData struct {
-			Data []map[string]interface{} `json:"data"`
+		// 响应格式: {"data": {"tasks": [...], "total": N}}
+		var tasksResult struct {
+			Data struct {
+				Tasks []map[string]interface{} `json:"tasks"`
+			} `json:"data"`
 		}
-		if err := json.NewDecoder(tasksResp.Body).Decode(&tasksData); err != nil {
-			return nil, err
+		if err := json.NewDecoder(tasksResp.Body).Decode(&tasksResult); err != nil {
+			return nil, fmt.Errorf("解析任务列表失败: %w", err)
 		}
-		tasks = tasksData.Data
+		tasks = tasksResult.Data.Tasks
 	} else {
 		// 任务级别：获取单个任务
 		taskResp, err := http.Get(fmt.Sprintf("%s/tasks/by-path/%s", s.getApiURL(), pathName))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("获取任务失败: %w", err)
 		}
 		defer taskResp.Body.Close()
 
-		var task map[string]interface{}
-		if err := json.NewDecoder(taskResp.Body).Decode(&task); err != nil {
-			return nil, err
+		// 响应格式: {"data": {"task": {...}}}
+		var taskResult struct {
+			Data struct {
+				Task map[string]interface{} `json:"task"`
+			} `json:"data"`
 		}
-		tasks = append(tasks, task)
+		if err := json.NewDecoder(taskResp.Body).Decode(&taskResult); err != nil {
+			return nil, fmt.Errorf("解析任务失败: %w", err)
+		}
+		if taskResult.Data.Task != nil {
+			tasks = append(tasks, taskResult.Data.Task)
+		}
 	}
 
 	// TODO: 实现拓扑排序以按依赖顺序排列任务

@@ -1256,3 +1256,90 @@ rm .aitdd/config.json
 | | 进程管理 | 由后端服务统一管理 | 需要独立管理进程 |
 | | 资源占用 | 共享后端服务资源 | 独立进程资源 |
 | | 调试 | 与后端日志统一 | 独立日志输出 |
+
+---
+
+## AI分析工具
+
+### ai_analysis
+
+AI驱动的设计合理性分析工具，支持任务、模块、项目三个层级的分析。
+
+**参数：**
+- `analysis_type` (string, 必填): 分析类型，可选值 `task`/`module`/`project`
+- `target_ids` ([]number, 可选): 要分析的目标ID列表，不填则分析当前项目所有内容
+- `concurrent` (boolean, 可选): 是否并发执行，默认true
+
+**示例：**
+分析指定任务:
+- analysis_type: "task"
+- target_ids: [1, 2, 3]
+
+分析整个项目:
+- analysis_type: "project"
+
+**返回：** 包含问题列表、建议和评分的结构化报告
+
+---
+
+### get_analysis_progress
+
+获取AI分析任务的进度状态。
+
+**参数：**
+- `analysis_id` (string, 必填): 分析任务ID
+
+**返回：** 包含进度百分比、状态和部分结果的进度信息
+
+---
+
+### cancel_analysis
+
+取消正在进行的AI分析任务。
+
+**参数：**
+- `analysis_id` (string, 必填): 要取消的分析任务ID
+
+**返回：** 取消操作的结果
+
+---
+
+## AI分析配置
+
+### 配置文件 `backend/config/sub_agent.json`
+
+配置AI模型参数：
+
+```json
+{
+  "models": [
+    {
+      "name": "primary",
+      "api_key": "${AI_API_KEY}",
+      "endpoint": "https://api.openai.com/v1/chat/completions",
+      "is_primary": true
+    }
+  ],
+  "rate_limit": {
+    "max_concurrent": 3,
+    "requests_per_min": 20
+  },
+  "timeout": {
+    "connect": 10,
+    "request": 60
+  },
+  "retry": {
+    "max_retries": 3,
+    "backoff_ms": 1000
+  }
+}
+```
+
+### 环境变量
+
+复制 `backend/config/.env.example` 到 `.env` 并填入实际值：
+
+```bash
+AI_API_KEY=your_api_key_here
+AI_API_ENDPOINT=https://api.openai.com/v1/chat/completions
+```
