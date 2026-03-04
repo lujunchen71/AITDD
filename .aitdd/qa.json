@@ -1,0 +1,80 @@
+{
+  "questions": {
+    "task": [
+      {
+        "category": "prompt",
+        "question": "请分析当前任务的提示词是否清晰、完整，能否指导开发人员正确实现功能？",
+        "severity": "error"
+      },
+      {
+        "category": "test",
+        "question": "请分析当前任务的测试用例是否合理，能否覆盖主要功能场景？，不分析testResult",
+        "severity": "warning"
+      },
+      {
+        "category": "contract",
+        "question": "请分析当前任务的上游必需存在的契约接口和给下游消费接口定义是否完整，是否包含所有必要的输入信息，是否一定需要？，不考虑对外部第三方依赖",
+        "severity": "error"
+      },
+      {
+        "category": "contract",
+        "question": "请分析当前任务的接口描述是否清晰，参数和返回值是否定义明确？",
+        "severity": "warning"
+      }
+    ],
+    "module": [
+      {
+        "category": "dependency",
+        "question": "请分析当前模块的必要的契约依赖关系是否合理，是否存在不必要的依赖或缺失的依赖？，不考虑对外部第三方依赖",
+        "severity": "error"
+      },
+      {
+        "category": "description",
+        "question": "请分析当前模块的功能描述是否合理，是否清晰定义了模块的职责边界？",
+        "severity": "warning"
+      },
+      {
+        "category": "task",
+        "question": "请分析当前模块的任务粒度是否合理，是否存在过大或过小的任务划分？",
+        "severity": "warning"
+      },
+      {
+        "category": "architecture",
+        "question": "请分析当前模块的职责范围是否正确，是否与其他模块存在职责重叠？",
+        "severity": "error"
+      },
+      {
+        "category": "description",
+        "question": "请分析当前模块的职责描述是否清晰，能否让开发人员理解模块的核心功能？",
+        "severity": "warning"
+      }
+    ],
+    "project": [
+      {
+        "category": "requirement",
+        "question": "请分析当前项目是否有需要澄清的地方，需求是否明确？",
+        "severity": "info"
+      },
+      {
+        "category": "architecture",
+        "question": "请分析当前项目的架构选型是否合理，技术栈选择是否适合项目需求？",
+        "severity": "error"
+      },
+      {
+        "category": "architecture",
+        "question": "请分析当前项目的模块耦合性设计是否合理，模块间依赖是否清晰？",
+        "severity": "warning"
+      },
+      {
+        "category": "consistency",
+        "question": "请分析当前项目的接口设计风格是否一致，是否遵循统一的设计规范？",
+        "severity": "warning"
+      },
+      {
+        "category": "maintainability",
+        "question": "请分析当前项目的整体设计是否易于维护和扩展？",
+        "severity": "info"
+      }
+    ]
+  }
+}
