@@ -24,6 +24,13 @@ func GetModules(c *gin.Context) {
 	} else if projectID := c.Query("projectId"); projectID != "" {
 		// 兼容单个项目ID
 		query = query.Where("project_id = ?", projectID)
+	} else if projectPathName := c.Query("projectPathName"); projectPathName != "" {
+		// 通过项目 pathName 查询：先获取项目ID，再过滤模块
+		var project models.Project
+		if err := database.DB.Where("path_name = ?", projectPathName).First(&project).Error; err == nil {
+			query = query.Where("project_id = ?", project.ID)
+		}
+		// 如果项目不存在，query 不会添加过滤条件，返回空列表
 	}
 	if parentID := c.Query("parentId"); parentID != "" {
 		query = query.Where("parent_id = ?", parentID)

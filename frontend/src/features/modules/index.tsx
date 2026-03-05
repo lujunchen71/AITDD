@@ -530,7 +530,7 @@ const ModulesPage: React.FC = () => {
                   <Empty
                     description="请从左侧选择一个模块查看详情和任务"
                     style={{ padding: '40px 0' }}
-                    imageStyle={{ filter: 'hue-rotate(200deg)' }}
+                    styles={{ image: { filter: 'hue-rotate(200deg)' } }}
                   />
                 </div>
               )}

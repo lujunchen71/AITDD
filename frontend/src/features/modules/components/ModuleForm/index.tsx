@@ -54,7 +54,7 @@ const ModuleForm: React.FC<ModuleFormProps> = ({
       onCancel={onCancel}
       confirmLoading={loading}
       width={600}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form
         form={form}

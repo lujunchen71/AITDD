@@ -4,7 +4,7 @@
       "name": "primary",
       "api_key": "sk-239103d32e3e40c8a2cc1b954269a838",
       "endpoint": "https://api.deepseek.com/v1/chat/completions",
-      "model": "deepseek-chat",
+      "model": "deepseek-reasoner",
       "is_primary": true
     }
   ],

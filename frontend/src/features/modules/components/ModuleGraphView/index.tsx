@@ -19,14 +19,19 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Module, Task, TaskDependency, ModuleDependency } from '../../../../types';
+import BugLogDisplay, { parseBugLog } from '../BugLogDisplay';
 import { AppstoreOutlined, SettingOutlined, PlayCircleOutlined, ApiOutlined, ReloadOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Checkbox, Popover, Button, Tooltip, message, Dropdown } from 'antd';
 import { modulePositionApi } from '../../../../services/api';
-import { 
-  localStorageService, 
+import {
+  localStorageService,
   DisplaySettings,
-  defaultDisplaySettings as storageDefaultDisplaySettings 
+  defaultDisplaySettings as storageDefaultDisplaySettings
 } from '../../../../services/localStorageService';
+import { usePropertyPanelStore } from '../../../../stores/usePropertyPanelStore';
+import PropertyPanel from '../PropertyPanel';
+import BugLogPanel from '../BugLogPanel';
+import { useProjectStore } from '../../../../stores/useProjectStore';
 
 interface ModuleGraphViewProps {
   modules: Module[];
@@ -67,6 +72,42 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
   onModuleRefactor: _onModuleRefactor,
   onModuleDelete: _onModuleDelete,
 }) => {
+  // 属性面板 Store
+  const propertyPanelStore = usePropertyPanelStore();
+  const isPanelVisible = usePropertyPanelStore(s => s.visible);
+
+  // BugLog 面板可见状态（与属性面板互斥）
+  const [bugLogPanelVisible, setBugLogPanelVisible] = React.useState(false);
+
+  const handlePanelModeChange = React.useCallback((mode: 0 | 1 | 2) => {
+    if (mode === 0) {
+      propertyPanelStore.close();
+      setBugLogPanelVisible(false);
+    } else if (mode === 1) {
+      setBugLogPanelVisible(false);
+      propertyPanelStore.showProjectInfo();
+    } else {
+      propertyPanelStore.close();
+      setBugLogPanelVisible(true);
+    }
+  }, [propertyPanelStore]);
+
+  // 从 projectStore 获取当前项目
+  const { project } = useProjectStore();
+
+  // 用于动态计算属性面板顶部位置的 ref（指向 top-right Panel 的容器 div）
+  const topRightPanelRef = React.useRef<HTMLDivElement>(null);
+  const [panelAnchorTop, setPanelAnchorTop] = React.useState(160);
+
+  // 当面板可见时，根据 top-right 控件的实际位置计算属性面板的 top 值
+  React.useEffect(() => {
+    const anyVisible = isPanelVisible || bugLogPanelVisible;
+    if (anyVisible && topRightPanelRef.current) {
+      const rect = topRightPanelRef.current.getBoundingClientRect();
+      setPanelAnchorTop(rect.bottom + 8);
+    }
+  }, [isPanelVisible, bugLogPanelVisible]);
+
   // 从本地存储加载折叠的模块ID列表
   const [collapsedModules, setCollapsedModules] = useState<Set<string>>(() => {
     const savedCollapsedIds = localStorageService.getCollapsedModules();
@@ -533,6 +574,49 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [calculateAutoLayout, setNodes, savePositions]);
 
+  // 用 ref 追踪当前面板模式（0=关闭, 1=属性面板, 2=BugLog面板）
+  // 避免 useEffect 闭包问题，直接读取 ref 值
+  const panelModeRef = React.useRef<0 | 1 | 2>(0);
+  // 记录上次打开的是哪个面板，用于 P 键恢复
+  const lastActivePanelRef = React.useRef<1 | 2>(1);
+
+  // 同步 panelMode 到 ref（每次渲染时更新）
+  const panelMode = bugLogPanelVisible ? 2 : isPanelVisible ? 1 : 0;
+  panelModeRef.current = panelMode;
+  if (panelMode !== 0) lastActivePanelRef.current = panelMode;
+
+  // P 键：有面板打开时关闭；没有面板时恢复上次打开的面板
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'p' || e.key === 'P') {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+          return;
+        }
+        const currentMode = panelModeRef.current;
+        if (currentMode === 1) {
+          // 属性面板打开 → 关闭
+          usePropertyPanelStore.getState().close();
+        } else if (currentMode === 2) {
+          // BugLog 面板打开 → 关闭
+          setBugLogPanelVisible(false);
+        } else {
+          // 没有面板 → 恢复上次打开的面板
+          const last = lastActivePanelRef.current;
+          if (last === 2) {
+            setBugLogPanelVisible(true);
+            usePropertyPanelStore.getState().close();
+          } else {
+            usePropertyPanelStore.getState().showProjectInfo();
+            setBugLogPanelVisible(false);
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // 记录拖拽开始时的位置，用于计算偏移量
   const dragStartPos = useRef<{ [key: string]: { x: number; y: number } }>({});
   
@@ -638,10 +722,14 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
           console.log('[ModuleGraphView] 普通点击，覆盖选中:', moduleId);
           setSelectedModuleIds(new Set([moduleId]));
           onModuleClick?.(moduleId);
+          // 同步更新属性面板
+          if (isPanelVisible) {
+            propertyPanelStore.showModuleInfo(moduleId);
+          }
         }
       }
     },
-    [onModuleClick]
+    [onModuleClick, isPanelVisible, propertyPanelStore]
   );
 
   // 处理选择变化（框选完成时）
@@ -672,7 +760,11 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
   // 点击空白处清除选中
   const onPaneClick = useCallback(() => {
     setSelectedModuleIds(new Set());
-  }, []);
+    // 属性面板显示项目信息
+    if (isPanelVisible) {
+      propertyPanelStore.showProjectInfo();
+    }
+  }, [isPanelVisible, propertyPanelStore]);
 
   // 自定义节点类型
   const nodeTypes = useMemo(() => ({
@@ -880,35 +972,128 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
           </div>
         </Panel>
         <Panel position="top-right" style={{ background: 'transparent' }}>
-          <Popover
-            content={settingsContent}
-            title={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <SettingOutlined />
-                <span>全局显示设置</span>
+          <div ref={topRightPanelRef} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* 面板选择器：圆点指示器 */}
+            <Tooltip
+              title={
+                panelMode === 0 ? '关闭面板' :
+                panelMode === 1 ? '属性面板' :
+                'BugLog 面板'
+              }
+              placement="bottom"
+            >
+              <div style={{
+                background: '#12122a',
+                border: '1px solid #3d3d5c',
+                borderRadius: 12,
+                padding: '5px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                cursor: 'pointer',
+              }}>
+                {/* 圆点 0：关闭 */}
+                <div
+                  title="关闭面板"
+                  style={{
+                    width: panelMode === 0 ? 10 : 8,
+                    height: panelMode === 0 ? 10 : 8,
+                    borderRadius: '50%',
+                    background: panelMode === 0 ? '#555566' : '#3d3d5c',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.width = '10px'; (e.currentTarget as HTMLDivElement).style.height = '10px'; }}
+                  onMouseLeave={e => { if (panelMode !== 0) { (e.currentTarget as HTMLDivElement).style.width = '8px'; (e.currentTarget as HTMLDivElement).style.height = '8px'; } }}
+                  onClick={() => handlePanelModeChange(0)}
+                />
+                {/* 圆点 1：属性面板 */}
+                <div
+                  title="属性面板"
+                  style={{
+                    width: panelMode === 1 ? 10 : 8,
+                    height: panelMode === 1 ? 10 : 8,
+                    borderRadius: '50%',
+                    background: panelMode === 1 ? '#1890ff' : '#3d3d5c',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.width = '10px'; (e.currentTarget as HTMLDivElement).style.height = '10px'; }}
+                  onMouseLeave={e => { if (panelMode !== 1) { (e.currentTarget as HTMLDivElement).style.width = '8px'; (e.currentTarget as HTMLDivElement).style.height = '8px'; } }}
+                  onClick={() => handlePanelModeChange(panelMode === 1 ? 0 : 1)}
+                />
+                {/* 圆点 2：BugLog 面板 */}
+                <div
+                  title="BugLog 面板"
+                  style={{
+                    width: panelMode === 2 ? 10 : 8,
+                    height: panelMode === 2 ? 10 : 8,
+                    borderRadius: '50%',
+                    background: panelMode === 2 ? '#ff4d4f' : '#3d3d5c',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.width = '10px'; (e.currentTarget as HTMLDivElement).style.height = '10px'; }}
+                  onMouseLeave={e => { if (panelMode !== 2) { (e.currentTarget as HTMLDivElement).style.width = '8px'; (e.currentTarget as HTMLDivElement).style.height = '8px'; } }}
+                  onClick={() => handlePanelModeChange(panelMode === 2 ? 0 : 2)}
+                />
               </div>
-            }
-            trigger="click"
-            placement="bottomRight"
-            overlayStyle={{
-              background: '#1a1a2e',
-              border: '1px solid #3d3d5c',
-            }}
-          >
-            <Button
-              type="primary"
-              icon={<SettingOutlined />}
-              style={{
+            </Tooltip>
+            {/* 显示设置 Popover */}
+            <Popover
+              content={settingsContent}
+              title={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <SettingOutlined />
+                  <span>全局显示设置</span>
+                </div>
+              }
+              trigger="click"
+              placement="bottomRight"
+              overlayStyle={{
                 background: '#1a1a2e',
                 border: '1px solid #3d3d5c',
-                color: '#fff',
               }}
             >
-              显示设置
-            </Button>
-          </Popover>
+              <Button
+                type="primary"
+                icon={<SettingOutlined />}
+                style={{
+                  background: '#1a1a2e',
+                  border: '1px solid #3d3d5c',
+                  color: '#fff',
+                }}
+              >
+                显示设置
+              </Button>
+            </Popover>
+          </div>
         </Panel>
       </ReactFlow>
+
+      {/* 属性面板悬浮层 - 位于显示设置按钮下方，延伸到底部 */}
+      <PropertyPanel
+        project={project as any}
+        modules={modules}
+        tasks={tasks}
+        taskDependencies={taskDependencies}
+        anchorRight={16}
+        anchorTop={panelAnchorTop}
+      />
+
+      {/* BugLog 面板悬浮层 - 与属性面板同位置，互斥显示 */}
+      {bugLogPanelVisible && (
+        <BugLogPanel
+          modules={modules}
+          tasks={tasks}
+          anchorRight={16}
+          anchorTop={panelAnchorTop}
+          onClose={() => setBugLogPanelVisible(false)}
+        />
+      )}
     </div>
   );
 };
@@ -1122,12 +1307,21 @@ const TaskNode: React.FC<{
     });
   };
 
+  // 处理任务节点点击：单击→属性面板显示任务信息，shift+点击→打开编辑窗口
+  const handleTaskClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (e.shiftKey) {
+      // Shift+点击：打开编辑窗口
+      onTaskClick?.(task.id);
+    } else {
+      // 普通点击：在属性面板中显示任务信息
+      usePropertyPanelStore.getState().showTaskInfo(task.id);
+    }
+  };
+
   return (
     <div
-      onClick={(e) => {
-        e.stopPropagation();
-        onTaskClick?.(task.id);
-      }}
+      onClick={handleTaskClick}
       style={{
         width: '100%',
         height: '32px',
@@ -1185,7 +1379,7 @@ const TaskNode: React.FC<{
       }}>
         {task.name}
       </span>
-      {/* 提示标识 - 每个都有独立的Tooltip */}
+      {/* 提示标识 - 单击切换属性面板内容，shift+click 打开编辑 */}
       {displaySettings.showPrompt && task.prompt && (
         <InfoBadge
           icon="📝"
@@ -1194,6 +1388,8 @@ const TaskNode: React.FC<{
           fontSize={displaySettings.fontSize}
           requireAltForTooltip={displaySettings.requireAltForTooltip}
           tooltipScale={displaySettings.tooltipScale}
+          onPanelShow={() => usePropertyPanelStore.getState().showContent('prompt', task.id)}
+          onEditClick={() => onTaskClick?.(task.id)}
         />
       )}
       {displaySettings.showTests && task.tests && (
@@ -1205,20 +1401,33 @@ const TaskNode: React.FC<{
           fontSize={displaySettings.fontSize}
           requireAltForTooltip={displaySettings.requireAltForTooltip}
           tooltipScale={displaySettings.tooltipScale}
+          onPanelShow={() => usePropertyPanelStore.getState().showContent('tests', task.id)}
+          onEditClick={() => onTaskClick?.(task.id)}
         />
       )}
       {displaySettings.showError && task.bugLog && (
-        <InfoBadge
-          icon="❌"
-          title="错误信息"
-          content={task.bugLog}
-          type="error"
-          fontSize={displaySettings.fontSize}
-          requireAltForTooltip={displaySettings.requireAltForTooltip}
-          tooltipScale={displaySettings.tooltipScale}
-        />
+        parseBugLog(task.bugLog) ? (
+          <BugLogDisplay
+            bugLogStr={task.bugLog}
+            fontSize={displaySettings.fontSize}
+            requireAltForTooltip={displaySettings.requireAltForTooltip}
+            tooltipScale={displaySettings.tooltipScale}
+          />
+        ) : (
+          <InfoBadge
+            icon="❌"
+            title="错误信息"
+            content={task.bugLog}
+            type="error"
+            fontSize={displaySettings.fontSize}
+            requireAltForTooltip={displaySettings.requireAltForTooltip}
+            tooltipScale={displaySettings.tooltipScale}
+            onPanelShow={() => usePropertyPanelStore.getState().showContent('error', task.id)}
+            onEditClick={() => onTaskClick?.(task.id)}
+          />
+        )
       )}
-      {/* 上游依赖箭头 - 黄色，带Tooltip显示上游接口信息 */}
+      {/* 上游依赖箭头 - 黄色，单击切换属性面板上游契约内容 */}
       {hasUpstream && (
         <DependencyBadge
           type="upstream"
@@ -1228,9 +1437,10 @@ const TaskNode: React.FC<{
           fontSize={displaySettings.fontSize}
           requireAltForTooltip={displaySettings.requireAltForTooltip}
           tooltipScale={displaySettings.tooltipScale}
+          onPanelShow={() => usePropertyPanelStore.getState().showContent('upstream-contract', task.id)}
         />
       )}
-      {/* 下游依赖箭头 - 蓝色，带Tooltip显示下游接口信息 */}
+      {/* 下游依赖箭头 - 蓝色，单击切换属性面板下游契约内容 */}
       {hasDownstream && (
         <DependencyBadge
           type="downstream"
@@ -1240,6 +1450,7 @@ const TaskNode: React.FC<{
           fontSize={displaySettings.fontSize}
           requireAltForTooltip={displaySettings.requireAltForTooltip}
           tooltipScale={displaySettings.tooltipScale}
+          onPanelShow={() => usePropertyPanelStore.getState().showContent('downstream-contract', task.id)}
         />
       )}
       {displaySettings.showStatus && (
@@ -1292,7 +1503,7 @@ const TaskNode: React.FC<{
   );
 };
 
-// 信息标识组件 - 悬停显示详细信息（使用Ant Design Tooltip）
+// 信息标识组件 - 单击切换属性面板内容，悬停显示详细信息（使用Ant Design Tooltip）
 const InfoBadge: React.FC<{
   icon: string;
   title: string;
@@ -1302,7 +1513,9 @@ const InfoBadge: React.FC<{
   fontSize?: number;
   requireAltForTooltip?: boolean;
   tooltipScale?: number;
-}> = ({ icon, title, content, type = 'default', subItems, fontSize = 12, requireAltForTooltip = true, tooltipScale = 1 }) => {
+  onPanelShow?: () => void;   // 单击：切换属性面板显示对应内容
+  onEditClick?: () => void;   // shift+点击：打开编辑窗口
+}> = ({ icon, title, content, type = 'default', subItems, fontSize = 12, requireAltForTooltip = true, tooltipScale = 1, onPanelShow, onEditClick }) => {
   const [isAltPressed, setIsAltPressed] = React.useState(false);
   const [showTooltip, setShowTooltip] = React.useState(false);
 
@@ -1432,14 +1645,28 @@ const InfoBadge: React.FC<{
     </div>
   );
 
+  // 处理图标点击：单击→切换属性面板，shift+click→打开编辑窗口
+  const handleIconClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (e.shiftKey) {
+      onEditClick?.();
+    } else {
+      onPanelShow?.();
+    }
+  };
+
   // 如果需要Alt键但Alt未按下，不显示Tooltip
   if (requireAltForTooltip && !isAltPressed) {
     return (
-      <span style={{
-        fontSize: `${fontSize - 2}px`,
-        cursor: 'pointer',
-        opacity: 0.7,
-      }}>
+      <span
+        style={{
+          fontSize: `${fontSize - 2}px`,
+          cursor: 'pointer',
+          opacity: 0.7,
+        }}
+        onClick={handleIconClick}
+        title={`单击查看${title}，Shift+单击打开编辑`}
+      >
         {icon}
       </span>
     );
@@ -1459,10 +1686,14 @@ const InfoBadge: React.FC<{
         }
       }}
     >
-      <span style={{
-        fontSize: `${fontSize - 2}px`,
-        cursor: 'pointer',
-      }}>
+      <span
+        style={{
+          fontSize: `${fontSize - 2}px`,
+          cursor: 'pointer',
+        }}
+        onClick={handleIconClick}
+        title={`单击查看${title}，Shift+单击打开编辑`}
+      >
         {icon}
       </span>
     </Tooltip>
@@ -1490,7 +1721,7 @@ const parseContractDetailJSON = (jsonStr: string | undefined): ContractDetail | 
   }
 };
 
-// 依赖箭头组件 - 带Tooltip显示上下游接口信息
+// 依赖箭头组件 - 单击切换属性面板内容，带Tooltip显示上下游接口信息
 const DependencyBadge: React.FC<{
   type: 'upstream' | 'downstream';
   count: number;
@@ -1499,7 +1730,8 @@ const DependencyBadge: React.FC<{
   fontSize?: number;
   requireAltForTooltip?: boolean;
   tooltipScale?: number;
-}> = ({ type, count, taskInfo: _taskInfo, contractDetail, fontSize = 12, requireAltForTooltip = true, tooltipScale = 1 }) => {
+  onPanelShow?: () => void;  // 单击：切换属性面板显示契约内容
+}> = ({ type, count, taskInfo: _taskInfo, contractDetail, fontSize = 12, requireAltForTooltip = true, tooltipScale = 1, onPanelShow }) => {
   const [isAltPressed, setIsAltPressed] = React.useState(false);
   void React.useState(false); // tooltip state reserved for future use
 
@@ -1630,28 +1862,37 @@ const DependencyBadge: React.FC<{
     </div>
   );
 
+  // 处理点击：切换属性面板显示契约内容
+  const handleBadgeClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onPanelShow?.();
+  };
+
   // 如果需要Alt键但Alt未按下，显示提示
   if (requireAltForTooltip && !isAltPressed) {
     return (
       <Tooltip
-        title={<span style={{ fontSize: scaledFontSize }}>按住 Alt 键查看详情</span>}
+        title={<span style={{ fontSize: scaledFontSize }}>按住 Alt 键查看详情，单击查看属性面板</span>}
         color="#1a1a2e"
         overlayInnerStyle={{ padding: 8 * tooltipScale }}
         mouseEnterDelay={0}
         mouseLeaveDelay={0.1}
       >
-        <span style={{
-          fontSize: `${fontSize - 3}px`,
-          padding: '1px 5px',
-          background: bgColor,
-          color: textColor,
-          borderRadius: '3px',
-          flexShrink: 0,
-          cursor: 'pointer',
-          fontWeight: 600,
-          fontFamily: 'monospace',
-          opacity: 0.7,
-        }}>
+        <span
+          style={{
+            fontSize: `${fontSize - 3}px`,
+            padding: '1px 5px',
+            background: bgColor,
+            color: textColor,
+            borderRadius: '3px',
+            flexShrink: 0,
+            cursor: 'pointer',
+            fontWeight: 600,
+            fontFamily: 'monospace',
+            opacity: 0.7,
+          }}
+          onClick={handleBadgeClick}
+        >
           {arrow}[{count}]
         </span>
       </Tooltip>
@@ -1666,17 +1907,20 @@ const DependencyBadge: React.FC<{
       mouseEnterDelay={0}
       mouseLeaveDelay={0.1}
     >
-      <span style={{
-        fontSize: `${fontSize - 3}px`,
-        padding: '1px 5px',
-        background: bgColor,
-        color: textColor,
-        borderRadius: '3px',
-        flexShrink: 0,
-        cursor: 'pointer',
-        fontWeight: 600,
-        fontFamily: 'monospace',
-      }}>
+      <span
+        style={{
+          fontSize: `${fontSize - 3}px`,
+          padding: '1px 5px',
+          background: bgColor,
+          color: textColor,
+          borderRadius: '3px',
+          flexShrink: 0,
+          cursor: 'pointer',
+          fontWeight: 600,
+          fontFamily: 'monospace',
+        }}
+        onClick={handleBadgeClick}
+      >
         {arrow}[{count}]
       </span>
     </Tooltip>

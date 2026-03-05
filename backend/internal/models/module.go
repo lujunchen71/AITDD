@@ -17,6 +17,7 @@ type Module struct {
 	Prompt                   string  `json:"prompt" gorm:"type:text"`
 	Status                   string  `json:"status" gorm:"not null;default:'designing';type:text;index"`
 	TestCoverage             float64 `json:"testCoverage" gorm:"default:0"`
+	BugLog                   string  `json:"bugLog" gorm:"column:bug_log;type:text"` // JSON: BugLog 结构
 	UpstreamContractSummary  string  `json:"upstreamContractSummary" gorm:"type:text"`
 	DownstreamContractSummary string  `json:"downstreamContractSummary" gorm:"type:text"`
 	Locked                   bool    `json:"locked" gorm:"not null;default:false"`

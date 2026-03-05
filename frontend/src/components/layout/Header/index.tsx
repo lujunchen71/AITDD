@@ -24,29 +24,10 @@ const Header: React.FC = () => {
   const selectedProjectIds = useSelectedProjectIds();
   const [dropdownVisible, setDropdownVisible] = useState(false);
 
-  // [DEBUG] Header 渲染调试
-  useEffect(() => {
-    console.log('[Header] Rendered, projects count:', projects.length, 'selectedProjectIds:', selectedProjectIds);
-  });
-
   // 加载项目列表
   useEffect(() => {
-    console.log('[Header] useEffect: fetchProjects called');
-    fetchProjects().then(() => {
-      console.log('[Header] fetchProjects completed');
-      // 注意：这里 projects.length 可能还是旧值，因为状态更新是异步的
-    });
+    fetchProjects();
   }, [fetchProjects]);
-
-  // 监控 projects 变化
-  useEffect(() => {
-    console.log('[Header] projects 变化:', projects.length, 'items');
-  }, [projects]);
-
-  // 监控 selectedProjectIds 变化
-  useEffect(() => {
-    console.log('[Header] selectedProjectIds 变化:', selectedProjectIds);
-  }, [selectedProjectIds]);
 
   // 用户菜单项
   const userMenuItems: MenuProps['items'] = [
@@ -160,7 +141,7 @@ const Header: React.FC = () => {
         
         {/* 项目选择器 - 移到左侧 */}
         <Dropdown
-          dropdownRender={() => projectDropdownContent}
+          popupRender={() => projectDropdownContent}
           trigger={['click']}
           open={dropdownVisible}
           onOpenChange={setDropdownVisible}

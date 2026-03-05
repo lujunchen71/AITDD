@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aitdd/backend/internal/database"
+	"github.com/aitdd/backend/internal/models"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -1513,15 +1515,72 @@ type ContractMapping struct {
 	ContractItem ContractDetailItem `json:"contractItem"` // 契约条目
 }
 
+// BugLogLevel 单个级别的问题列表
+type BugLogLevel struct {
+	Error   []string `json:"error"`
+	Warning []string `json:"warning"`
+}
+
 // BugLog Bug日志结构
 type BugLog struct {
-	Static  []string `json:"static"`
-	Dynamic []string `json:"dynamic"`
+	Static  BugLogLevel `json:"static"`
+	Dynamic BugLogLevel `json:"dynamic"`
+	Exe     BugLogLevel `json:"exe"`
 }
 
 // HasErrors 检查是否存在错误
 func (b *BugLog) HasErrors() bool {
-	return len(b.Static) > 0 || len(b.Dynamic) > 0
+	return len(b.Static.Error) > 0 || len(b.Dynamic.Error) > 0
+}
+
+// HasWarnings 检查是否存在警告
+func (b *BugLog) HasWarnings() bool {
+	return len(b.Static.Warning) > 0 || len(b.Dynamic.Warning) > 0
+}
+
+// HasIssues 检查是否存在任何问题（错误或警告）
+func (b *BugLog) HasIssues() bool {
+	return b.HasErrors() || b.HasWarnings()
+}
+
+// NewBugLog 创建带空切片的新 BugLog（避免 null 序列化问题）
+func NewBugLog() BugLog {
+	return BugLog{
+		Static:  BugLogLevel{Error: []string{}, Warning: []string{}},
+		Dynamic: BugLogLevel{Error: []string{}, Warning: []string{}},
+		Exe:     BugLogLevel{Error: []string{}, Warning: []string{}},
+	}
+}
+
+// ParseBugLog 解析 BugLog JSON 字符串，支持向后兼容
+func ParseBugLog(bugLogStr string) BugLog {
+	if bugLogStr == "" || bugLogStr == "{}" || bugLogStr == "null" {
+		return NewBugLog()
+	}
+	var bugLog BugLog
+	if err := json.Unmarshal([]byte(bugLogStr), &bugLog); err != nil {
+		return NewBugLog()
+	}
+	// 确保切片不为 nil
+	if bugLog.Static.Error == nil {
+		bugLog.Static.Error = []string{}
+	}
+	if bugLog.Static.Warning == nil {
+		bugLog.Static.Warning = []string{}
+	}
+	if bugLog.Dynamic.Error == nil {
+		bugLog.Dynamic.Error = []string{}
+	}
+	if bugLog.Dynamic.Warning == nil {
+		bugLog.Dynamic.Warning = []string{}
+	}
+	if bugLog.Exe.Error == nil {
+		bugLog.Exe.Error = []string{}
+	}
+	if bugLog.Exe.Warning == nil {
+		bugLog.Exe.Warning = []string{}
+	}
+	return bugLog
 }
 
 // groupIssuesByResource 按资源路径分组编译问题
@@ -1656,7 +1715,135 @@ func (s *MCPServer) handleCompileStaticImpl(ctx context.Context, request mcp.Cal
 		return mcp.NewToolResultError(fmt.Sprintf("序列化结果失败: %v", err)), nil
 	}
 
+	// 将静态编译结果写入数据库 bug_log.static
+	// 只覆盖被编译范围内的资源（仅更新 static 字段，保留 dynamic 和 exe 字段）
+	go s.writeStaticBugLogToDB(pathName, result.Errors, result.Warnings)
+
 	return mcp.NewToolResultText(string(data)), nil
+}
+
+// writeStaticBugLogToDB 将静态编译错误/警告写入数据库的 bug_log.static 字段
+// 仅覆盖被编译范围内资源的 static 字段，保留 dynamic 和 exe 字段不变
+func (s *MCPServer) writeStaticBugLogToDB(compiledPathName string, errors []CompileIssue, warnings []CompileIssue) {
+	if database.DB == nil {
+		return
+	}
+
+	// 按路径名收集 static error 和 warning
+	taskStaticErrors := make(map[string][]string)
+	taskStaticWarnings := make(map[string][]string)
+	moduleStaticErrors := make(map[string][]string)
+	moduleStaticWarnings := make(map[string][]string)
+
+	for _, issue := range errors {
+		if issue.ResourcePathName == "" {
+			continue
+		}
+		if issue.ResourceType == "task" {
+			taskStaticErrors[issue.ResourcePathName] = append(taskStaticErrors[issue.ResourcePathName], issue.Message)
+		} else if issue.ResourceType == "module" {
+			moduleStaticErrors[issue.ResourcePathName] = append(moduleStaticErrors[issue.ResourcePathName], issue.Message)
+		}
+	}
+	for _, issue := range warnings {
+		if issue.ResourcePathName == "" {
+			continue
+		}
+		if issue.ResourceType == "task" {
+			taskStaticWarnings[issue.ResourcePathName] = append(taskStaticWarnings[issue.ResourcePathName], issue.Message)
+		} else if issue.ResourceType == "module" {
+			moduleStaticWarnings[issue.ResourcePathName] = append(moduleStaticWarnings[issue.ResourcePathName], issue.Message)
+		}
+	}
+
+	// 确定需要更新的任务范围（被编译范围内的所有任务）
+	var taskPathNames []string
+	var modulePathNames []string
+	pathParts := strings.Split(compiledPathName, "/")
+	if len(pathParts) == 1 {
+		// 项目级别：查询项目下所有任务
+		var tasks []models.Task
+		database.DB.Joins("JOIN modules ON modules.id = tasks.module_id").
+			Joins("JOIN projects ON projects.id = modules.project_id").
+			Where("projects.path_name = ?", compiledPathName).
+			Select("tasks.path_name").Find(&tasks)
+		for _, t := range tasks {
+			taskPathNames = append(taskPathNames, t.PathName)
+		}
+		// 项目级别同时更新模块
+		var modules []models.Module
+		database.DB.Joins("JOIN projects ON projects.id = modules.project_id").
+			Where("projects.path_name = ? AND modules.path_name IS NOT NULL", compiledPathName).
+			Select("modules.path_name").Find(&modules)
+		for _, m := range modules {
+			modulePathNames = append(modulePathNames, m.PathName)
+		}
+	} else if len(pathParts) == 2 {
+		// 模块级别：查询模块下所有任务
+		var tasks []models.Task
+		database.DB.Joins("JOIN modules ON modules.id = tasks.module_id").
+			Where("modules.path_name = ?", compiledPathName).
+			Select("tasks.path_name").Find(&tasks)
+		for _, t := range tasks {
+			taskPathNames = append(taskPathNames, t.PathName)
+		}
+		modulePathNames = append(modulePathNames, compiledPathName)
+	} else {
+		// 任务级别
+		taskPathNames = append(taskPathNames, compiledPathName)
+	}
+
+	// 更新 task 的 bug_log.static
+	for _, taskPathName := range taskPathNames {
+		var task models.Task
+		if err := database.DB.Where("path_name = ?", taskPathName).First(&task).Error; err != nil {
+			continue
+		}
+		// 读取现有 bugLog，只更新 static 字段
+		existingBugLog := ParseBugLog(task.BugLog)
+		existingBugLog.Static.Error = taskStaticErrors[taskPathName]
+		if existingBugLog.Static.Error == nil {
+			existingBugLog.Static.Error = []string{}
+		}
+		existingBugLog.Static.Warning = taskStaticWarnings[taskPathName]
+		if existingBugLog.Static.Warning == nil {
+			existingBugLog.Static.Warning = []string{}
+		}
+		bugLogBytes, err := json.Marshal(existingBugLog)
+		if err != nil {
+			continue
+		}
+		database.DB.Model(&task).Updates(map[string]interface{}{
+			"bug_log":    string(bugLogBytes),
+			"updated_at": time.Now().UnixMilli(),
+		})
+	}
+
+	// 更新 module 的 bug_log.static
+	for _, modPathName := range modulePathNames {
+		var module models.Module
+		if err := database.DB.Where("path_name = ?", modPathName).First(&module).Error; err != nil {
+			continue
+		}
+		// 读取现有 bugLog，只更新 static 字段
+		existingBugLog := ParseBugLog(module.BugLog)
+		existingBugLog.Static.Error = moduleStaticErrors[modPathName]
+		if existingBugLog.Static.Error == nil {
+			existingBugLog.Static.Error = []string{}
+		}
+		existingBugLog.Static.Warning = moduleStaticWarnings[modPathName]
+		if existingBugLog.Static.Warning == nil {
+			existingBugLog.Static.Warning = []string{}
+		}
+		bugLogBytes, err := json.Marshal(existingBugLog)
+		if err != nil {
+			continue
+		}
+		database.DB.Model(&module).Updates(map[string]interface{}{
+			"bug_log":    string(bugLogBytes),
+			"updated_at": time.Now().UnixMilli(),
+		})
+	}
 }
 
 // compileStaticProject 项目级别静态编译
@@ -2167,27 +2354,6 @@ func (s *MCPServer) compileStaticTaskFromData(task map[string]interface{}, modul
 		})
 	}
 
-	// E-S-02: 检查 Bug 日志（使用新的 BugLog 结构）
-	bugLogStr, _ := task["bugLog"].(string)
-	if bugLogStr != "" && bugLogStr != "{}" && bugLogStr != "null" {
-		var bugLog BugLog
-		if err := json.Unmarshal([]byte(bugLogStr), &bugLog); err == nil {
-			if bugLog.HasErrors() {
-				result.Errors = append(result.Errors, CompileIssue{
-					RuleID:           "E-S-02",
-					RuleName:         "存在Bug日志",
-					ResourceType:     "task",
-					ResourceName:     taskName,
-					ResourcePathName: taskPathName,
-					Message:          fmt.Sprintf("任务 [%s] 存在未解决的Bug - static: %d, dynamic: %d",
-						taskName, len(bugLog.Static), len(bugLog.Dynamic)),
-					Suggestion:       "请解决Bug后清除日志",
-					Severity:         "error",
-				})
-			}
-		}
-	}
-
 	// E-S-03: 检查人工协助
 	humanAssistance, _ := task["humanAssistance"].(string)
 	if humanAssistance != "" && humanAssistance != "{}" && humanAssistance != "null" {
@@ -2410,35 +2576,13 @@ func (s *MCPServer) checkDownstreamContract(task map[string]interface{}, taskPat
 }
 
 // checkStatusAnomaly 检查状态异常 (E-S-08)
+// 注意：E-S-08 规则已移除 bugLog 检查，bugLog 用于记录运行时问题，不应作为静态编译错误
+// 保留此函数以供未来添加其他状态异常检查
 func (s *MCPServer) checkStatusAnomaly(task map[string]interface{}, taskPathName string, result *CompileStaticResult) {
-	taskName, _ := task["name"].(string)
-	status, _ := task["status"].(string)
-
-	// 只检查已完成状态的任务
-	if status != "completed" {
-		return
-	}
-
-	// 检查 bugLog
-	bugLogStr, _ := task["bugLog"].(string)
-	if bugLogStr != "" && bugLogStr != "{}" && bugLogStr != "null" {
-		var bugLog BugLog
-		if err := json.Unmarshal([]byte(bugLogStr), &bugLog); err == nil {
-			if bugLog.HasErrors() {
-				result.Errors = append(result.Errors, CompileIssue{
-					RuleID:           "E-S-08",
-					RuleName:         "已完成任务存在Bug",
-					ResourceType:     "task",
-					ResourceName:     taskName,
-					ResourcePathName: taskPathName,
-					Message:          fmt.Sprintf("任务 [%s] 已完成但存在未解决的Bug - static: %d, dynamic: %d",
-						taskName, len(bugLog.Static), len(bugLog.Dynamic)),
-					Suggestion:       "请解决Bug后清除日志或将状态改为非完成状态",
-					Severity:         "error",
-				})
-			}
-		}
-	}
+	// 当前无检查逻辑，保留函数结构以供未来扩展
+	_ = task       // 避免未使用警告
+	_ = taskPathName // 避免未使用警告
+	_ = result     // 避免未使用警告
 }
 
 // findTaskPathByName 根据任务名称或路径查找任务路径
@@ -2541,11 +2685,11 @@ func buildContractMappingTable(allTasks []TaskWithModulePath, errors *[]CompileI
 				// 报错: 任务的上游契约未找到提供方
 				*errors = append(*errors, CompileIssue{
 					RuleID:           "E-S-07",
-					RuleName:         "契约不一致-上游契约未找到提供方",
+					RuleName:         "契约不一致",
 					ResourceType:     "task",
 					ResourcePathName: taskPath,
-					Message:          fmt.Sprintf("上游契约 [Label:%s, API:%s, From:%s] 未找到提供方", upItem.Label, upItem.ContractAPI, upItem.From),
-					Suggestion:       "请检查上游任务的下游契约是否定义了此接口，或在上游合理位置补充契约定义",
+					Message:          fmt.Sprintf("当前任务上游契约值 [Label:%s, API:%s, From:%s] 未找到提供方", upItem.Label, upItem.ContractAPI, upItem.From),
+					Suggestion:       "请找到一个合理的提供方task并在其下游契约中添加同样的契约值",
 					Severity:         "error",
 				})
 			}
@@ -2574,11 +2718,11 @@ func buildContractMappingTable(allTasks []TaskWithModulePath, errors *[]CompileI
 				// 报错: 任务的下游契约未找到消费方
 				*errors = append(*errors, CompileIssue{
 					RuleID:           "E-S-07",
-					RuleName:         "契约不一致-下游契约未找到消费方",
+					RuleName:         "契约不一致",
 					ResourceType:     "task",
 					ResourcePathName: taskPath,
-					Message:          fmt.Sprintf("下游契约 [Label:%s, API:%s, From:%s] 未找到消费方", downItem.Label, downItem.ContractAPI, downItem.From),
-					Suggestion:       "请检查下游任务的上游契约是否定义了此接口，或在下游合理位置补充契约定义",
+					Message:          fmt.Sprintf("当前任务下游契约值 [Label:%s, API:%s, From:%s] 未找到消费方", downItem.Label, downItem.ContractAPI, downItem.From),
+					Suggestion:       "请找到一个合理的消费方task并在其上游契约中添加同样的契约值",
 					Severity:         "error",
 				})
 			}
@@ -2829,7 +2973,11 @@ type CompileDynamicError struct {
 // 支持三种分析类型：task（任务）、module（模块）、project（项目）
 // 编译完成后可选择性地执行AI分析
 func (s *MCPServer) handleCompileDynamicImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	pathName, ok := getParam(request, "pathName")
+	// 优先使用 compilePathName 参数，兼容旧的 pathName 参数
+	pathName, ok := getParam(request, "compilePathName")
+	if !ok || pathName == "" {
+		pathName, ok = getParam(request, "pathName") // 兼容旧参数名
+	}
 	if !ok || pathName == "" {
 		pathName = s.configManager.GetProjectPathName()
 	}
@@ -2943,21 +3091,17 @@ func (s *MCPServer) handleCompileDynamicImpl(ctx context.Context, request mcp.Ca
 
 	// 如果传入了sub_agent_config和qa_config，则使用RunAIAnalysisForCompile执行AI分析
 	// 直接传递 tasks 列表，不再依赖数字 ID
+	// 使用 pathName 作为项目名称（报告标题）
 	subAgentConfigRaw, hasSubAgentConfig := getParamAny(request, "sub_agent_config")
 	qaConfigRaw, hasQAConfig := getParamAny(request, "qa_config")
 	if hasSubAgentConfig && hasQAConfig && subAgentConfigRaw != nil && qaConfigRaw != nil {
-		projectName, _ := getParam(request, "project_name")
-		if projectName == "" {
-			projectName = pathName
-		}
-
 		output.WriteString("\n## AI设计合理性分析\n\n")
-		aiReport, err := RunAIAnalysisForCompile(ctx, projectName, subAgentConfigRaw, qaConfigRaw, tasks)
+		aiReport, err := RunAIAnalysisForCompile(ctx, pathName, subAgentConfigRaw, qaConfigRaw, tasks)
 		if err != nil {
-			output.WriteString(fmt.Sprintf("AI分析出错: %v\n", err))
-		} else {
-			output.WriteString(aiReport)
+			// 返回工具错误，让 AI 感知到错误并重试（而不是仅写入输出字符串）
+			return mcp.NewToolResultError(fmt.Sprintf("AI设计合理性分析失败: %v", err)), nil
 		}
+		output.WriteString(aiReport)
 	}
 
 	return mcp.NewToolResultText(output.String()), nil

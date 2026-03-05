@@ -246,11 +246,8 @@ data 可选字段:
 - name, description, status, prompt: string
 - upstreamContractDetail/downstreamContractDetail: {title, list:[{label:str,contract_api:str,from:str}]}, from含义：这个函数定义的来源("projectName/moduleName/taskName")
 - tests: [{target:string, api:string}]
-- testResult/codePaths/bugLog: string[]
 - humanAssistance: object
 - issueDetails: string`),
-
-
 
 		mcp.WithArray("operations", mcp.Description("批量操作数组，每项: {pathName: string, version: number, data: object}"), mcp.Required()),
 	), s.handleModifyTask)
@@ -359,12 +356,11 @@ func (s *MCPServer) registerCompileTools() {
 
 	// compile_dynamic - 动态编译
 	s.server.AddTool(mcp.NewTool("compile_dynamic",
-		mcp.WithDescription("动态编译：执行实际代码生成、测试运行等，生成执行报告。支持在编译后执行AI设计合理性分析。"),
-		mcp.WithString("pathName", mcp.Description("项目或模块 pathName"), mcp.Required()),
+		mcp.WithDescription("动态编译：执行实际代码生成、测试运行等，生成执行报告，并执行AI设计合理性分析。\n\n【重要】调用前必须先读取以下两个配置文件的内容：\n- 项目根目录 .aitdd/qa.json → 传入 qa_config 参数\n- 项目根目录 .aitdd/sub_agent.json → 传入 sub_agent_config 参数\n\n步骤：1. 读取 .aitdd/qa.json 文件内容；2. 读取 .aitdd/sub_agent.json 文件内容；3. 将两个文件内容分别作为 qa_config 和 sub_agent_config 参数传入本工具。"),
+		mcp.WithString("compilePathName", mcp.Description("编译目标路径名称（项目/模块/任务的 pathName），例如：PYQT6Calculator 或 PYQT6Calculator/主界面模块")),
 		mcp.WithBoolean("runTests", mcp.Description("是否运行测试")),
-		mcp.WithString("project_name", mcp.Description("项目名称（用于AI分析报告展示）")),
-		mcp.WithObject("sub_agent_config", mcp.Description("AI子代理配置，请从项目根目录 .aitdd/sub_agent.json 文件读取内容后传入")),
-		mcp.WithObject("qa_config", mcp.Description("分析问题配置，请从项目根目录 .aitdd/qa.json 文件读取内容后传入")),
+		mcp.WithObject("qa_config", mcp.Description("【必填】分析问题配置。调用前必须先读取项目根目录 .aitdd/qa.json 文件，将其完整 JSON 内容作为此参数传入。"), mcp.Required()),
+		mcp.WithObject("sub_agent_config", mcp.Description("【必填】AI子代理配置。调用前必须先读取项目根目录 .aitdd/sub_agent.json 文件，将其完整 JSON 内容作为此参数传入。"), mcp.Required()),
 	), s.handleCompileDynamic)
 }
 

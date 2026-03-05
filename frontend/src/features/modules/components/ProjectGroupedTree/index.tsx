@@ -182,7 +182,7 @@ const ModuleTreeByProject: React.FC<ModuleTreeByProjectProps> = ({
                   setSelectedModuleForMenu(null);
                 }
               }}
-              destroyPopupOnHide
+              destroyOnHidden
             >
               <Button
                 type="text"
@@ -324,7 +324,7 @@ const ModuleTreeByProject: React.FC<ModuleTreeByProjectProps> = ({
                       setSelectedTaskForMenu(null);
                     }
                   }}
-                  destroyPopupOnHide
+                  destroyOnHidden
                 >
                   <Button
                     type="text"

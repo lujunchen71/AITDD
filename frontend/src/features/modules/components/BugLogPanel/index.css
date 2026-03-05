@@ -1,0 +1,362 @@
+.buglog-panel {
+  position: fixed;
+  width: 500px;
+  background: #1a1a2e;
+  border: 1px solid #3d3d5c;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.buglog-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #3d3d5c;
+  background: #12122a;
+  border-radius: 8px 8px 0 0;
+  flex-shrink: 0;
+}
+
+.buglog-panel-title {
+  color: #e0e0e0;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.buglog-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  color: #c0c0c0;
+}
+
+/* 滚动条样式 */
+.buglog-panel-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.buglog-panel-content::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+.buglog-panel-content::-webkit-scrollbar-thumb {
+  background: #3d3d5c;
+  border-radius: 3px;
+}
+
+.buglog-panel-content::-webkit-scrollbar-thumb:hover {
+  background: #5d5d7c;
+}
+
+/* 项目级统计卡片 */
+.buglog-project-stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #12122a;
+  border: 1px solid #2d2d44;
+  border-radius: 6px;
+}
+
+.buglog-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.buglog-stat-number {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.buglog-stat-label {
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.buglog-stat-number.error {
+  color: #ff4d4f;
+}
+
+.buglog-stat-number.warn {
+  color: #fa8c16;
+}
+
+.buglog-stat-number.info {
+  color: #1890ff;
+}
+
+/* 趋势信息 */
+.buglog-trend {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  background: #12122a;
+  border-radius: 4px;
+  border-left: 3px solid #3d3d5c;
+}
+
+/* 模块列表 */
+.buglog-module-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.buglog-module-item {
+  background: #12122a;
+  border: 1px solid #2d2d44;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.buglog-module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  user-select: none;
+}
+
+.buglog-module-header:hover {
+  background: #1e1e3a;
+}
+
+.buglog-module-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c0c0c0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buglog-module-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.buglog-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.buglog-badge.error {
+  background: rgba(255, 77, 79, 0.2);
+  color: #ff4d4f;
+  border: 1px solid rgba(255, 77, 79, 0.4);
+}
+
+.buglog-badge.warn {
+  background: rgba(250, 140, 22, 0.2);
+  color: #fa8c16;
+  border: 1px solid rgba(250, 140, 22, 0.4);
+}
+
+.buglog-badge.info {
+  background: rgba(24, 144, 255, 0.2);
+  color: #1890ff;
+  border: 1px solid rgba(24, 144, 255, 0.4);
+}
+
+.buglog-expand-icon {
+  color: #555;
+  font-size: 11px;
+  margin-left: 6px;
+  transition: transform 0.2s;
+}
+
+.buglog-expand-icon.expanded {
+  transform: rotate(180deg);
+}
+
+/* 任务列表 */
+.buglog-task-list {
+  border-top: 1px solid #2d2d44;
+  padding: 6px 0;
+}
+
+/* 任务行包装器（含展开区域） */
+.buglog-task-item-wrapper {
+  border-bottom: 1px solid #1e1e36;
+}
+
+.buglog-task-item-wrapper:last-child {
+  border-bottom: none;
+}
+
+.buglog-task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px 5px 24px;
+  transition: background 0.1s;
+}
+
+.buglog-task-item.clickable {
+  cursor: pointer;
+}
+
+.buglog-task-item:hover {
+  background: #1a1a36;
+}
+
+/* 任务详情展开区域 */
+.buglog-task-detail {
+  padding: 4px 12px 8px 24px;
+  background: #0d0d1e;
+  border-top: 1px solid #1e1e36;
+}
+
+/* BugLog section（静态/动态/执行） */
+.buglog-section {
+  margin-bottom: 6px;
+}
+
+.buglog-section:last-child {
+  margin-bottom: 0;
+}
+
+.buglog-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+  margin-top: 6px;
+}
+
+/* 错误/警告消息条目 */
+.buglog-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  margin-bottom: 2px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.buglog-message.error {
+  background: rgba(255, 77, 79, 0.08);
+  color: #ff7875;
+}
+
+.buglog-message.warn {
+  background: rgba(250, 140, 22, 0.08);
+  color: #ffa940;
+}
+
+.buglog-message.info {
+  background: rgba(24, 144, 255, 0.08);
+  color: #69c0ff;
+}
+
+.buglog-msg-level {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.buglog-msg-text {
+  flex: 1;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* issueDetails 区域 */
+.buglog-issue-details {
+  margin-top: 6px;
+  border-top: 1px dashed #2d2d44;
+  padding-top: 4px;
+}
+
+.buglog-task-name {
+  font-size: 12px;
+  color: #a0a0a0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.buglog-task-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.buglog-issue-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 77, 79, 0.3);
+  color: #ff4d4f;
+  font-size: 9px;
+  font-weight: 700;
+  border: 1px solid rgba(255, 77, 79, 0.5);
+  margin-left: 2px;
+  cursor: default;
+}
+
+/* 空状态 */
+.buglog-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  color: #555;
+  font-size: 13px;
+}
+
+.buglog-empty-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+/* Ant Design 覆盖 */
+.buglog-panel .ant-typography {
+  color: #c0c0c0 !important;
+}
+
+.buglog-panel .ant-divider {
+  border-color: #3d3d5c !important;
+  margin: 10px 0 !important;
+}

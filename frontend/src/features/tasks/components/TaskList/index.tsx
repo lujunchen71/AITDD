@@ -235,7 +235,7 @@ const TaskList: React.FC<TaskListProps> = ({
       {filteredTasks.length === 0 ? (
         <Empty 
           description="暂无任务" 
-          imageStyle={{ opacity: 0.5 }}
+          styles={{ image: { opacity: 0.5 } }}
           style={{ padding: '40px 0' }}
         />
       ) : (

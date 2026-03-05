@@ -1,0 +1,157 @@
+.property-panel {
+  position: fixed;
+  width: 500px;
+  background: #1a1a2e;
+  border: 1px solid #3d3d5c;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.property-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #3d3d5c;
+  background: #12122a;
+  border-radius: 8px 8px 0 0;
+  flex-shrink: 0;
+}
+
+.property-panel-title {
+  color: #e0e0e0;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.property-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  color: #c0c0c0;
+}
+
+/* 滚动条样式 */
+.property-panel-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.property-panel-content::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+.property-panel-content::-webkit-scrollbar-thumb {
+  background: #3d3d5c;
+  border-radius: 3px;
+}
+
+.property-panel-content::-webkit-scrollbar-thumb:hover {
+  background: #5d5d7c;
+}
+
+/* Ant Design 组件样式覆盖（深色主题） */
+.property-panel .ant-descriptions-item-label {
+  color: #888 !important;
+  font-size: 12px;
+}
+
+.property-panel .ant-descriptions-item-content {
+  color: #e0e0e0 !important;
+  font-size: 12px;
+}
+
+.property-panel .ant-divider {
+  border-color: #3d3d5c !important;
+  margin: 10px 0 !important;
+}
+
+.property-panel .ant-typography {
+  color: #c0c0c0 !important;
+}
+
+.property-panel .ant-statistic-title {
+  color: #888 !important;
+  font-size: 12px;
+}
+
+.property-panel .ant-statistic-content {
+  color: #e0e0e0 !important;
+  font-size: 18px;
+}
+
+.property-panel .ant-list-item {
+  border-color: #3d3d5c !important;
+  color: #c0c0c0;
+  padding: 6px 0 !important;
+}
+
+.property-panel .ant-tag {
+  font-size: 11px;
+}
+
+.property-panel .ant-card {
+  background: #12122a !important;
+  border-color: #3d3d5c !important;
+}
+
+.property-panel .ant-card-body {
+  padding: 10px !important;
+}
+
+.property-panel .ant-empty-description {
+  color: #666 !important;
+}
+
+.property-panel .ant-table {
+  background: transparent !important;
+}
+
+.property-panel .ant-table-thead > tr > th {
+  background: #12122a !important;
+  color: #888 !important;
+  border-color: #3d3d5c !important;
+  font-size: 12px;
+}
+
+.property-panel .ant-table-tbody > tr > td {
+  background: transparent !important;
+  color: #c0c0c0 !important;
+  border-color: #3d3d5c !important;
+  font-size: 12px;
+}
+
+.property-panel .ant-table-tbody > tr:hover > td {
+  background: #2d2d44 !important;
+}
+
+.property-panel .ant-collapse {
+  background: transparent !important;
+  border-color: #3d3d5c !important;
+}
+
+.property-panel .ant-collapse-header {
+  color: #c0c0c0 !important;
+  font-size: 12px;
+}
+
+.property-panel .ant-collapse-content {
+  background: #12122a !important;
+  border-color: #3d3d5c !important;
+  color: #c0c0c0 !important;
+}
+
+/* 代码块样式 */
+.property-panel .ant-typography code {
+  background: #0f0f23 !important;
+  color: #00d9ff !important;
+  border-color: #3d3d5c !important;
+  font-size: 11px;
+}

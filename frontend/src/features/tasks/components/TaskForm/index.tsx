@@ -148,7 +148,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
       onCancel={onCancel}
       confirmLoading={loading}
       width={800}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form
         form={form}

@@ -12,6 +12,7 @@ type Project struct {
 	Name         string `json:"name" gorm:"not null;type:text"`
 	PathName     string `json:"pathName" gorm:"unique;type:text"`
 	Constitution string `json:"constitution" gorm:"type:text"`
+	BugLog       string `json:"bugLog" gorm:"column:bug_log;type:text"` // JSON: BugLog 结构
 	CreatedAt    int64  `json:"createdAt" gorm:"not null"`
 	UpdatedAt    int64  `json:"updatedAt" gorm:"not null"`
 	Version      int    `json:"version" gorm:"not null;default:1"`

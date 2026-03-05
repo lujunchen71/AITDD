@@ -157,8 +157,6 @@ func (e *RuleEngine) getDefaultConfig() *RuleConfig {
 					{ID: "D-02", Name: "孤立任务检测", Description: "检测没有依赖关系的孤立任务", Severity: "warning", Enabled: true},
 					{ID: "D-03", Name: "契约一致性检查", Description: "检查上下游契约是否匹配", Severity: "error", Enabled: true},
 					{ID: "D-04", Name: "任务状态一致性", Description: "检查任务状态与依赖关系是否一致", Severity: "warning", Enabled: true},
-					{ID: "D-05", Name: "Bug日志检测", Description: "检测是否有未解决的Bug", Severity: "warning", Enabled: true},
-					{ID: "D-06", Name: "Issue详情检测", Description: "检测是否有未处理的Issue", Severity: "warning", Enabled: true},
 					{ID: "D-07", Name: "测试失败检测", Description: "检测测试是否失败", Severity: "error", Enabled: true},
 					{ID: "D-08", Name: "阻塞任务检测", Description: "检测被阻塞的任务", Severity: "warning", Enabled: true},
 				},
@@ -258,10 +256,6 @@ func (e *RuleEngine) executeDynamicChecks(module map[string]interface{}, tasks [
 		switch rule.ID {
 		case "D-02":
 			e.checkOrphanTasks(tasks, module, rule, report)
-		case "D-05":
-			e.checkBugLog(tasks, module, rule, report)
-		case "D-06":
-			e.checkIssueDetails(tasks, module, rule, report)
 		case "D-07":
 			e.checkTestResult(tasks, module, rule, report)
 		case "D-08":
@@ -409,48 +403,6 @@ func (e *RuleEngine) checkOrphanTasks(tasks []map[string]interface{}, module map
 	for _, task := range tasks {
 		// 这里可以添加更复杂的依赖检查逻辑
 		_ = task // 占位
-	}
-}
-
-func (e *RuleEngine) checkBugLog(tasks []map[string]interface{}, module map[string]interface{}, rule Rule, report *CheckReport) {
-	for _, task := range tasks {
-		bugLog := getString(task, "bugLog")
-		if bugLog != "" && bugLog != "[]" {
-			result := CheckResult{
-				RuleID:       rule.ID,
-				RuleName:     rule.Name,
-				Severity:     rule.Severity,
-				ResourceType: "task",
-				ResourceID:   getString(task, "id"),
-				ResourceName: getString(task, "name"),
-				ModuleID:     getString(module, "id"),
-				ModuleName:   getString(module, "name"),
-				Message:      "任务存在未解决的Bug记录",
-				Suggestion:   "检查并解决Bug记录中的问题",
-			}
-			e.addResult(report, result)
-		}
-	}
-}
-
-func (e *RuleEngine) checkIssueDetails(tasks []map[string]interface{}, module map[string]interface{}, rule Rule, report *CheckReport) {
-	for _, task := range tasks {
-		issueDetails := getString(task, "issueDetails")
-		if issueDetails != "" {
-			result := CheckResult{
-				RuleID:       rule.ID,
-				RuleName:     rule.Name,
-				Severity:     rule.Severity,
-				ResourceType: "task",
-				ResourceID:   getString(task, "id"),
-				ResourceName: getString(task, "name"),
-				ModuleID:     getString(module, "id"),
-				ModuleName:   getString(module, "name"),
-				Message:      "任务存在未处理的Issue详情",
-				Suggestion:   "检查并处理Issue详情中的问题",
-			}
-			e.addResult(report, result)
-		}
 	}
 }
 
