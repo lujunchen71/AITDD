@@ -157,12 +157,28 @@ export const useProjectStore = create<ProjectState>()(
         set({ isLoading: true, error: null });
         
         try {
-          // 先尝试获取所有项目
+          // 先通过 /project 接口获取当前项目（根据 .aitdd/project.json 的 pathName 匹配）
+          const projectResponse = await api.get<{ project: Project | null }>('/project');
+          const currentProject = projectResponse.data?.project;
+          
+          // 再获取所有项目列表
           const response = await api.get<{ projects: Project[], total: number }>('/projects');
           const projects = response.data?.projects || [];
           
+          if (currentProject) {
+            const projectId = (currentProject as any).ID || (currentProject as any).id || currentProject.id;
+            set({
+              projectId,
+              project: currentProject,
+              projects: projects,
+              isLoading: false,
+              isInitialized: true,
+            });
+            return;
+          }
+          
           if (projects.length > 0) {
-            // 项目已存在，使用第一个项目作为当前项目
+            // fallback: 使用第一个项目
             const project = projects[0];
             const projectId = (project as any).ID || (project as any).id || project.id;
             

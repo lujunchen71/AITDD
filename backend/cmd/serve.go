@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/aitdd/backend/internal/database"
+	"github.com/aitdd/backend/internal/mcp"
 	"github.com/aitdd/backend/internal/server"
 	"github.com/aitdd/backend/internal/services"
 	"github.com/spf13/cobra"
@@ -30,8 +31,9 @@ func init() {
 }
 
 func runServe(cmd *cobra.Command, args []string) {
-	// 加载配置
-	configService := services.NewConfigService(".aitdd/project.json")
+	// 加载配置（向上查找 .aitdd/project.json，支持从 backend/ 子目录运行）
+	configPath := mcp.FindProjectConfigPath()
+	configService := services.NewConfigService(configPath)
 	config, err := configService.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "加载配置失败: %v\n", err)

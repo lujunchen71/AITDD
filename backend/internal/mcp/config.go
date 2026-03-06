@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -28,6 +29,11 @@ type ConfigManager struct {
 var globalConfigManager *ConfigManager
 var configOnce sync.Once
 
+// FindProjectConfigPath 从当前目录向上查找项目配置文件路径（供外部包使用）
+func FindProjectConfigPath() string {
+	return findProjectConfigPath()
+}
+
 // findProjectConfigPath 从当前目录向上查找项目配置文件路径
 func findProjectConfigPath() string {
 	// 首先检查环境变量
@@ -41,7 +47,8 @@ func findProjectConfigPath() string {
 		return ".aitdd/project.json"
 	}
 
-	// 从当前目录向上查找.aitdd目录
+	// 从当前目录向上查找.aitdd/project.json文件
+	// 只有在找到 project.json 文件时才停止，避免因为存在 .aitdd 目录（如 compile/）就误停
 	dir := cwd
 	for {
 		configPath := filepath.Join(dir, ".aitdd", "project.json")
@@ -49,16 +56,10 @@ func findProjectConfigPath() string {
 			return configPath
 		}
 
-		// 检查.aitdd目录是否存在
-		aitddDir := filepath.Join(dir, ".aitdd")
-		if _, err := os.Stat(aitddDir); err == nil {
-			return configPath
-		}
-
 		// 向上一级目录
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			// 已经到达根目录，使用当前工作目录
+			// 已经到达根目录，使用当前工作目录下的 .aitdd/project.json
 			return filepath.Join(cwd, ".aitdd", "project.json")
 		}
 		dir = parent
@@ -257,4 +258,26 @@ func (cm *ConfigManager) GetProjectName() string {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 	return cm.config.ProjectName
+}
+
+// ValidatePathBelongsToProject 验证给定的 pathName 是否属于当前项目
+// 返回空字符串表示验证通过，非空字符串为错误信息
+// 如果 currentProjectPathName 为空（未配置项目），跳过验证并返回空字符串
+func (cm *ConfigManager) ValidatePathBelongsToProject(pathName string) string {
+	currentProjectPathName := cm.GetProjectPathName()
+	if currentProjectPathName == "" {
+		return "" // 未配置项目，跳过验证
+	}
+	if pathName == "" {
+		return "" // 空路径，跳过验证（各接口自行处理必填校验）
+	}
+	// 提取路径第一段
+	firstSegment := pathName
+	if idx := strings.Index(pathName, "/"); idx >= 0 {
+		firstSegment = pathName[:idx]
+	}
+	if firstSegment != currentProjectPathName {
+		return fmt.Sprintf("路径 %q 不属于当前项目 %q，拒绝操作以防止误修改其他项目数据", pathName, currentProjectPathName)
+	}
+	return ""
 }

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/aitdd/backend/internal/database"
+	"github.com/aitdd/backend/internal/mcp"
 	"github.com/aitdd/backend/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -80,11 +81,25 @@ func CreateProject(c *gin.Context) {
 	})
 }
 
-// GetProject 获取项目信息
+// GetProject 获取当前项目信息（根据 .aitdd/project.json 中的 pathName 查找）
 func GetProject(c *gin.Context) {
 	var project models.Project
 
-	// 获取第一个项目（单项目模式）
+	// 从 .aitdd/project.json 获取当前项目的 pathName
+	configManager := mcp.GetConfigManager()
+	config := configManager.GetConfig()
+	if config != nil && config.PathName != "" {
+		// 按 pathName 查找对应项目
+		result := database.DB.Where("path_name = ?", config.PathName).First(&project)
+		if result.Error == nil {
+			Success(c, gin.H{
+				"project": project,
+			})
+			return
+		}
+	}
+
+	// fallback: 获取第一个项目
 	result := database.DB.First(&project)
 	if result.Error != nil {
 		// 如果没有项目，返回空

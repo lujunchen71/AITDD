@@ -92,8 +92,12 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
     }
   }, [propertyPanelStore]);
 
-  // 从 projectStore 获取当前项目
-  const { project } = useProjectStore();
+  // 从 projectStore 获取当前项目（根据 modules 的 projectId 匹配，而不是默认的第一个项目）
+  const { projects, project: storeProject } = useProjectStore();
+  const currentProjectId = modules.length > 0 ? modules[0].projectId : null;
+  const project = currentProjectId
+    ? (projects.find(p => p.id === currentProjectId) || storeProject)
+    : storeProject;
 
   // 用于动态计算属性面板顶部位置的 ref（指向 top-right Panel 的容器 div）
   const topRightPanelRef = React.useRef<HTMLDivElement>(null);
@@ -1087,6 +1091,7 @@ const ModuleGraphView: React.FC<ModuleGraphViewProps> = ({
       {/* BugLog 面板悬浮层 - 与属性面板同位置，互斥显示 */}
       {bugLogPanelVisible && (
         <BugLogPanel
+          project={project as any}
           modules={modules}
           tasks={tasks}
           anchorRight={16}
