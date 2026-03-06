@@ -86,13 +86,21 @@ type targetAnalysisSummary struct {
 
 // ========== RunAIAnalysisForCompile 主入口 ==========
 
+// levelCompileResult 单级编译结果
+type levelCompileResult struct {
+	levelName   string                  // 级别名称：project/module/task
+	allResults  []*singleQuestionResult // 所有分析结果
+	hasErrors   bool                    // 是否有错误
+	errorReport string                  // 错误报告文本
+}
+
 // RunAIAnalysisForCompile 在compile_dynamic工具中执行AI分析
-// 新逻辑：
-//   - 对每个 task，对每个 qa_config.questions.task 问题，单独发一个 AI 请求
-//   - 对每个 module（从 tasks 中提取），对每个 qa_config.questions.module 问题，单独发一个 AI 请求
-//   - 对项目本身，对每个 qa_config.questions.project 问题，单独发一个 AI 请求
-//   - 所有请求并发执行（受 max_concurrent 控制）
-//   - 按目标聚合结果，生成报表
+// 新逻辑（分级并发，先大后小，有错误则停止）：
+//   - 第一级：project 级别，并发分析项目整体
+//   - 第二级：module 级别，并发分析所有模块
+//   - 第三级：task 级别，并发分析所有任务
+//   - 每级分析前：清空当前级别及下游的 buglog.dynamic 错误
+//   - 每级完成后：如有错误则写入 buglog 并返回，不继续下一级
 //
 // projectName: 项目名称（pathName格式）
 // subAgentConfigRaw: 来自参数的sub_agent配置（JSON字符串或map）
@@ -158,54 +166,148 @@ func RunAIAnalysisForCompile(ctx context.Context, projectName string, subAgentCo
 	// ========== 2. 提取项目信息 ==========
 	projectInfo := extractProjectInfo(tasks, projectName)
 
-	// ========== 3. 生成所有待执行的单问题任务 ==========
+	// ========== 3. 编译前清空所有层级的 buglog.dynamic 错误 ==========
+	clearDynamicBugLogForScope(projectName, tasks, moduleMap)
+
+	// ========== 4. 获取各级问题配置 ==========
 	taskQuestions := qaConfig.GetTaskQuestions()
 	moduleQuestions := qaConfig.GetModuleQuestions()
 	projectQuestions := qaConfig.GetProjectQuestions()
 
-	var jobs []*singleQuestionJob
+	logger.Info("开始分级并发AI分析（先大后小）", map[string]interface{}{
+		"task_count":        len(tasks),
+		"module_count":      len(moduleMap),
+		"max_concurrent":    maxConcurrent,
+		"task_questions":    len(taskQuestions),
+		"module_questions":  len(moduleQuestions),
+		"project_questions": len(projectQuestions),
+	})
 
-	// 3.1 task 问题
-	for _, taskData := range tasks {
-		taskPathName, _ := taskData["pathName"].(string)
-		taskName, _ := taskData["name"].(string)
-		if taskPathName == "" {
-			taskPathName = taskName
+	var outputParts []string
+	var allResults []*singleQuestionResult
+
+	// ========== 5. 第一级：project 级别 ==========
+	if len(projectQuestions) > 0 {
+		projectJobs := buildProjectJobs(projectName, projectInfo, moduleMap, tasks, projectQuestions, generator)
+		projectLevelResult := runLevelConcurrent(ctx, projectJobs, aiClient, generator, projectName, logger, maxConcurrent)
+		allResults = append(allResults, projectLevelResult.allResults...)
+
+		if projectLevelResult.hasErrors {
+			// project 级有错误，写入 buglog，返回错误信息，停止
+			writeDynamicBugLogForResults(projectName, tasks, moduleMap, projectLevelResult.allResults)
+			output := formatLevelErrorReport("🔴 第一级（项目级）编译发现错误，请先修复后再继续", projectLevelResult.errorReport)
+			return output, nil
 		}
+		outputParts = append(outputParts, "✅ 第一级（项目级）编译通过")
+	}
 
-		// 构建 task 上下文（含上游/下游任务信息、模块信息、项目信息）
-		taskContextStr := buildTaskContext(taskData, tasks, moduleMap, projectInfo, projectName)
+	// ========== 6. 第二级：module 级别 ==========
+	if len(moduleQuestions) > 0 && len(moduleMap) > 0 {
+		moduleJobs := buildModuleJobs(moduleMap, tasks, projectInfo, projectName, moduleQuestions, generator)
+		moduleLevelResult := runLevelConcurrent(ctx, moduleJobs, aiClient, generator, projectName, logger, maxConcurrent)
+		allResults = append(allResults, moduleLevelResult.allResults...)
 
-		for qi, q := range taskQuestions {
-			userPrompt := generator.BuildTaskSingleQuestionPrompt(taskData, taskContextStr, q)
-			systemPrompt := generator.BuildSystemPrompt(QuestionTypeTask)
+		if moduleLevelResult.hasErrors {
+			// module 级有错误，写入 buglog，返回错误信息，停止
+			writeDynamicBugLogForResults(projectName, tasks, moduleMap, moduleLevelResult.allResults)
+			output := formatLevelErrorReport("🔴 第二级（模块级）编译发现错误，请先修复后再继续", moduleLevelResult.errorReport)
+			return output, nil
+		}
+		outputParts = append(outputParts, fmt.Sprintf("✅ 第二级（模块级）编译通过，共 %d 个模块", len(moduleMap)))
+	}
 
-			jobs = append(jobs, &singleQuestionJob{
-				analysisType:   QuestionTypeTask,
-				targetPathName: taskPathName,
-				targetName:     taskName,
-				questionIndex:  qi,
-				question:       q,
-				systemPrompt:   systemPrompt,
-				userPrompt:     userPrompt,
-			})
+	// ========== 7. 第三级：task 级别 ==========
+	if len(taskQuestions) > 0 && len(tasks) > 0 {
+		taskJobs := buildTaskJobs(tasks, moduleMap, projectInfo, projectName, taskQuestions, generator)
+		taskLevelResult := runLevelConcurrent(ctx, taskJobs, aiClient, generator, projectName, logger, maxConcurrent)
+		allResults = append(allResults, taskLevelResult.allResults...)
+
+		if taskLevelResult.hasErrors {
+			// task 级有错误，写入 buglog，返回错误信息，停止
+			writeDynamicBugLogForResults(projectName, tasks, moduleMap, taskLevelResult.allResults)
+			output := formatLevelErrorReport("🔴 第三级（任务级）编译发现错误，请先修复后再继续", taskLevelResult.errorReport)
+			return output, nil
+		}
+		outputParts = append(outputParts, fmt.Sprintf("✅ 第三级（任务级）编译通过，共 %d 个任务", len(tasks)))
+	}
+
+	// ========== 8. 全部通过，生成完整报表 ==========
+	// 写入所有结果到 buglog（全部通过，只有 warnings）
+	writeDynamicBugLogForResults(projectName, tasks, moduleMap, allResults)
+
+	var analyzeErrors []string
+	for _, r := range allResults {
+		if r.err != "" {
+			analyzeErrors = append(analyzeErrors, r.err)
 		}
 	}
 
-	// 3.2 module 问题
+	output := formatNewCompileAIReport(
+		projectName,
+		tasks,
+		moduleMap,
+		projectInfo,
+		taskQuestions,
+		moduleQuestions,
+		projectQuestions,
+		allResults,
+		analyzeErrors,
+		maxConcurrent,
+	)
+
+	if len(outputParts) > 0 {
+		summary := strings.Join(outputParts, "\n") + "\n\n"
+		return summary + output, nil
+	}
+
+	return output, nil
+}
+
+// buildProjectJobs 构建 project 级别的分析任务
+func buildProjectJobs(
+	projectName string,
+	projectInfo map[string]interface{},
+	moduleMap map[string]map[string]interface{},
+	tasks []map[string]interface{},
+	projectQuestions []Question,
+	generator *AnalysisGenerator,
+) []*singleQuestionJob {
+	var jobs []*singleQuestionJob
+	for qi, q := range projectQuestions {
+		userPrompt := generator.BuildProjectSingleQuestionPrompt(projectInfo, moduleMap, tasks, q)
+		systemPrompt := generator.BuildSystemPrompt(QuestionTypeProject)
+		jobs = append(jobs, &singleQuestionJob{
+			analysisType:   QuestionTypeProject,
+			targetPathName: projectName,
+			targetName:     projectName,
+			questionIndex:  qi,
+			question:       q,
+			systemPrompt:   systemPrompt,
+			userPrompt:     userPrompt,
+		})
+	}
+	return jobs
+}
+
+// buildModuleJobs 构建 module 级别的分析任务
+func buildModuleJobs(
+	moduleMap map[string]map[string]interface{},
+	tasks []map[string]interface{},
+	projectInfo map[string]interface{},
+	projectName string,
+	moduleQuestions []Question,
+	generator *AnalysisGenerator,
+) []*singleQuestionJob {
+	var jobs []*singleQuestionJob
 	for modPathName, modData := range moduleMap {
 		modName, _ := modData["name"].(string)
 		if modName == "" {
 			modName = modPathName
 		}
-
-		// 构建 module 上下文
 		moduleContextStr := buildModuleContext(modPathName, modData, tasks, moduleMap, projectInfo, projectName)
-
 		for qi, q := range moduleQuestions {
 			userPrompt := generator.BuildModuleSingleQuestionPrompt(modData, moduleContextStr, q)
 			systemPrompt := generator.BuildSystemPrompt(QuestionTypeModule)
-
 			jobs = append(jobs, &singleQuestionJob{
 				analysisType:   QuestionTypeModule,
 				targetPathName: modPathName,
@@ -217,34 +319,58 @@ func RunAIAnalysisForCompile(ctx context.Context, projectName string, subAgentCo
 			})
 		}
 	}
+	return jobs
+}
 
-	// 3.3 project 问题
-	for qi, q := range projectQuestions {
-		userPrompt := generator.BuildProjectSingleQuestionPrompt(projectInfo, moduleMap, tasks, q)
-		systemPrompt := generator.BuildSystemPrompt(QuestionTypeProject)
+// buildTaskJobs 构建 task 级别的分析任务
+func buildTaskJobs(
+	tasks []map[string]interface{},
+	moduleMap map[string]map[string]interface{},
+	projectInfo map[string]interface{},
+	projectName string,
+	taskQuestions []Question,
+	generator *AnalysisGenerator,
+) []*singleQuestionJob {
+	var jobs []*singleQuestionJob
+	for _, taskData := range tasks {
+		taskPathName, _ := taskData["pathName"].(string)
+		taskName, _ := taskData["name"].(string)
+		if taskPathName == "" {
+			taskPathName = taskName
+		}
+		taskContextStr := buildTaskContext(taskData, tasks, moduleMap, projectInfo, projectName)
+		for qi, q := range taskQuestions {
+			userPrompt := generator.BuildTaskSingleQuestionPrompt(taskData, taskContextStr, q)
+			systemPrompt := generator.BuildSystemPrompt(QuestionTypeTask)
+			jobs = append(jobs, &singleQuestionJob{
+				analysisType:   QuestionTypeTask,
+				targetPathName: taskPathName,
+				targetName:     taskName,
+				questionIndex:  qi,
+				question:       q,
+				systemPrompt:   systemPrompt,
+				userPrompt:     userPrompt,
+			})
+		}
+	}
+	return jobs
+}
 
-		jobs = append(jobs, &singleQuestionJob{
-			analysisType:   QuestionTypeProject,
-			targetPathName: projectName,
-			targetName:     projectName,
-			questionIndex:  qi,
-			question:       q,
-			systemPrompt:   systemPrompt,
-			userPrompt:     userPrompt,
-		})
+// runLevelConcurrent 并发执行某一级别的所有分析任务
+// 返回该级别的结果，包含是否有错误信息
+func runLevelConcurrent(
+	ctx context.Context,
+	jobs []*singleQuestionJob,
+	aiClient *AIClient,
+	generator *AnalysisGenerator,
+	projectName string,
+	logger *MCPLogger,
+	maxConcurrent int,
+) *levelCompileResult {
+	if len(jobs) == 0 {
+		return &levelCompileResult{hasErrors: false}
 	}
 
-	logger.Info("开始并发AI分析（一问一请求）", map[string]interface{}{
-		"task_count":      len(tasks),
-		"module_count":    len(moduleMap),
-		"total_jobs":      len(jobs),
-		"max_concurrent":  maxConcurrent,
-		"task_questions":  len(taskQuestions),
-		"module_questions": len(moduleQuestions),
-		"project_questions": len(projectQuestions),
-	})
-
-	// ========== 4. 并发执行所有问题请求 ==========
 	resultCh := make(chan *singleQuestionResult, len(jobs))
 	semaphore := make(chan struct{}, maxConcurrent)
 	var wg sync.WaitGroup
@@ -329,42 +455,138 @@ done:
 		close(resultCh)
 	}()
 
-	// ========== 5. 收集结果 ==========
+	// 收集结果
 	var allResults []*singleQuestionResult
-	var analyzeErrors []string
-
 	for r := range resultCh {
-		if r.err != "" {
-			analyzeErrors = append(analyzeErrors, r.err)
-		}
 		allResults = append(allResults, r)
 	}
 
-	logger.Info("并发AI分析完成", map[string]interface{}{
-		"total_jobs":    len(jobs),
-		"result_count":  len(allResults),
-		"error_count":   len(analyzeErrors),
-	})
+	// 检测是否有错误（error/critical 严重度的 issue）
+	hasErrors := false
+	var errorLines []string
+	for _, r := range allResults {
+		if r.err != "" {
+			// AI 调用失败本身也算错误
+			hasErrors = true
+			errorLines = append(errorLines, fmt.Sprintf("  - [调用失败] %s", r.err))
+			continue
+		}
+		if r.result == nil {
+			continue
+		}
+		for _, issue := range r.result.Issues {
+			if issue.Severity == "error" || issue.Severity == "critical" {
+				hasErrors = true
+				target := ""
+				if r.job != nil {
+					target = r.job.targetPathName
+				}
+				msg := issue.Description
+				if issue.Suggestion != "" {
+					msg = msg + " → " + issue.Suggestion
+				}
+				errorLines = append(errorLines, fmt.Sprintf("  - [%s][%s] %s", target, issue.Severity, msg))
+			}
+		}
+	}
 
-	// ========== 6. 按目标聚合结果，生成报表 ==========
-	output := formatNewCompileAIReport(
-		projectName,
-		tasks,
-		moduleMap,
-		projectInfo,
-		taskQuestions,
-		moduleQuestions,
-		projectQuestions,
-		allResults,
-		analyzeErrors,
-		maxConcurrent,
-	)
+	errorReport := ""
+	if hasErrors && len(errorLines) > 0 {
+		errorReport = strings.Join(errorLines, "\n")
+	}
 
-	// ========== 7. 将动态编译结果写入数据库 bug_log.dynamic ==========
-	// 按目标汇总 issues，然后写入数据库
-	go writeDynamicBugLogToDB(projectName, tasks, moduleMap, projectInfo, allResults)
+	return &levelCompileResult{
+		allResults:  allResults,
+		hasErrors:   hasErrors,
+		errorReport: errorReport,
+	}
+}
 
-	return output, nil
+// formatLevelErrorReport 格式化某级别的错误报告
+func formatLevelErrorReport(title string, errorReport string) string {
+	var sb strings.Builder
+	sb.WriteString("## AI设计合理性分析\n\n")
+	sb.WriteString(title)
+	sb.WriteString("\n\n")
+	sb.WriteString("### 发现的错误\n\n")
+	if errorReport != "" {
+		sb.WriteString(errorReport)
+	} else {
+		sb.WriteString("（无详细错误信息）")
+	}
+	sb.WriteString("\n\n")
+	sb.WriteString("**请修复以上高优先级错误后重新执行编译。**\n")
+	return sb.String()
+}
+
+// clearDynamicBugLogForScope 清空编译范围内所有层级的 buglog.dynamic 错误
+// 在每次动态编译前调用，确保旧的错误信息被清空
+func clearDynamicBugLogForScope(projectName string, tasks []map[string]interface{}, moduleMap map[string]map[string]interface{}) {
+	if database.DB == nil {
+		return
+	}
+	logger := GetMCPLogger()
+	emptyDynamic := BugLogLevel{Error: []string{}, Warning: []string{}}
+
+	// 清空所有 task 的 bug_log.dynamic
+	for _, taskData := range tasks {
+		taskPathName, _ := taskData["pathName"].(string)
+		if taskPathName == "" {
+			continue
+		}
+		var task models.Task
+		if err := database.DB.Where("path_name = ?", taskPathName).First(&task).Error; err != nil {
+			continue
+		}
+		existingBugLog := ParseBugLog(task.BugLog)
+		existingBugLog.Dynamic = emptyDynamic
+		bugLogBytes, err := json.Marshal(existingBugLog)
+		if err != nil {
+			continue
+		}
+		if err := database.DB.Model(&task).Updates(map[string]interface{}{
+			"bug_log":    string(bugLogBytes),
+			"updated_at": time.Now().UnixMilli(),
+		}).Error; err != nil {
+			logger.Warn("清空task bug_log.dynamic 失败", map[string]interface{}{"taskPathName": taskPathName, "error": err.Error()})
+		}
+	}
+
+	// 清空所有 module 的 bug_log.dynamic
+	for modPathName := range moduleMap {
+		var module models.Module
+		if err := database.DB.Where("path_name = ?", modPathName).First(&module).Error; err != nil {
+			continue
+		}
+		existingBugLog := ParseBugLog(module.BugLog)
+		existingBugLog.Dynamic = emptyDynamic
+		bugLogBytes, err := json.Marshal(existingBugLog)
+		if err != nil {
+			continue
+		}
+		if err := database.DB.Model(&module).Updates(map[string]interface{}{
+			"bug_log":    string(bugLogBytes),
+			"updated_at": time.Now().UnixMilli(),
+		}).Error; err != nil {
+			logger.Warn("清空module bug_log.dynamic 失败", map[string]interface{}{"modPathName": modPathName, "error": err.Error()})
+		}
+	}
+
+	// 清空 project 的 bug_log.dynamic
+	var project models.Project
+	if err := database.DB.Where("path_name = ?", projectName).First(&project).Error; err == nil {
+		existingBugLog := ParseBugLog(project.BugLog)
+		existingBugLog.Dynamic = emptyDynamic
+		bugLogBytes, err := json.Marshal(existingBugLog)
+		if err == nil {
+			if err := database.DB.Model(&project).Updates(map[string]interface{}{
+				"bug_log":    string(bugLogBytes),
+				"updated_at": time.Now().UnixMilli(),
+			}).Error; err != nil {
+				logger.Warn("清空project bug_log.dynamic 失败", map[string]interface{}{"projectName": projectName, "error": err.Error()})
+			}
+		}
+	}
 }
 
 // cleanCompileDir 清理 compile 目录中的所有 .json 文件
@@ -391,10 +613,9 @@ func cleanCompileDir(dirPath string) error {
 	return nil
 }
 
-// writeDynamicBugLogToDB 将动态编译（AI分析）结果写入数据库的 bug_log.dynamic 字段
-// 每个 task/module/project 的所有问题汇总，按 severity 分类后写入
-// 完全覆盖 dynamic 字段（仅针对被编译范围内的资源）
-func writeDynamicBugLogToDB(projectName string, tasks []map[string]interface{}, moduleMap map[string]map[string]interface{}, projectInfo map[string]interface{}, allResults []*singleQuestionResult) {
+// writeDynamicBugLogForResults 将指定的分析结果写入数据库的 bug_log.dynamic 字段
+// 支持部分结果写入（每级编译后立即调用），不需要传入全部结果
+func writeDynamicBugLogForResults(projectName string, tasks []map[string]interface{}, moduleMap map[string]map[string]interface{}, allResults []*singleQuestionResult) {
 	if database.DB == nil {
 		return
 	}
@@ -402,9 +623,8 @@ func writeDynamicBugLogToDB(projectName string, tasks []map[string]interface{}, 
 	logger := GetMCPLogger()
 
 	// 按目标路径汇总 issues（错误和警告）
-	// key: targetPathName
-	taskErrors := make(map[string][]string)   // targetPathName -> error messages
-	taskWarnings := make(map[string][]string)  // targetPathName -> warning messages
+	taskErrors := make(map[string][]string)
+	taskWarnings := make(map[string][]string)
 	moduleErrors := make(map[string][]string)
 	moduleWarnings := make(map[string][]string)
 	var projectErrors []string
@@ -444,12 +664,15 @@ func writeDynamicBugLogToDB(projectName string, tasks []map[string]interface{}, 
 		}
 	}
 
-	// 更新 task 的 bug_log.dynamic
-	for _, taskData := range tasks {
-		taskPathName, _ := taskData["pathName"].(string)
-		if taskPathName == "" {
-			continue
-		}
+	// 更新 task 的 bug_log.dynamic（只更新有结果的 task）
+	allTaskPaths := make(map[string]bool)
+	for p := range taskErrors {
+		allTaskPaths[p] = true
+	}
+	for p := range taskWarnings {
+		allTaskPaths[p] = true
+	}
+	for taskPathName := range allTaskPaths {
 		var task models.Task
 		if err := database.DB.Where("path_name = ?", taskPathName).First(&task).Error; err != nil {
 			continue
@@ -471,15 +694,19 @@ func writeDynamicBugLogToDB(projectName string, tasks []map[string]interface{}, 
 			"bug_log":    string(bugLogBytes),
 			"updated_at": time.Now().UnixMilli(),
 		}).Error; err != nil {
-			logger.Warn("更新task bug_log.dynamic 失败", map[string]interface{}{
-				"taskPathName": taskPathName,
-				"error":        err.Error(),
-			})
+			logger.Warn("更新task bug_log.dynamic 失败", map[string]interface{}{"taskPathName": taskPathName, "error": err.Error()})
 		}
 	}
 
-	// 更新 module 的 bug_log.dynamic
-	for modPathName := range moduleMap {
+	// 更新 module 的 bug_log.dynamic（只更新有结果的 module）
+	allModPaths := make(map[string]bool)
+	for p := range moduleErrors {
+		allModPaths[p] = true
+	}
+	for p := range moduleWarnings {
+		allModPaths[p] = true
+	}
+	for modPathName := range allModPaths {
 		var module models.Module
 		if err := database.DB.Where("path_name = ?", modPathName).First(&module).Error; err != nil {
 			continue
@@ -501,14 +728,11 @@ func writeDynamicBugLogToDB(projectName string, tasks []map[string]interface{}, 
 			"bug_log":    string(bugLogBytes),
 			"updated_at": time.Now().UnixMilli(),
 		}).Error; err != nil {
-			logger.Warn("更新module bug_log.dynamic 失败", map[string]interface{}{
-				"modPathName": modPathName,
-				"error":       err.Error(),
-			})
+			logger.Warn("更新module bug_log.dynamic 失败", map[string]interface{}{"modPathName": modPathName, "error": err.Error()})
 		}
 	}
 
-	// 更新 project 的 bug_log.dynamic
+	// 更新 project 的 bug_log.dynamic（始终写入，确保清空后的状态正确反映）
 	var project models.Project
 	if err := database.DB.Where("path_name = ?", projectName).First(&project).Error; err == nil {
 		existingBugLog := ParseBugLog(project.BugLog)
@@ -526,15 +750,13 @@ func writeDynamicBugLogToDB(projectName string, tasks []map[string]interface{}, 
 				"bug_log":    string(bugLogBytes),
 				"updated_at": time.Now().UnixMilli(),
 			}).Error; err != nil {
-				logger.Warn("更新project bug_log.dynamic 失败", map[string]interface{}{
-					"projectName": projectName,
-					"error":       err.Error(),
-				})
+				logger.Warn("更新project bug_log.dynamic 失败", map[string]interface{}{"projectName": projectName, "error": err.Error()})
 			}
 		}
 	}
 
-	_ = projectInfo // 已通过 projectName 查询 project 记录
+	_ = moduleMap // 保留参数以兼容调用签名
+	_ = tasks     // 保留参数以兼容调用签名
 }
 
 // ========== 上下文构建函数 ==========

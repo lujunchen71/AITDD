@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { Row, Col, Card, Typography, Button, Space, Segmented, message, Modal } from 'antd';
-import { PlusOutlined, UnorderedListOutlined, ApartmentOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, UnorderedListOutlined, ApartmentOutlined, BranchesOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import TaskList from './components/TaskList';
 import TaskForm from './components/TaskForm';
 import TaskGraph from './components/TaskGraph';
+import TaskMermaidView from './components/TaskMermaidView';
 import TaskDetailPanel from './components/TaskDetailPanel';
 import { apiClient } from '../../services/api';
-import { useProjectId } from '../../stores/useProjectStore';
+import { useProjectId, useSelectedProjectIds } from '../../stores/useProjectStore';
 
 const { Title } = Typography;
 const { confirm } = Modal;
 
 const TasksPage: React.FC = () => {
-  const [viewMode, setViewMode] = useState<'list' | 'graph'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'graph' | 'mermaid'>('list');
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [formVisible, setFormVisible] = useState(false);
@@ -22,6 +23,14 @@ const TasksPage: React.FC = () => {
   const [formLoading, setFormLoading] = useState(false);
   const [editingTask, setEditingTask] = useState<any>(null);
   const projectId = useProjectId();
+  const selectedProjectIds = useSelectedProjectIds();
+
+  // 计算用于 Mermaid 视图的项目ID列表：优先使用选中的项目，否则使用当前项目
+  const mermaidProjectIds = selectedProjectIds.length > 0
+    ? selectedProjectIds
+    : projectId
+    ? [projectId]
+    : [];
 
   const handleAddTask = () => {
     setEditingTaskId(undefined);
@@ -175,7 +184,7 @@ const TasksPage: React.FC = () => {
           <Space>
             <Segmented
               value={viewMode}
-              onChange={(value) => setViewMode(value as 'list' | 'graph')}
+              onChange={(value) => setViewMode(value as 'list' | 'graph' | 'mermaid')}
               options={[
                 {
                   value: 'list',
@@ -186,6 +195,11 @@ const TasksPage: React.FC = () => {
                   value: 'graph',
                   icon: <ApartmentOutlined />,
                   label: '依赖图',
+                },
+                {
+                  value: 'mermaid',
+                  icon: <BranchesOutlined />,
+                  label: 'Mermaid 图',
                 },
               ]}
             />
@@ -213,7 +227,7 @@ const TasksPage: React.FC = () => {
             onDuplicate={handleDuplicateTask}
             onLock={handleLockTask}
           />
-        ) : (
+        ) : viewMode === 'graph' ? (
           <div style={{ height: 600 }}>
             <TaskGraph
               key={refreshKey}
@@ -221,6 +235,14 @@ const TasksPage: React.FC = () => {
               onTaskSelect={handleTaskSelect}
             />
           </div>
+        ) : (
+          <TaskMermaidView
+            key={refreshKey}
+            moduleId={selectedModuleId || undefined}
+            projectIds={mermaidProjectIds}
+            onTaskSelect={handleTaskSelect}
+            refreshKey={refreshKey}
+          />
         )}
       </Card>
 

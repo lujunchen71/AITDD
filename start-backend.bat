@@ -33,14 +33,7 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr :%PORT% ^| findstr LISTENING 
     set PORT_IN_USE=1
     echo [WARN] Port %PORT% is in use by PID %%a, terminating...
     taskkill /PID %%a /F >nul 2>&1
-    if errorlevel 1 (
-        echo [ERROR] Failed to terminate process %%a
-        echo [ERROR] Please manually kill the process and try again
-        pause
-        exit /b 1
-    ) else (
-        echo [INFO] Process %%a terminated successfully
-    )
+    echo [INFO] Process %%a terminated (or already gone)
 )
 
 REM 如果终止了进程，等待端口释放

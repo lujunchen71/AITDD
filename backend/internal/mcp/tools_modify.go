@@ -34,6 +34,11 @@ func (s *MCPServer) handleCreateNodeImpl(ctx context.Context, request mcp.CallTo
 		return mcp.NewToolResultText("缺少 parentPath 参数"), nil
 	}
 
+	// 验证路径是否属于当前项目
+	if errMsg := s.configManager.ValidatePathBelongsToProject(parentPath); errMsg != "" {
+		return mcp.NewToolResultText(errMsg), nil
+	}
+
 	name, ok := getParam(request, "name")
 	if !ok || name == "" {
 		return mcp.NewToolResultText("缺少 name 参数"), nil
@@ -359,6 +364,11 @@ func (s *MCPServer) handleDeleteNodeImpl(ctx context.Context, request mcp.CallTo
 		return mcp.NewToolResultText("缺少 path 参数"), nil
 	}
 
+	// 验证路径是否属于当前项目
+	if errMsg := s.configManager.ValidatePathBelongsToProject(path); errMsg != "" {
+		return mcp.NewToolResultText(errMsg), nil
+	}
+
 	force, _ := getParamBool(request, "force")
 
 	// 检测节点类型
@@ -498,6 +508,13 @@ func (s *MCPServer) handleModifyModuleImpl(ctx context.Context, request mcp.Call
 
 	if len(operations) == 0 {
 		return mcp.NewToolResultText("未能解析有效的操作项"), nil
+	}
+
+	// 验证所有 pathName 是否属于当前项目
+	for _, op := range operations {
+		if errMsg := s.configManager.ValidatePathBelongsToProject(op.PathName); errMsg != "" {
+			return mcp.NewToolResultText(errMsg), nil
+		}
 	}
 
 	// 阶段1：预检所有版本号
@@ -675,6 +692,44 @@ func (s *MCPServer) handleModifyModuleImpl(ctx context.Context, request mcp.Call
 		}
 	}
 
+	// 对每个成功修改的模块执行静态编译，并将结果追加到响应
+	output.WriteString("\n--- 静态编译结果 ---\n")
+	hasCompileErrors := false
+	for _, r := range results {
+		if r.Error != "" {
+			continue // 跳过修改失败的模块
+		}
+		compileResult := &CompileStaticResult{
+			Success:  true,
+			Errors:   []CompileIssue{},
+			Warnings: []CompileIssue{},
+		}
+		s.compileStaticModule(r.PathName, true, compileResult)
+		compileResult.ErrorCount = len(compileResult.Errors)
+		compileResult.WarningCount = len(compileResult.Warnings)
+		compileResult.Success = compileResult.ErrorCount == 0
+
+		// 同步写入 bugLog
+		s.writeStaticBugLogToDB(r.PathName, compileResult.Errors, compileResult.Warnings)
+
+		output.WriteString(fmt.Sprintf("module: \"%s\"\n", r.PathName))
+		if compileResult.Success {
+			output.WriteString("  compile: pass\n")
+		} else {
+			hasCompileErrors = true
+			output.WriteString(fmt.Sprintf("  compile: fail (%d errors, %d warnings)\n", compileResult.ErrorCount, compileResult.WarningCount))
+			for _, e := range compileResult.Errors {
+				output.WriteString(fmt.Sprintf("  error [%s]: %s\n", e.RuleID, e.Message))
+			}
+			for _, w := range compileResult.Warnings {
+				output.WriteString(fmt.Sprintf("  warning [%s]: %s\n", w.RuleID, w.Message))
+			}
+		}
+	}
+	if !hasCompileErrors {
+		output.WriteString("all: 静态编译全部通过\n")
+	}
+
 	return mcp.NewToolResultText(output.String()), nil
 }
 
@@ -736,6 +791,13 @@ func (s *MCPServer) handleModifyTaskImpl(ctx context.Context, request mcp.CallTo
 
 	if len(operations) == 0 {
 		return mcp.NewToolResultText("未能解析有效的操作项"), nil
+	}
+
+	// 验证所有 pathName 是否属于当前项目
+	for _, op := range operations {
+		if errMsg := s.configManager.ValidatePathBelongsToProject(op.PathName); errMsg != "" {
+			return mcp.NewToolResultText(errMsg), nil
+		}
 	}
 
 	// 阶段1：预检所有版本号
@@ -941,6 +1003,44 @@ func (s *MCPServer) handleModifyTaskImpl(ctx context.Context, request mcp.CallTo
 		}
 	}
 
+	// 对每个成功修改的任务执行静态编译，并将结果追加到响应
+	output.WriteString("\n--- 静态编译结果 ---\n")
+	hasCompileErrors := false
+	for _, r := range results {
+		if r.Error != "" {
+			continue // 跳过修改失败的任务
+		}
+		compileResult := &CompileStaticResult{
+			Success:  true,
+			Errors:   []CompileIssue{},
+			Warnings: []CompileIssue{},
+		}
+		s.compileStaticTask(r.PathName, true, compileResult)
+		compileResult.ErrorCount = len(compileResult.Errors)
+		compileResult.WarningCount = len(compileResult.Warnings)
+		compileResult.Success = compileResult.ErrorCount == 0
+
+		// 同步写入 bugLog
+		s.writeStaticBugLogToDB(r.PathName, compileResult.Errors, compileResult.Warnings)
+
+		output.WriteString(fmt.Sprintf("task: \"%s\"\n", r.PathName))
+		if compileResult.Success {
+			output.WriteString("  compile: pass\n")
+		} else {
+			hasCompileErrors = true
+			output.WriteString(fmt.Sprintf("  compile: fail (%d errors, %d warnings)\n", compileResult.ErrorCount, compileResult.WarningCount))
+			for _, e := range compileResult.Errors {
+				output.WriteString(fmt.Sprintf("  error [%s]: %s\n", e.RuleID, e.Message))
+			}
+			for _, w := range compileResult.Warnings {
+				output.WriteString(fmt.Sprintf("  warning [%s]: %s\n", w.RuleID, w.Message))
+			}
+		}
+	}
+	if !hasCompileErrors {
+		output.WriteString("all: 静态编译全部通过\n")
+	}
+
 	return mcp.NewToolResultText(output.String()), nil
 }
 
@@ -1000,6 +1100,13 @@ func (s *MCPServer) handleCreateModuleImpl(ctx context.Context, request mcp.Call
 
 	if len(operations) == 0 {
 		return mcp.NewToolResultText("未能解析有效的操作项，每项需要 parentPath 和 name"), nil
+	}
+
+	// 验证所有 parentPath 是否属于当前项目
+	for _, op := range operations {
+		if errMsg := s.configManager.ValidatePathBelongsToProject(op.ParentPath); errMsg != "" {
+			return mcp.NewToolResultText(errMsg), nil
+		}
 	}
 
 	// 逐个执行创建操作
@@ -1201,6 +1308,13 @@ func (s *MCPServer) handleCreateTaskImpl(ctx context.Context, request mcp.CallTo
 
 	if len(operations) == 0 {
 		return mcp.NewToolResultText("未能解析有效的操作项，每项需要 parentPath 和 name"), nil
+	}
+
+	// 验证所有 parentPath 是否属于当前项目
+	for _, op := range operations {
+		if errMsg := s.configManager.ValidatePathBelongsToProject(op.ParentPath); errMsg != "" {
+			return mcp.NewToolResultText(errMsg), nil
+		}
 	}
 
 	// 逐个执行创建操作

@@ -1,0 +1,445 @@
+﻿=== RUN   TestSaveAIAnalysisLog
+    ai_log_test.go:84: 鏃ュ織鏂囦欢鍐呭楠岃瘉鎴愬姛锛屾枃浠惰矾寰? .aitdd\compile\TestProject\TestProject_娴嬭瘯妯″潡_娴嬭瘯浠诲姟_0.json
+    ai_log_test.go:85: 鏂囦欢鍐呭:
+        {
+          "timestamp": "2026-03-06T19:01:01+08:00",
+          "project_path_name": "TestProject",
+          "target_path_name": "TestProject/娴嬭瘯妯″潡/娴嬭瘯浠诲姟",
+          "target_name": "娴嬭瘯浠诲姟",
+          "analysis_type": "task",
+          "question_index": 0,
+          "question": "璇峰垎鏋愪互涓嬩换鍔＄殑鎻愮ず璇嶆槸鍚︽竻鏅?..",
+          "question_category": "prompt",
+          "question_severity": "error",
+          "system_prompt": "浣犳槸涓€涓笓涓氱殑杞欢宸ョ▼鍒嗘瀽鍔╂墜",
+          "user_prompt": "璇峰垎鏋愪互涓嬩换鍔?..",
+          "raw_response": "{\"summary\": \"娴嬭瘯鍝嶅簲\", \"score\": 85}"
+        }
+--- PASS: TestSaveAIAnalysisLog (0.01s)
+=== RUN   TestSaveAIAnalysisLogWithResult
+    ai_log_test.go:174: 甯﹁В鏋愮粨鏋滅殑鏃ュ織鏂囦欢楠岃瘉鎴愬姛
+--- PASS: TestSaveAIAnalysisLogWithResult (0.00s)
+=== RUN   TestSaveAIAnalysisLogWithError
+    ai_log_test.go:232: 甯﹂敊璇殑鏃ュ織鏂囦欢楠岃瘉鎴愬姛
+--- PASS: TestSaveAIAnalysisLogWithError (0.00s)
+=== RUN   TestSaveAIAnalysisLogModule
+    ai_log_test.go:278: module鏃ュ織鏂囦欢楠岃瘉鎴愬姛锛屾枃浠惰矾寰? .aitdd\compile\MyProject\module_MyProject_鐢ㄦ埛绠＄悊_1.json
+--- PASS: TestSaveAIAnalysisLogModule (0.00s)
+=== RUN   TestSaveAIAnalysisLogProject
+    ai_log_test.go:321: project鏃ュ織鏂囦欢楠岃瘉鎴愬姛锛屾枃浠惰矾寰? .aitdd\compile\BigProject\project_0.json
+--- PASS: TestSaveAIAnalysisLogProject (0.00s)
+=== RUN   TestGenerateLogFileName
+=== RUN   TestGenerateLogFileName/task闂
+=== RUN   TestGenerateLogFileName/module闂
+=== RUN   TestGenerateLogFileName/project闂
+--- PASS: TestGenerateLogFileName (0.00s)
+    --- PASS: TestGenerateLogFileName/task闂 (0.00s)
+    --- PASS: TestGenerateLogFileName/module闂 (0.00s)
+    --- PASS: TestGenerateLogFileName/project闂 (0.00s)
+=== RUN   TestHandleQueryModuleImpl_BatchQuery
+=== RUN   TestHandleQueryModuleImpl_BatchQuery/鎵归噺鏌ヨ澶氫釜妯″潡
+    batch_operations_test.go:213: 杈撳嚭:
+        ```yaml
+        test-project:
+          auth:
+            pathName: "test-project/auth"
+            name: Auth Module
+            status: developing
+            version: 1
+          api:
+            pathName: "test-project/api"
+            description: API module
+            prompt: Implement API
+        ```
+=== RUN   TestHandleQueryModuleImpl_BatchQuery/绌簈ueries鏁扮粍搴旇繑鍥為敊璇?=== RUN   TestHandleQueryModuleImpl_BatchQuery/缂哄皯queries鍙傛暟搴旇繑鍥為敊璇?=== RUN   TestHandleQueryModuleImpl_BatchQuery/閮ㄥ垎璺緞涓嶅瓨鍦?    batch_operations_test.go:277: 杈撳嚭:
+        ```yaml
+        test-project:
+          not-exist:
+            error: 鏈壘鍒版ā鍧? test-project/not-exist
+          auth:
+            pathName: "test-project/auth"
+            name: Auth Module
+        ```
+--- PASS: TestHandleQueryModuleImpl_BatchQuery (0.00s)
+    --- PASS: TestHandleQueryModuleImpl_BatchQuery/鎵归噺鏌ヨ澶氫釜妯″潡 (0.00s)
+    --- PASS: TestHandleQueryModuleImpl_BatchQuery/绌簈ueries鏁扮粍搴旇繑鍥為敊璇?(0.00s)
+    --- PASS: TestHandleQueryModuleImpl_BatchQuery/缂哄皯queries鍙傛暟搴旇繑鍥為敊璇?(0.00s)
+    --- PASS: TestHandleQueryModuleImpl_BatchQuery/閮ㄥ垎璺緞涓嶅瓨鍦?(0.00s)
+=== RUN   TestHandleQueryTaskImpl_BatchQuery
+=== RUN   TestHandleQueryTaskImpl_BatchQuery/鎵归噺鏌ヨ澶氫釜浠诲姟
+    batch_operations_test.go:320: 杈撳嚭:
+        ```yaml
+        test-project:
+          auth:
+            login:
+              pathName: "test-project/auth/login"
+              name: Login Task
+              status: in_progress
+              tests: 
+                - 
+                  api: test_login()
+                  target: 楠岃瘉鐧诲綍
+            logout:
+              pathName: "test-project/auth/logout"
+              name: Logout Task
+              description: Logout functionality
+        ```
+=== RUN   TestHandleQueryTaskImpl_BatchQuery/鎷掔粷妯″潡璺緞锛堟枩鏉犳暟閲忎笉瓒筹級
+=== RUN   TestHandleQueryTaskImpl_BatchQuery/绌簈ueries鏁扮粍搴旇繑鍥為敊璇?--- PASS: TestHandleQueryTaskImpl_BatchQuery (0.00s)
+    --- PASS: TestHandleQueryTaskImpl_BatchQuery/鎵归噺鏌ヨ澶氫釜浠诲姟 (0.00s)
+    --- PASS: TestHandleQueryTaskImpl_BatchQuery/鎷掔粷妯″潡璺緞锛堟枩鏉犳暟閲忎笉瓒筹級 (0.00s)
+    --- PASS: TestHandleQueryTaskImpl_BatchQuery/绌簈ueries鏁扮粍搴旇繑鍥為敊璇?(0.00s)
+=== RUN   TestHandleModifyModuleImpl_BatchModify
+=== RUN   TestHandleModifyModuleImpl_BatchModify/鎵归噺淇敼澶氫釜妯″潡鎴愬姛
+    batch_operations_test.go:411: 杈撳嚭:
+        success: true
+        summary: 鍏ㄩ儴 2 涓ā鍧椾慨鏀规垚鍔?        results:
+          - pathName: "test-project/auth"
+            newVersion: 2
+          - pathName: "test-project/api"
+            newVersion: 3
+        
+        --- 闈欐€佺紪璇戠粨鏋?---
+        module: "test-project/auth"
+          compile: fail (1 errors, 0 warnings)
+          error [E-S-00]: 妯″潡涓嶅瓨鍦ㄦ垨鑾峰彇澶辫触
+        module: "test-project/api"
+          compile: fail (1 errors, 0 warnings)
+          error [E-S-00]: 妯″潡涓嶅瓨鍦ㄦ垨鑾峰彇澶辫触
+=== RUN   TestHandleModifyModuleImpl_BatchModify/鐗堟湰鍐茬獊搴旀嫆缁濇暣涓壒閲忔搷浣?    batch_operations_test.go:448: 杈撳嚭:
+        success: false
+        error: VERSION_CONFLICT
+        message: 鎵归噺淇敼宸插彇娑堬細鍙戠幇 2 涓増鏈啿绐?        conflicts:
+          - pathName: "test-project/auth"
+            providedVersion: 1
+            currentVersion: 2
+            message: "鐗堟湰鍐茬獊"
+          - pathName: "test-project/api"
+            providedVersion: 1
+            currentVersion: 3
+            message: "鐗堟湰鍐茬獊"
+        checks:
+          - pathName: "test-project/auth"
+            providedVersion: 1
+            currentVersion: 2
+            status: "鐗堟湰鍐茬獊"
+          - pathName: "test-project/api"
+            providedVersion: 1
+            currentVersion: 3
+            status: "鐗堟湰鍐茬獊"
+=== RUN   TestHandleModifyModuleImpl_BatchModify/绌簅perations鏁扮粍搴旇繑鍥為敊璇?=== RUN   TestHandleModifyModuleImpl_BatchModify/缂哄皯operations鍙傛暟搴旇繑鍥為敊璇?--- PASS: TestHandleModifyModuleImpl_BatchModify (0.00s)
+    --- PASS: TestHandleModifyModuleImpl_BatchModify/鎵归噺淇敼澶氫釜妯″潡鎴愬姛 (0.00s)
+    --- PASS: TestHandleModifyModuleImpl_BatchModify/鐗堟湰鍐茬獊搴旀嫆缁濇暣涓壒閲忔搷浣?(0.00s)
+    --- PASS: TestHandleModifyModuleImpl_BatchModify/绌簅perations鏁扮粍搴旇繑鍥為敊璇?(0.00s)
+    --- PASS: TestHandleModifyModuleImpl_BatchModify/缂哄皯operations鍙傛暟搴旇繑鍥為敊璇?(0.00s)
+=== RUN   TestHandleModifyTaskImpl_BatchModify
+=== RUN   TestHandleModifyTaskImpl_BatchModify/鎵归噺淇敼澶氫釜浠诲姟鎴愬姛
+    batch_operations_test.go:532: 杈撳嚭:
+        success: true
+        summary: 鍏ㄩ儴 2 涓换鍔′慨鏀规垚鍔?        results:
+          - pathName: "test-project/auth/login"
+            newVersion: 2
+          - pathName: "test-project/auth/logout"
+            newVersion: 2
+        
+        --- 闈欐€佺紪璇戠粨鏋?---
+        task: "test-project/auth/login"
+          compile: fail (4 errors, 0 warnings)
+          error [E-S-01]: 浠诲姟 [Login Task] 浠ｇ爜璺緞涓虹┖
+          error [E-S-04]: 浠诲姟 [Login Task] 鎻愮ず璇嶄负绌?          error [E-S-05]: 浠诲姟 [Login Task] 缂哄皯涓婃父濂戠害瀹氫箟
+          error [E-S-06]: 浠诲姟 [Login Task] 缂哄皯涓嬫父濂戠害瀹氫箟
+        task: "test-project/auth/logout"
+          compile: fail (5 errors, 0 warnings)
+          error [E-S-01]: 浠诲姟 [Logout Task] 浠ｇ爜璺緞涓虹┖
+          error [E-S-04]: 浠诲姟 [Logout Task] 鎻愮ず璇嶄负绌?          error [E-S-05]: 浠诲姟 [Logout Task] 缂哄皯涓婃父濂戠害瀹氫箟
+          error [E-S-06]: 浠诲姟 [Logout Task] 缂哄皯涓嬫父濂戠害瀹氫箟
+          error [E-S-13]: 浠诲姟 [Logout Task] 鏈畾涔夋祴璇曠敤渚?=== RUN   TestHandleModifyTaskImpl_BatchModify/鐗堟湰鍐茬獊搴旀嫆缁濇暣涓壒閲忔搷浣?    batch_operations_test.go:566: 杈撳嚭:
+        success: false
+        error: VERSION_CONFLICT
+        message: 鎵归噺淇敼宸插彇娑堬細鍙戠幇 2 涓増鏈啿绐?        conflicts:
+          - pathName: "test-project/auth/login"
+            providedVersion: 1
+            currentVersion: 2
+            message: "鐗堟湰鍐茬獊"
+          - pathName: "test-project/auth/logout"
+            providedVersion: 99
+            currentVersion: 2
+            message: "鐗堟湰鍐茬獊"
+        checks:
+          - pathName: "test-project/auth/login"
+            providedVersion: 1
+            currentVersion: 2
+            status: "鐗堟湰鍐茬獊"
+          - pathName: "test-project/auth/logout"
+            providedVersion: 99
+            currentVersion: 2
+            status: "鐗堟湰鍐茬獊"
+=== RUN   TestHandleModifyTaskImpl_BatchModify/JSON瀛楁澶勭悊
+    batch_operations_test.go:610: 杈撳嚭:
+        success: true
+        summary: 鍏ㄩ儴 1 涓换鍔′慨鏀规垚鍔?        results:
+          - pathName: "test-project/auth/login"
+            newVersion: 2
+        
+        --- 闈欐€佺紪璇戠粨鏋?---
+        task: "test-project/auth/login"
+          compile: fail (3 errors, 0 warnings)
+          error [E-S-04]: 浠诲姟 [Login Task] 鎻愮ず璇嶄负绌?          error [E-S-05]: 浠诲姟 [Login Task] 缂哄皯涓婃父濂戠害瀹氫箟
+          error [E-S-06]: 浠诲姟 [Login Task] 缂哄皯涓嬫父濂戠害瀹氫箟
+--- PASS: TestHandleModifyTaskImpl_BatchModify (0.00s)
+    --- PASS: TestHandleModifyTaskImpl_BatchModify/鎵归噺淇敼澶氫釜浠诲姟鎴愬姛 (0.00s)
+    --- PASS: TestHandleModifyTaskImpl_BatchModify/鐗堟湰鍐茬獊搴旀嫆缁濇暣涓壒閲忔搷浣?(0.00s)
+    --- PASS: TestHandleModifyTaskImpl_BatchModify/JSON瀛楁澶勭悊 (0.00s)
+=== RUN   TestConfigManager_Load
+=== RUN   TestConfigManager_Load/鍔犺浇瀛樺湪鐨勯厤缃枃浠?=== RUN   TestConfigManager_Load/鍔犺浇涓嶅瓨鍦ㄧ殑閰嶇疆鏂囦欢鏃跺垱寤洪粯璁ら厤缃?--- PASS: TestConfigManager_Load (0.00s)
+    --- PASS: TestConfigManager_Load/鍔犺浇瀛樺湪鐨勯厤缃枃浠?(0.00s)
+    --- PASS: TestConfigManager_Load/鍔犺浇涓嶅瓨鍦ㄧ殑閰嶇疆鏂囦欢鏃跺垱寤洪粯璁ら厤缃?(0.00s)
+=== RUN   TestConfigManager_Save
+--- PASS: TestConfigManager_Save (0.00s)
+=== RUN   TestConfigManager_SetApiBaseUrl
+--- PASS: TestConfigManager_SetApiBaseUrl (0.01s)
+=== RUN   TestConfigManager_SetProject
+--- PASS: TestConfigManager_SetProject (0.01s)
+=== RUN   TestConfigManager_GetConfig
+--- PASS: TestConfigManager_GetConfig (0.00s)
+=== RUN   TestConfigManager_ConcurrentAccess
+--- PASS: TestConfigManager_ConcurrentAccess (0.01s)
+=== RUN   TestCheckModuleCircularReference_NoCircular
+--- PASS: TestCheckModuleCircularReference_NoCircular (0.00s)
+=== RUN   TestCheckModuleCircularReference_SimpleCircular
+--- PASS: TestCheckModuleCircularReference_SimpleCircular (0.00s)
+=== RUN   TestCheckModuleCircularReference_MultipleModules
+--- PASS: TestCheckModuleCircularReference_MultipleModules (0.00s)
+=== RUN   TestCheckModuleCircularReference_NoCrossModuleRef
+--- PASS: TestCheckModuleCircularReference_NoCrossModuleRef (0.00s)
+=== RUN   TestCheckModuleCircularReference_SingleModule
+--- PASS: TestCheckModuleCircularReference_SingleModule (0.00s)
+=== RUN   TestCheckModuleCircularReference_EmptyModules
+--- PASS: TestCheckModuleCircularReference_EmptyModules (0.00s)
+=== RUN   TestCheckModuleCircularReference_MultipleCrossRefs
+--- PASS: TestCheckModuleCircularReference_MultipleCrossRefs (0.00s)
+=== RUN   TestGenerateCircularReferenceReport
+--- PASS: TestGenerateCircularReferenceReport (0.00s)
+=== RUN   TestCheckModuleCircularReference_WithJSONCodePaths
+--- PASS: TestCheckModuleCircularReference_WithJSONCodePaths (0.00s)
+=== RUN   TestNewMCPServer
+--- PASS: TestNewMCPServer (0.00s)
+=== RUN   TestMCPServer_GetApiURL
+--- PASS: TestMCPServer_GetApiURL (0.01s)
+=== RUN   TestGetParam
+=== RUN   TestGetParam/鍙傛暟瀛樺湪
+=== RUN   TestGetParam/鍙傛暟涓嶅瓨鍦?=== RUN   TestGetParam/鍙傛暟绫诲瀷涓嶆槸瀛楃涓?=== RUN   TestGetParam/鍙傛暟鍊间负_nil
+=== RUN   TestGetParam/绌哄瓧绗︿覆鍙傛暟
+--- PASS: TestGetParam (0.00s)
+    --- PASS: TestGetParam/鍙傛暟瀛樺湪 (0.00s)
+    --- PASS: TestGetParam/鍙傛暟涓嶅瓨鍦?(0.00s)
+    --- PASS: TestGetParam/鍙傛暟绫诲瀷涓嶆槸瀛楃涓?(0.00s)
+    --- PASS: TestGetParam/鍙傛暟鍊间负_nil (0.00s)
+    --- PASS: TestGetParam/绌哄瓧绗︿覆鍙傛暟 (0.00s)
+=== RUN   TestMCPServer_DetectNodeType
+=== RUN   TestMCPServer_DetectNodeType/骞跺彂璋冪敤
+--- PASS: TestMCPServer_DetectNodeType (0.00s)
+    --- PASS: TestMCPServer_DetectNodeType/骞跺彂璋冪敤 (0.00s)
+=== RUN   TestMCPServer_RegisterTools
+--- PASS: TestMCPServer_RegisterTools (0.00s)
+=== RUN   TestDetectNodeType
+=== RUN   TestDetectNodeType/椤圭洰璺緞锛堟棤鏂滄潬锛?=== RUN   TestDetectNodeType/妯″潡璺緞锛堜竴涓枩鏉狅級
+=== RUN   TestDetectNodeType/浠诲姟璺緞锛堜袱涓枩鏉狅級
+=== RUN   TestDetectNodeType/娣卞眰浠诲姟璺緞
+=== RUN   TestDetectNodeType/绌鸿矾寰?--- PASS: TestDetectNodeType (0.00s)
+    --- PASS: TestDetectNodeType/椤圭洰璺緞锛堟棤鏂滄潬锛?(0.00s)
+    --- PASS: TestDetectNodeType/妯″潡璺緞锛堜竴涓枩鏉狅級 (0.00s)
+    --- PASS: TestDetectNodeType/浠诲姟璺緞锛堜袱涓枩鏉狅級 (0.00s)
+    --- PASS: TestDetectNodeType/娣卞眰浠诲姟璺緞 (0.00s)
+    --- PASS: TestDetectNodeType/绌鸿矾寰?(0.00s)
+=== RUN   TestFormatAsYAML
+=== RUN   TestFormatAsYAML/鏍煎紡鍖栨墍鏈夊瓧娈?=== RUN   TestFormatAsYAML/鍙牸寮忓寲鎸囧畾瀛楁
+=== RUN   TestFormatAsYAML/澶勭悊绌哄€?=== RUN   TestFormatAsYAML/澶勭悊鏁扮粍
+=== RUN   TestFormatAsYAML/澶勭悊绌烘暟缁?=== RUN   TestFormatAsYAML/澶勭悊澶氳瀛楃涓?--- PASS: TestFormatAsYAML (0.00s)
+    --- PASS: TestFormatAsYAML/鏍煎紡鍖栨墍鏈夊瓧娈?(0.00s)
+    --- PASS: TestFormatAsYAML/鍙牸寮忓寲鎸囧畾瀛楁 (0.00s)
+    --- PASS: TestFormatAsYAML/澶勭悊绌哄€?(0.00s)
+    --- PASS: TestFormatAsYAML/澶勭悊鏁扮粍 (0.00s)
+    --- PASS: TestFormatAsYAML/澶勭悊绌烘暟缁?(0.00s)
+    --- PASS: TestFormatAsYAML/澶勭悊澶氳瀛楃涓?(0.00s)
+=== RUN   TestFormatValue
+=== RUN   TestFormatValue/瀛楃涓?=== RUN   TestFormatValue/nil_鍊?=== RUN   TestFormatValue/甯冨皵鍊糭true
+=== RUN   TestFormatValue/甯冨皵鍊糭false
+=== RUN   TestFormatValue/鏁存暟
+=== RUN   TestFormatValue/娴偣鏁?=== RUN   TestFormatValue/绌烘暟缁?=== RUN   TestFormatValue/闈炵┖鏁扮粍
+--- PASS: TestFormatValue (0.00s)
+    --- PASS: TestFormatValue/瀛楃涓?(0.00s)
+    --- PASS: TestFormatValue/nil_鍊?(0.00s)
+    --- PASS: TestFormatValue/甯冨皵鍊糭true (0.00s)
+    --- PASS: TestFormatValue/甯冨皵鍊糭false (0.00s)
+    --- PASS: TestFormatValue/鏁存暟 (0.00s)
+    --- PASS: TestFormatValue/娴偣鏁?(0.00s)
+    --- PASS: TestFormatValue/绌烘暟缁?(0.00s)
+    --- PASS: TestFormatValue/闈炵┖鏁扮粍 (0.00s)
+=== RUN   TestGeneratePathName
+=== RUN   TestGeneratePathName/绠€鍗曡矾寰?=== RUN   TestGeneratePathName/甯︾┖鏍肩殑鍚嶇О
+=== RUN   TestGeneratePathName/娣卞眰璺緞
+=== RUN   TestGeneratePathName/澶氬眰绌烘牸
+--- PASS: TestGeneratePathName (0.00s)
+    --- PASS: TestGeneratePathName/绠€鍗曡矾寰?(0.00s)
+    --- PASS: TestGeneratePathName/甯︾┖鏍肩殑鍚嶇О (0.00s)
+    --- PASS: TestGeneratePathName/娣卞眰璺緞 (0.00s)
+    --- PASS: TestGeneratePathName/澶氬眰绌烘牸 (0.00s)
+=== RUN   TestTruncateString
+=== RUN   TestTruncateString/鐭瓧绗︿覆涓嶅彉
+=== RUN   TestTruncateString/闀垮瓧绗︿覆鎴柇
+=== RUN   TestTruncateString/姝ｅソ绛変簬鏈€澶ч暱搴?=== RUN   TestTruncateString/绌哄瓧绗︿覆
+--- PASS: TestTruncateString (0.00s)
+    --- PASS: TestTruncateString/鐭瓧绗︿覆涓嶅彉 (0.00s)
+    --- PASS: TestTruncateString/闀垮瓧绗︿覆鎴柇 (0.00s)
+    --- PASS: TestTruncateString/姝ｅソ绛変簬鏈€澶ч暱搴?(0.00s)
+    --- PASS: TestTruncateString/绌哄瓧绗︿覆 (0.00s)
+=== RUN   TestHandleQueryNodeImpl
+=== RUN   TestHandleQueryNodeImpl/鏌ヨ椤圭洰鑺傜偣
+=== RUN   TestHandleQueryNodeImpl/鏌ヨ妯″潡鑺傜偣
+=== RUN   TestHandleQueryNodeImpl/鏌ヨ浠诲姟鑺傜偣
+=== RUN   TestHandleQueryNodeImpl/缂哄皯_path_鍙傛暟
+--- PASS: TestHandleQueryNodeImpl (0.01s)
+    --- PASS: TestHandleQueryNodeImpl/鏌ヨ椤圭洰鑺傜偣 (0.00s)
+    --- PASS: TestHandleQueryNodeImpl/鏌ヨ妯″潡鑺傜偣 (0.00s)
+    --- PASS: TestHandleQueryNodeImpl/鏌ヨ浠诲姟鑺傜偣 (0.00s)
+    --- PASS: TestHandleQueryNodeImpl/缂哄皯_path_鍙傛暟 (0.00s)
+=== RUN   TestHandleCreateNodeImpl_MissingParameters
+=== RUN   TestHandleCreateNodeImpl_MissingParameters/缂哄皯_type_鍙傛暟
+=== RUN   TestHandleCreateNodeImpl_MissingParameters/缂哄皯_parentPath_鍙傛暟
+=== RUN   TestHandleCreateNodeImpl_MissingParameters/缂哄皯_name_鍙傛暟
+=== RUN   TestHandleCreateNodeImpl_MissingParameters/涓嶆敮鎸佺殑鑺傜偣绫诲瀷
+--- PASS: TestHandleCreateNodeImpl_MissingParameters (0.01s)
+    --- PASS: TestHandleCreateNodeImpl_MissingParameters/缂哄皯_type_鍙傛暟 (0.00s)
+    --- PASS: TestHandleCreateNodeImpl_MissingParameters/缂哄皯_parentPath_鍙傛暟 (0.00s)
+    --- PASS: TestHandleCreateNodeImpl_MissingParameters/缂哄皯_name_鍙傛暟 (0.00s)
+    --- PASS: TestHandleCreateNodeImpl_MissingParameters/涓嶆敮鎸佺殑鑺傜偣绫诲瀷 (0.00s)
+=== RUN   TestHandleModifyNodeImpl_MissingPath
+=== RUN   TestHandleModifyNodeImpl_MissingPath/缂哄皯_pathName_鍙傛暟
+--- PASS: TestHandleModifyNodeImpl_MissingPath (0.01s)
+    --- PASS: TestHandleModifyNodeImpl_MissingPath/缂哄皯_pathName_鍙傛暟 (0.00s)
+=== RUN   TestHandleDeleteNodeImpl_MissingPath
+=== RUN   TestHandleDeleteNodeImpl_MissingPath/缂哄皯_pathName_鍙傛暟
+--- PASS: TestHandleDeleteNodeImpl_MissingPath (0.01s)
+    --- PASS: TestHandleDeleteNodeImpl_MissingPath/缂哄皯_pathName_鍙傛暟 (0.00s)
+=== RUN   TestGeneratePathName_EdgeCases
+=== RUN   TestGeneratePathName_EdgeCases/绌虹埗璺緞
+=== RUN   TestGeneratePathName_EdgeCases/鐗规畩瀛楃鍚嶇О
+=== RUN   TestGeneratePathName_EdgeCases/澶у啓杞皬鍐?=== RUN   TestGeneratePathName_EdgeCases/澶氫釜杩炵画绌烘牸
+--- PASS: TestGeneratePathName_EdgeCases (0.00s)
+    --- PASS: TestGeneratePathName_EdgeCases/绌虹埗璺緞 (0.00s)
+    --- PASS: TestGeneratePathName_EdgeCases/鐗规畩瀛楃鍚嶇О (0.00s)
+    --- PASS: TestGeneratePathName_EdgeCases/澶у啓杞皬鍐?(0.00s)
+    --- PASS: TestGeneratePathName_EdgeCases/澶氫釜杩炵画绌烘牸 (0.00s)
+=== RUN   TestCompareContracts
+=== RUN   TestCompareContracts/涓や釜绌哄绾?=== RUN   TestCompareContracts/涓婃父涓虹┖
+=== RUN   TestCompareContracts/涓嬫父涓虹┖
+=== RUN   TestCompareContracts/鐩稿悓濂戠害
+=== RUN   TestCompareContracts/涓嶅悓濂戠害
+=== RUN   TestCompareContracts/宓屽瀵硅薄鐩稿悓
+=== RUN   TestCompareContracts/宓屽瀵硅薄涓嶅悓
+=== RUN   TestCompareContracts/闈濲SON瀛楃涓叉瘮杈?=== RUN   TestCompareContracts/闈濲SON瀛楃涓蹭笉鍚?--- PASS: TestCompareContracts (0.00s)
+    --- PASS: TestCompareContracts/涓や釜绌哄绾?(0.00s)
+    --- PASS: TestCompareContracts/涓婃父涓虹┖ (0.00s)
+    --- PASS: TestCompareContracts/涓嬫父涓虹┖ (0.00s)
+    --- PASS: TestCompareContracts/鐩稿悓濂戠害 (0.00s)
+    --- PASS: TestCompareContracts/涓嶅悓濂戠害 (0.00s)
+    --- PASS: TestCompareContracts/宓屽瀵硅薄鐩稿悓 (0.00s)
+    --- PASS: TestCompareContracts/宓屽瀵硅薄涓嶅悓 (0.00s)
+    --- PASS: TestCompareContracts/闈濲SON瀛楃涓叉瘮杈?(0.00s)
+    --- PASS: TestCompareContracts/闈濲SON瀛楃涓蹭笉鍚?(0.00s)
+=== RUN   TestCompareJSONFields
+=== RUN   TestCompareJSONFields/绌哄璞?=== RUN   TestCompareJSONFields/瀹屽叏鐩稿悓
+=== RUN   TestCompareJSONFields/涓嬫父缂哄皯瀛楁
+=== RUN   TestCompareJSONFields/涓婃父缂哄皯瀛楁
+=== RUN   TestCompareJSONFields/宓屽瀵硅薄宸紓
+--- PASS: TestCompareJSONFields (0.00s)
+    --- PASS: TestCompareJSONFields/绌哄璞?(0.00s)
+    --- PASS: TestCompareJSONFields/瀹屽叏鐩稿悓 (0.00s)
+    --- PASS: TestCompareJSONFields/涓嬫父缂哄皯瀛楁 (0.00s)
+    --- PASS: TestCompareJSONFields/涓婃父缂哄皯瀛楁 (0.00s)
+    --- PASS: TestCompareJSONFields/宓屽瀵硅薄宸紓 (0.00s)
+=== RUN   TestTruncateString_EdgeCases
+=== RUN   TestTruncateString_EdgeCases/闆堕暱搴﹂檺鍒?=== RUN   TestTruncateString_EdgeCases/灏忎簬鐪佺暐鍙烽暱搴?=== RUN   TestTruncateString_EdgeCases/绛変簬鐪佺暐鍙烽暱搴?=== RUN   TestTruncateString_EdgeCases/鍗曚釜瀛楃
+=== RUN   TestTruncateString_EdgeCases/ASCII_瀛楃涓蹭笉鎴柇
+=== RUN   TestTruncateString_EdgeCases/ASCII_瀛楃涓叉埅鏂?--- PASS: TestTruncateString_EdgeCases (0.00s)
+    --- PASS: TestTruncateString_EdgeCases/闆堕暱搴﹂檺鍒?(0.00s)
+    --- PASS: TestTruncateString_EdgeCases/灏忎簬鐪佺暐鍙烽暱搴?(0.00s)
+    --- PASS: TestTruncateString_EdgeCases/绛変簬鐪佺暐鍙烽暱搴?(0.00s)
+    --- PASS: TestTruncateString_EdgeCases/鍗曚釜瀛楃 (0.00s)
+    --- PASS: TestTruncateString_EdgeCases/ASCII_瀛楃涓蹭笉鎴柇 (0.00s)
+    --- PASS: TestTruncateString_EdgeCases/ASCII_瀛楃涓叉埅鏂?(0.00s)
+=== RUN   TestHandleCheckContractAlignmentImpl_MissingParameters
+=== RUN   TestHandleCheckContractAlignmentImpl_MissingParameters/缂哄皯鎵€鏈夊弬鏁?=== RUN   TestHandleCheckContractAlignmentImpl_MissingParameters/缂哄皯涓嬫父鍙傛暟
+=== RUN   TestHandleCheckContractAlignmentImpl_MissingParameters/缂哄皯涓婃父鍙傛暟
+--- PASS: TestHandleCheckContractAlignmentImpl_MissingParameters (0.01s)
+    --- PASS: TestHandleCheckContractAlignmentImpl_MissingParameters/缂哄皯鎵€鏈夊弬鏁?(0.00s)
+    --- PASS: TestHandleCheckContractAlignmentImpl_MissingParameters/缂哄皯涓嬫父鍙傛暟 (0.00s)
+    --- PASS: TestHandleCheckContractAlignmentImpl_MissingParameters/缂哄皯涓婃父鍙傛暟 (0.00s)
+=== RUN   TestHandleCheckDependenciesImpl_MissingParameters
+=== RUN   TestHandleCheckDependenciesImpl_MissingParameters/缂哄皯_pathName_鍙傛暟
+--- PASS: TestHandleCheckDependenciesImpl_MissingParameters (0.01s)
+    --- PASS: TestHandleCheckDependenciesImpl_MissingParameters/缂哄皯_pathName_鍙傛暟 (0.00s)
+=== RUN   TestHandleQueryDependenciesImpl
+=== RUN   TestHandleQueryDependenciesImpl/缂哄皯_pathName_鍙傛暟
+--- PASS: TestHandleQueryDependenciesImpl (0.01s)
+    --- PASS: TestHandleQueryDependenciesImpl/缂哄皯_pathName_鍙傛暟 (0.00s)
+=== RUN   TestHandleCreateDependencyImpl_MissingParameters
+=== RUN   TestHandleCreateDependencyImpl_MissingParameters/缂哄皯鎵€鏈夊弬鏁?=== RUN   TestHandleCreateDependencyImpl_MissingParameters/缂哄皯_downstreamPathName
+=== RUN   TestHandleCreateDependencyImpl_MissingParameters/缂哄皯_upstreamPathName
+--- PASS: TestHandleCreateDependencyImpl_MissingParameters (0.01s)
+    --- PASS: TestHandleCreateDependencyImpl_MissingParameters/缂哄皯鎵€鏈夊弬鏁?(0.00s)
+    --- PASS: TestHandleCreateDependencyImpl_MissingParameters/缂哄皯_downstreamPathName (0.00s)
+    --- PASS: TestHandleCreateDependencyImpl_MissingParameters/缂哄皯_upstreamPathName (0.00s)
+=== RUN   TestHandleDeleteDependencyImpl_MissingParameters
+=== RUN   TestHandleDeleteDependencyImpl_MissingParameters/缂哄皯鎵€鏈夊弬鏁?=== RUN   TestHandleDeleteDependencyImpl_MissingParameters/缂哄皯_downstreamPathName
+--- PASS: TestHandleDeleteDependencyImpl_MissingParameters (0.01s)
+    --- PASS: TestHandleDeleteDependencyImpl_MissingParameters/缂哄皯鎵€鏈夊弬鏁?(0.00s)
+    --- PASS: TestHandleDeleteDependencyImpl_MissingParameters/缂哄皯_downstreamPathName (0.00s)
+=== RUN   TestHandleCreateIssueImpl_MissingParameters
+=== RUN   TestHandleCreateIssueImpl_MissingParameters/缂哄皯鎵€鏈夊弬鏁?=== RUN   TestHandleCreateIssueImpl_MissingParameters/缂哄皯_content
+=== RUN   TestHandleCreateIssueImpl_MissingParameters/缂哄皯_pathName
+--- PASS: TestHandleCreateIssueImpl_MissingParameters (0.01s)
+    --- PASS: TestHandleCreateIssueImpl_MissingParameters/缂哄皯鎵€鏈夊弬鏁?(0.00s)
+    --- PASS: TestHandleCreateIssueImpl_MissingParameters/缂哄皯_content (0.00s)
+    --- PASS: TestHandleCreateIssueImpl_MissingParameters/缂哄皯_pathName (0.00s)
+=== RUN   TestHandleReplyIssueImpl_MissingParameters
+=== RUN   TestHandleReplyIssueImpl_MissingParameters/缂哄皯鎵€鏈夊弬鏁?=== RUN   TestHandleReplyIssueImpl_MissingParameters/缂哄皯_content
+=== RUN   TestHandleReplyIssueImpl_MissingParameters/缂哄皯_issueId
+--- PASS: TestHandleReplyIssueImpl_MissingParameters (0.01s)
+    --- PASS: TestHandleReplyIssueImpl_MissingParameters/缂哄皯鎵€鏈夊弬鏁?(0.00s)
+    --- PASS: TestHandleReplyIssueImpl_MissingParameters/缂哄皯_content (0.00s)
+    --- PASS: TestHandleReplyIssueImpl_MissingParameters/缂哄皯_issueId (0.00s)
+=== RUN   TestHandleResolveIssueImpl_MissingParameters
+=== RUN   TestHandleResolveIssueImpl_MissingParameters/缂哄皯_issueId_鍙傛暟
+--- PASS: TestHandleResolveIssueImpl_MissingParameters (0.01s)
+    --- PASS: TestHandleResolveIssueImpl_MissingParameters/缂哄皯_issueId_鍙傛暟 (0.00s)
+=== RUN   TestHandleQueryIssuesImpl
+=== RUN   TestHandleQueryIssuesImpl/涓嶅甫鍙傛暟鏌ヨ
+=== RUN   TestHandleQueryIssuesImpl/甯pathName_鍙傛暟鏌ヨ
+=== RUN   TestHandleQueryIssuesImpl/甯︾姸鎬佽繃婊ゆ煡璇?--- PASS: TestHandleQueryIssuesImpl (0.01s)
+    --- PASS: TestHandleQueryIssuesImpl/涓嶅甫鍙傛暟鏌ヨ (0.00s)
+    --- PASS: TestHandleQueryIssuesImpl/甯pathName_鍙傛暟鏌ヨ (0.00s)
+    --- PASS: TestHandleQueryIssuesImpl/甯︾姸鎬佽繃婊ゆ煡璇?(0.00s)
+=== RUN   TestHandleCompileStaticImpl_MissingProject
+=== RUN   TestHandleCompileStaticImpl_MissingProject/鏈缃」鐩椂缂栬瘧
+--- PASS: TestHandleCompileStaticImpl_MissingProject (0.01s)
+    --- PASS: TestHandleCompileStaticImpl_MissingProject/鏈缃」鐩椂缂栬瘧 (0.00s)
+=== RUN   TestHandleCompileStaticImpl_WithPathName
+=== RUN   TestHandleCompileStaticImpl_WithPathName/甯pathName_鍙傛暟缂栬瘧
+--- PASS: TestHandleCompileStaticImpl_WithPathName (0.01s)
+    --- PASS: TestHandleCompileStaticImpl_WithPathName/甯pathName_鍙傛暟缂栬瘧 (0.00s)
+=== RUN   TestHandleCompileDynamicImpl_MissingProject
+=== RUN   TestHandleCompileDynamicImpl_MissingProject/鏈缃」鐩椂鍔ㄦ€佺紪璇?--- PASS: TestHandleCompileDynamicImpl_MissingProject (0.01s)
+    --- PASS: TestHandleCompileDynamicImpl_MissingProject/鏈缃」鐩椂鍔ㄦ€佺紪璇?(0.00s)
+=== RUN   TestHandleCompileDynamicImpl_WithPathName
+=== RUN   TestHandleCompileDynamicImpl_WithPathName/甯pathName_鍙傛暟鍔ㄦ€佺紪璇?--- PASS: TestHandleCompileDynamicImpl_WithPathName (0.01s)
+    --- PASS: TestHandleCompileDynamicImpl_WithPathName/甯pathName_鍙傛暟鍔ㄦ€佺紪璇?(0.00s)
+=== RUN   TestCompileStaticResult_Structure
+--- PASS: TestCompileStaticResult_Structure (0.00s)
+=== RUN   TestCompileDynamicResult_Structure
+--- PASS: TestCompileDynamicResult_Structure (0.00s)
+=== RUN   TestCompileIssue_Severity
+--- PASS: TestCompileIssue_Severity (0.00s)
+PASS
+ok  	github.com/aitdd/backend/internal/mcp	0.349s

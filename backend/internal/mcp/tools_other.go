@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -643,6 +644,14 @@ func (s *MCPServer) handleCreateDependencyImpl(ctx context.Context, request mcp.
 		return mcp.NewToolResultText("缺少必要参数：type, upstreamPath, downstreamPath"), nil
 	}
 
+	// 验证路径是否属于当前项目
+	if errMsg := s.configManager.ValidatePathBelongsToProject(upstreamPath); errMsg != "" {
+		return mcp.NewToolResultText(errMsg), nil
+	}
+	if errMsg := s.configManager.ValidatePathBelongsToProject(downstreamPath); errMsg != "" {
+		return mcp.NewToolResultText(errMsg), nil
+	}
+
 	switch depType {
 	case "module":
 		return s.createModuleDependencyUnified(upstreamPath, downstreamPath, request)
@@ -662,12 +671,16 @@ func (s *MCPServer) createModuleDependencyUnified(upstreamPath, downstreamPath s
 	}
 	defer upstreamResp.Body.Close()
 
-	var upstreamModule map[string]interface{}
-	if err := json.NewDecoder(upstreamResp.Body).Decode(&upstreamModule); err != nil {
+	var upstreamModuleResp map[string]interface{}
+	if err := json.NewDecoder(upstreamResp.Body).Decode(&upstreamModuleResp); err != nil {
 		return mcp.NewToolResultText("解析上游模块信息失败：" + err.Error()), nil
 	}
+	upstreamModuleData, _ := upstreamModuleResp["module"].(map[string]interface{})
+	if upstreamModuleData == nil {
+		upstreamModuleData = upstreamModuleResp
+	}
 
-	upstreamModuleID, ok := upstreamModule["id"].(string)
+	upstreamModuleID, ok := upstreamModuleData["id"].(string)
 	if !ok {
 		return mcp.NewToolResultText("无法获取上游模块ID"), nil
 	}
@@ -679,12 +692,16 @@ func (s *MCPServer) createModuleDependencyUnified(upstreamPath, downstreamPath s
 	}
 	defer downstreamResp.Body.Close()
 
-	var downstreamModule map[string]interface{}
-	if err := json.NewDecoder(downstreamResp.Body).Decode(&downstreamModule); err != nil {
+	var downstreamModuleResp map[string]interface{}
+	if err := json.NewDecoder(downstreamResp.Body).Decode(&downstreamModuleResp); err != nil {
 		return mcp.NewToolResultText("解析下游模块信息失败：" + err.Error()), nil
 	}
+	downstreamModuleData, _ := downstreamModuleResp["module"].(map[string]interface{})
+	if downstreamModuleData == nil {
+		downstreamModuleData = downstreamModuleResp
+	}
 
-	downstreamModuleID, ok := downstreamModule["id"].(string)
+	downstreamModuleID, ok := downstreamModuleData["id"].(string)
 	if !ok {
 		return mcp.NewToolResultText("无法获取下游模块ID"), nil
 	}
@@ -729,12 +746,16 @@ func (s *MCPServer) createTaskDependencyUnified(upstreamPath, downstreamPath str
 	}
 	defer upstreamResp.Body.Close()
 
-	var upstreamTask map[string]interface{}
-	if err := json.NewDecoder(upstreamResp.Body).Decode(&upstreamTask); err != nil {
+	var upstreamTaskResp map[string]interface{}
+	if err := json.NewDecoder(upstreamResp.Body).Decode(&upstreamTaskResp); err != nil {
 		return mcp.NewToolResultText("解析上游任务信息失败：" + err.Error()), nil
 	}
+	upstreamTaskData, _ := upstreamTaskResp["task"].(map[string]interface{})
+	if upstreamTaskData == nil {
+		upstreamTaskData = upstreamTaskResp
+	}
 
-	upstreamTaskID, ok := upstreamTask["id"].(string)
+	upstreamTaskID, ok := upstreamTaskData["id"].(string)
 	if !ok {
 		return mcp.NewToolResultText("无法获取上游任务ID"), nil
 	}
@@ -746,12 +767,16 @@ func (s *MCPServer) createTaskDependencyUnified(upstreamPath, downstreamPath str
 	}
 	defer downstreamResp.Body.Close()
 
-	var downstreamTask map[string]interface{}
-	if err := json.NewDecoder(downstreamResp.Body).Decode(&downstreamTask); err != nil {
+	var downstreamTaskResp map[string]interface{}
+	if err := json.NewDecoder(downstreamResp.Body).Decode(&downstreamTaskResp); err != nil {
 		return mcp.NewToolResultText("解析下游任务信息失败：" + err.Error()), nil
 	}
+	downstreamTaskData, _ := downstreamTaskResp["task"].(map[string]interface{})
+	if downstreamTaskData == nil {
+		downstreamTaskData = downstreamTaskResp
+	}
 
-	downstreamTaskID, ok := downstreamTask["id"].(string)
+	downstreamTaskID, ok := downstreamTaskData["id"].(string)
 	if !ok {
 		return mcp.NewToolResultText("无法获取下游任务ID"), nil
 	}
@@ -795,6 +820,14 @@ func (s *MCPServer) handleDeleteDependencyImpl(ctx context.Context, request mcp.
 		return mcp.NewToolResultText("缺少必要参数：type, upstreamPath, downstreamPath"), nil
 	}
 
+	// 验证路径是否属于当前项目
+	if errMsg := s.configManager.ValidatePathBelongsToProject(upstreamPath); errMsg != "" {
+		return mcp.NewToolResultText(errMsg), nil
+	}
+	if errMsg := s.configManager.ValidatePathBelongsToProject(downstreamPath); errMsg != "" {
+		return mcp.NewToolResultText(errMsg), nil
+	}
+
 	switch depType {
 	case "module":
 		return s.deleteModuleDependencyUnified(upstreamPath, downstreamPath)
@@ -814,12 +847,16 @@ func (s *MCPServer) deleteModuleDependencyUnified(upstreamPath, downstreamPath s
 	}
 	defer upstreamResp.Body.Close()
 
-	var upstreamModule map[string]interface{}
-	if err := json.NewDecoder(upstreamResp.Body).Decode(&upstreamModule); err != nil {
+	var upstreamModuleResp2 map[string]interface{}
+	if err := json.NewDecoder(upstreamResp.Body).Decode(&upstreamModuleResp2); err != nil {
 		return mcp.NewToolResultText("解析上游模块信息失败：" + err.Error()), nil
 	}
+	upstreamModuleData2, _ := upstreamModuleResp2["module"].(map[string]interface{})
+	if upstreamModuleData2 == nil {
+		upstreamModuleData2 = upstreamModuleResp2
+	}
 
-	upstreamModuleID, ok := upstreamModule["id"].(string)
+	upstreamModuleID, ok := upstreamModuleData2["id"].(string)
 	if !ok {
 		return mcp.NewToolResultText("无法获取上游模块ID"), nil
 	}
@@ -831,12 +868,16 @@ func (s *MCPServer) deleteModuleDependencyUnified(upstreamPath, downstreamPath s
 	}
 	defer downstreamResp.Body.Close()
 
-	var downstreamModule map[string]interface{}
-	if err := json.NewDecoder(downstreamResp.Body).Decode(&downstreamModule); err != nil {
+	var downstreamModuleResp2 map[string]interface{}
+	if err := json.NewDecoder(downstreamResp.Body).Decode(&downstreamModuleResp2); err != nil {
 		return mcp.NewToolResultText("解析下游模块信息失败：" + err.Error()), nil
 	}
+	downstreamModuleData2, _ := downstreamModuleResp2["module"].(map[string]interface{})
+	if downstreamModuleData2 == nil {
+		downstreamModuleData2 = downstreamModuleResp2
+	}
 
-	downstreamModuleID, ok := downstreamModule["id"].(string)
+	downstreamModuleID, ok := downstreamModuleData2["id"].(string)
 	if !ok {
 		return mcp.NewToolResultText("无法获取下游模块ID"), nil
 	}
@@ -871,12 +912,16 @@ func (s *MCPServer) deleteTaskDependencyUnified(upstreamPath, downstreamPath str
 	}
 	defer upstreamResp.Body.Close()
 
-	var upstreamTask map[string]interface{}
-	if err := json.NewDecoder(upstreamResp.Body).Decode(&upstreamTask); err != nil {
+	var upstreamTaskResp2 map[string]interface{}
+	if err := json.NewDecoder(upstreamResp.Body).Decode(&upstreamTaskResp2); err != nil {
 		return mcp.NewToolResultText("解析上游任务信息失败：" + err.Error()), nil
 	}
+	upstreamTaskData2, _ := upstreamTaskResp2["task"].(map[string]interface{})
+	if upstreamTaskData2 == nil {
+		upstreamTaskData2 = upstreamTaskResp2
+	}
 
-	upstreamTaskID, ok := upstreamTask["id"].(string)
+	upstreamTaskID, ok := upstreamTaskData2["id"].(string)
 	if !ok {
 		return mcp.NewToolResultText("无法获取上游任务ID"), nil
 	}
@@ -888,12 +933,16 @@ func (s *MCPServer) deleteTaskDependencyUnified(upstreamPath, downstreamPath str
 	}
 	defer downstreamResp.Body.Close()
 
-	var downstreamTask map[string]interface{}
-	if err := json.NewDecoder(downstreamResp.Body).Decode(&downstreamTask); err != nil {
+	var downstreamTaskResp2 map[string]interface{}
+	if err := json.NewDecoder(downstreamResp.Body).Decode(&downstreamTaskResp2); err != nil {
 		return mcp.NewToolResultText("解析下游任务信息失败：" + err.Error()), nil
 	}
+	downstreamTaskData2, _ := downstreamTaskResp2["task"].(map[string]interface{})
+	if downstreamTaskData2 == nil {
+		downstreamTaskData2 = downstreamTaskResp2
+	}
 
-	downstreamTaskID, ok := downstreamTask["id"].(string)
+	downstreamTaskID, ok := downstreamTaskData2["id"].(string)
 	if !ok {
 		return mcp.NewToolResultText("无法获取下游任务ID"), nil
 	}
@@ -1370,6 +1419,11 @@ func (s *MCPServer) handleLockResourceImpl(ctx context.Context, request mcp.Call
 		return mcp.NewToolResultText("缺少必要参数"), nil
 	}
 
+	// 验证路径是否属于当前项目
+	if errMsg := s.configManager.ValidatePathBelongsToProject(pathName); errMsg != "" {
+		return mcp.NewToolResultText(errMsg), nil
+	}
+
 	// 使用 by-path API 锁定资源
 	lockData := map[string]interface{}{
 		"resourceType": resourceType,
@@ -1398,6 +1452,11 @@ func (s *MCPServer) handleUnlockResourceImpl(ctx context.Context, request mcp.Ca
 
 	if !ok1 || !ok2 {
 		return mcp.NewToolResultText("缺少必要参数"), nil
+	}
+
+	// 验证路径是否属于当前项目
+	if errMsg := s.configManager.ValidatePathBelongsToProject(pathName); errMsg != "" {
+		return mcp.NewToolResultText(errMsg), nil
 	}
 
 	unlockData := map[string]interface{}{
@@ -1649,11 +1708,17 @@ func groupIssuesByResource(errors, warnings []CompileIssue) (map[string]CompileS
 // 遍历所有模块和任务，验证结构完整性，生成静态报告
 func (s *MCPServer) handleCompileStaticImpl(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	pathName, ok := getParam(request, "pathName")
+	currentProjectPathName := s.configManager.GetProjectPathName()
 	if !ok || pathName == "" {
-		pathName = s.configManager.GetProjectPathName()
+		pathName = currentProjectPathName
 	}
 	if pathName == "" {
 		return mcp.NewToolResultText("未配置项目路径名称，请先使用 init_project 设置项目"), nil
+	}
+
+	// 验证 pathName 是否属于当前项目
+	if errMsg := s.configManager.ValidatePathBelongsToProject(pathName); errMsg != "" {
+		return mcp.NewToolResultText(errMsg), nil
 	}
 
 	includeWarnings, _ := getParamBool(request, "includeWarnings")
@@ -2299,8 +2364,8 @@ func (s *MCPServer) compileStaticTask(taskPathName string, includeWarnings bool,
 	}
 	defer taskResp.Body.Close()
 
-	var task map[string]interface{}
-	if err := json.NewDecoder(taskResp.Body).Decode(&task); err != nil {
+	var rawResult map[string]interface{}
+	if err := json.NewDecoder(taskResp.Body).Decode(&rawResult); err != nil {
 		result.Errors = append(result.Errors, CompileIssue{
 			RuleID:           "E-S-00",
 			RuleName:         "任务结构检查",
@@ -2310,6 +2375,22 @@ func (s *MCPServer) compileStaticTask(taskPathName string, includeWarnings bool,
 			Severity:         "error",
 		})
 		return
+	}
+
+	// 解包 API 响应结构：{"data": {"task": {...}}} 或 {"task": {...}} 或直接是任务对象
+	var task map[string]interface{}
+	if data, ok := rawResult["data"].(map[string]interface{}); ok {
+		if t, ok := data["task"].(map[string]interface{}); ok {
+			task = t
+		}
+	}
+	if task == nil {
+		if t, ok := rawResult["task"].(map[string]interface{}); ok {
+			task = t
+		}
+	}
+	if task == nil {
+		task = rawResult
 	}
 
 	modulePathName := ""
@@ -3205,8 +3286,8 @@ func (s *MCPServer) getTasksInDependencyOrder(pathName string) ([]map[string]int
 
 	if len(pathParts) == 1 {
 		// 项目级别：获取所有任务
-		// 使用正确的 API: GET /modules?projectPathName={name}
-		modulesResp, err := http.Get(fmt.Sprintf("%s/modules?projectPathName=%s", s.getApiURL(), pathName))
+		// 使用正确的 API: GET /modules?projectPathName={name}，需要对 pathName 进行 URL 编码
+		modulesResp, err := http.Get(fmt.Sprintf("%s/modules?projectPathName=%s", s.getApiURL(), url.QueryEscape(pathName)))
 		if err != nil {
 			return nil, fmt.Errorf("获取模块列表失败: %w", err)
 		}

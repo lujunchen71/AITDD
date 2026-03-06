@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Tooltip } from 'antd';
-import { UnorderedListOutlined, DeploymentUnitOutlined } from '@ant-design/icons';
+import { UnorderedListOutlined, DeploymentUnitOutlined, BranchesOutlined } from '@ant-design/icons';
 import type { ViewMode } from '../../../../types';
 
 interface ViewSwitcherProps {
@@ -48,6 +48,21 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({
               : 'transparent',
             border: 'none',
             color: currentMode === 'graph' ? '#ffffff' : '#a0a0a0',
+          }}
+        />
+      </Tooltip>
+      <Tooltip title="Mermaid 流程图视图">
+        <Button
+          type={currentMode === 'mermaid' ? 'primary' : 'text'}
+          icon={<BranchesOutlined />}
+          onClick={() => onModeChange('mermaid')}
+          size="small"
+          style={{
+            background: currentMode === 'mermaid' 
+              ? 'linear-gradient(135deg, #e94560 0%, #ff6b6b 100%)' 
+              : 'transparent',
+            border: 'none',
+            color: currentMode === 'mermaid' ? '#ffffff' : '#a0a0a0',
           }}
         />
       </Tooltip>

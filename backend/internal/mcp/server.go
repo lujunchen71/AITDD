@@ -262,16 +262,6 @@ data 可选字段:
 
 // ==================== 5. 依赖管理工具 ====================
 func (s *MCPServer) registerDependencyTools() {
-	// create_dependency - 统一创建依赖
-	s.server.AddTool(mcp.NewTool("create_dependency",
-		mcp.WithDescription("统一创建依赖接口。根据 type 创建模块或任务依赖。type='module' 时创建模块依赖，type='task' 时创建任务依赖。"),
-		mcp.WithString("type", mcp.Description("依赖类型：module 或 task"), mcp.Required()),
-		mcp.WithString("upstreamPath", mcp.Description("上游资源 pathName（被依赖方）"), mcp.Required()),
-		mcp.WithString("downstreamPath", mcp.Description("下游资源 pathName（依赖方）"), mcp.Required()),
-		mcp.WithString("dependencyType", mcp.Description("依赖类型：required / optional / conditional")),
-		mcp.WithString("contractSummary", mcp.Description("契约摘要")),
-	), s.handleCreateDependency)
-
 	// delete_dependency - 统一删除依赖
 	s.server.AddTool(mcp.NewTool("delete_dependency",
 		mcp.WithDescription("统一删除依赖接口。根据 type 删除模块或任务依赖。"),
@@ -581,10 +571,6 @@ func (s *MCPServer) handleDeleteNode(ctx context.Context, request mcp.CallToolRe
 }
 
 // 5. 依赖管理
-func (s *MCPServer) handleCreateDependency(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return s.handleCreateDependencyImpl(ctx, request)
-}
-
 func (s *MCPServer) handleDeleteDependency(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return s.handleDeleteDependencyImpl(ctx, request)
 }

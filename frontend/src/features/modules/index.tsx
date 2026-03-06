@@ -6,6 +6,7 @@ import ProjectGroupedTree from './components/ProjectGroupedTree';
 import ModuleDetail from './components/ModuleDetail';
 import ModuleForm from './components/ModuleForm';
 import TaskForm from '../tasks/components/TaskForm';
+import TaskMermaidView from '../tasks/components/TaskMermaidView';
 import ViewSwitcher from './components/ViewSwitcher';
 import ModuleGraphView from './components/ModuleGraphView';
 import { apiClient } from '../../services/api';
@@ -537,7 +538,8 @@ const ModulesPage: React.FC = () => {
             </div>
           </>
         ) : (
-          // 图形视图模式
+          viewMode === 'graph' ? (
+          // 节点图表视图模式
           <ReactFlowProvider>
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <ModuleGraphView
@@ -550,6 +552,16 @@ const ModulesPage: React.FC = () => {
               />
             </div>
           </ReactFlowProvider>
+        ) : (
+          // Mermaid 流程图视图模式
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <TaskMermaidView
+              moduleId={selectedModuleId ?? undefined}
+              projectIds={selectedProjectIds}
+              key={`${refreshKey}-${selectedProjectIds.join(',')}`}
+            />
+          </div>
+        )
         )}
       </div>
 

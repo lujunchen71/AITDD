@@ -1,6 +1,8 @@
 import React from 'react';
-import { List, Tag, Typography, Divider } from 'antd';
+import { List, Tag, Typography, Divider, Tooltip } from 'antd';
+import { ArrowDownOutlined, LinkOutlined } from '@ant-design/icons';
 import { Task, TaskDependency, Module } from '../../../../../types';
+import { usePropertyPanelStore } from '../../../../../stores/usePropertyPanelStore';
 
 interface DependenciesViewProps {
   taskId: string | null;
@@ -15,6 +17,8 @@ const DependenciesView: React.FC<DependenciesViewProps> = ({
   modules,
   taskDependencies,
 }) => {
+  const { showTaskInfo } = usePropertyPanelStore();
+
   if (!taskId) {
     return (
       <div style={{ color: '#666', textAlign: 'center', padding: 20 }}>
@@ -53,14 +57,24 @@ const DependenciesView: React.FC<DependenciesViewProps> = ({
     pending: 'warning',
   };
 
+  const handleNavigateToTask = (tid: string) => {
+    const targetTask = tasks.find(t => t.id === tid);
+    if (targetTask) {
+      showTaskInfo(targetTask.id);
+    }
+  };
+
   return (
     <div>
       {/* 上游依赖 */}
-      <Typography.Text style={{ color: '#a0a0a0', fontSize: 12, display: 'block', marginBottom: 8, fontWeight: 600 }}>
-        上游依赖（Depends On）（{upstreamDeps.length}）
-      </Typography.Text>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        <ArrowDownOutlined style={{ color: '#52c41a', fontSize: 14 }} />
+        <Typography.Text style={{ color: '#a0a0a0', fontSize: 13, fontWeight: 600 }}>
+          上游依赖（Depends On）（{upstreamDeps.length}）
+        </Typography.Text>
+      </div>
       {upstreamDeps.length === 0 ? (
-        <div style={{ color: '#555', fontSize: 12, marginBottom: 12 }}>无上游依赖</div>
+        <div style={{ color: '#555', fontSize: 13, marginBottom: 12 }}>无上游依赖</div>
       ) : (
         <List
           size="small"
@@ -70,26 +84,39 @@ const DependenciesView: React.FC<DependenciesViewProps> = ({
             const upModule = upTask ? getTaskModule(dep.upstreamTaskId) : null;
             return (
               <List.Item
-                style={{ borderColor: '#3d3d5c', padding: '6px 0', flexDirection: 'column', alignItems: 'flex-start' }}
+                style={{ borderColor: '#3d3d5c', padding: '8px 0', flexDirection: 'column', alignItems: 'flex-start' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                  <Typography.Text style={{ color: '#c0c0c0', fontSize: 12 }}>
-                    ↑ {getTaskName(dep.upstreamTaskId)}
-                  </Typography.Text>
+                  <Tooltip title="点击跳转到该任务">
+                    <Typography.Text
+                      style={{
+                        color: '#00d9ff',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                      onClick={() => handleNavigateToTask(dep.upstreamTaskId)}
+                    >
+                      <LinkOutlined style={{ fontSize: 12 }} />
+                      {getTaskName(dep.upstreamTaskId)}
+                    </Typography.Text>
+                  </Tooltip>
                   <Tag
                     color={depStatusColors[dep.status] || 'default'}
-                    style={{ fontSize: 11 }}
+                    style={{ fontSize: 12 }}
                   >
                     {dep.status || 'active'}
                   </Tag>
                 </div>
                 {upModule && (
-                  <Typography.Text style={{ color: '#666', fontSize: 11 }}>
+                  <Typography.Text style={{ color: '#666', fontSize: 12, marginTop: 2 }}>
                     模块：{upModule.name}
                   </Typography.Text>
                 )}
                 {dep.contractSummary && (
-                  <Typography.Text style={{ color: '#555', fontSize: 11, display: 'block', marginTop: 2 }}>
+                  <Typography.Text style={{ color: '#555', fontSize: 12, display: 'block', marginTop: 2 }}>
                     契约：{dep.contractSummary}
                   </Typography.Text>
                 )}
@@ -102,11 +129,14 @@ const DependenciesView: React.FC<DependenciesViewProps> = ({
       <Divider style={{ borderColor: '#3d3d5c', margin: '10px 0' }} />
 
       {/* 下游依赖 */}
-      <Typography.Text style={{ color: '#a0a0a0', fontSize: 12, display: 'block', marginBottom: 8, fontWeight: 600 }}>
-        下游依赖（Used By）（{downstreamDeps.length}）
-      </Typography.Text>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        <ArrowDownOutlined style={{ color: '#ff7a45', fontSize: 14 }} />
+        <Typography.Text style={{ color: '#a0a0a0', fontSize: 13, fontWeight: 600 }}>
+          下游依赖（Used By）（{downstreamDeps.length}）
+        </Typography.Text>
+      </div>
       {downstreamDeps.length === 0 ? (
-        <div style={{ color: '#555', fontSize: 12 }}>无下游依赖</div>
+        <div style={{ color: '#555', fontSize: 13 }}>无下游依赖</div>
       ) : (
         <List
           size="small"
@@ -116,26 +146,39 @@ const DependenciesView: React.FC<DependenciesViewProps> = ({
             const downModule = downTask ? getTaskModule(dep.downstreamTaskId) : null;
             return (
               <List.Item
-                style={{ borderColor: '#3d3d5c', padding: '6px 0', flexDirection: 'column', alignItems: 'flex-start' }}
+                style={{ borderColor: '#3d3d5c', padding: '8px 0', flexDirection: 'column', alignItems: 'flex-start' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                  <Typography.Text style={{ color: '#c0c0c0', fontSize: 12 }}>
-                    ↓ {getTaskName(dep.downstreamTaskId)}
-                  </Typography.Text>
+                  <Tooltip title="点击跳转到该任务">
+                    <Typography.Text
+                      style={{
+                        color: '#00d9ff',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                      onClick={() => handleNavigateToTask(dep.downstreamTaskId)}
+                    >
+                      <LinkOutlined style={{ fontSize: 12 }} />
+                      {getTaskName(dep.downstreamTaskId)}
+                    </Typography.Text>
+                  </Tooltip>
                   <Tag
                     color={depStatusColors[dep.status] || 'default'}
-                    style={{ fontSize: 11 }}
+                    style={{ fontSize: 12 }}
                   >
                     {dep.status || 'active'}
                   </Tag>
                 </div>
                 {downModule && (
-                  <Typography.Text style={{ color: '#666', fontSize: 11 }}>
+                  <Typography.Text style={{ color: '#666', fontSize: 12, marginTop: 2 }}>
                     模块：{downModule.name}
                   </Typography.Text>
                 )}
                 {dep.contractSummary && (
-                  <Typography.Text style={{ color: '#555', fontSize: 11, display: 'block', marginTop: 2 }}>
+                  <Typography.Text style={{ color: '#555', fontSize: 12, display: 'block', marginTop: 2 }}>
                     契约：{dep.contractSummary}
                   </Typography.Text>
                 )}

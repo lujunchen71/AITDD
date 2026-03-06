@@ -4,6 +4,7 @@ export interface Project {
   id: string;
   name: string;
   constitution?: string;
+  bugLog?: string; // JSON string of BugLog structure
   createdAt: number;
   updatedAt: number;
   version: number;
@@ -25,6 +26,7 @@ export interface Module {
   prompt?: string;
   status: ModuleStatus;
   testCoverage: number;
+  bugLog?: string; // JSON string of BugLog structure
   upstreamContractSummary?: string;
   downstreamContractSummary?: string;
   locked: boolean;
@@ -298,7 +300,7 @@ export interface WebSocketMessage {
 // ==================== 可视化依赖图类型 ====================
 
 /** 视图模式 */
-export type ViewMode = 'list' | 'graph';
+export type ViewMode = 'list' | 'graph' | 'mermaid';
 
 /** 端口数据（用于模块间依赖） */
 export interface PortData {
