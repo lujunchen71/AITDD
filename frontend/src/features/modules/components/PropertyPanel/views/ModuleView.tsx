@@ -1,7 +1,9 @@
 import React from 'react';
-import { Descriptions, Divider, Tag, List, Card, Typography } from 'antd';
+import { Descriptions, Divider, Tag, List, Card, Typography, Button } from 'antd';
+import { BugOutlined } from '@ant-design/icons';
 import { Module, Task } from '../../../../../types';
 import { usePropertyPanelStore } from '../../../../../stores/usePropertyPanelStore';
+import { parseBugLog } from '../../BugLogPanel';
 
 interface ModuleViewProps {
   moduleId: string | null;
@@ -44,7 +46,7 @@ const taskStatusLabels: Record<string, string> = {
 };
 
 const ModuleView: React.FC<ModuleViewProps> = ({ moduleId, modules, tasks }) => {
-  const { showTaskInfo } = usePropertyPanelStore();
+  const { showTaskInfo, showContent } = usePropertyPanelStore();
 
   const module = modules.find(m => m.id === moduleId);
 
@@ -57,6 +59,16 @@ const ModuleView: React.FC<ModuleViewProps> = ({ moduleId, modules, tasks }) => 
   }
 
   const moduleTasks = tasks.filter(t => t.moduleId === module.id);
+
+  // 计算模块级错误统计
+  const moduleErrorStats = moduleTasks.reduce((acc, task) => {
+    const entries = parseBugLog(task.bugLog as string);
+    acc.errors += entries.filter(e => e.level === 'error').length;
+    acc.warns += entries.filter(e => e.level === 'warn').length;
+    if (task.issueDetails) acc.issues += 1;
+    return acc;
+  }, { errors: 0, warns: 0, issues: 0 });
+  const hasModuleErrors = moduleErrorStats.errors + moduleErrorStats.warns + moduleErrorStats.issues > 0;
 
   return (
     <div>
@@ -83,6 +95,29 @@ const ModuleView: React.FC<ModuleViewProps> = ({ moduleId, modules, tasks }) => 
           }
         </Descriptions.Item>
       </Descriptions>
+
+      {/* 模块错误统计 */}
+      {hasModuleErrors && (
+        <>
+          <Divider style={{ margin: '8px 0' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {moduleErrorStats.errors > 0 && <Tag color="error">{moduleErrorStats.errors} 个错误</Tag>}
+              {moduleErrorStats.warns > 0 && <Tag color="warning">{moduleErrorStats.warns} 个警告</Tag>}
+              {moduleErrorStats.issues > 0 && <Tag color="orange">{moduleErrorStats.issues} 个问题</Tag>}
+            </div>
+            <Button
+              type="link"
+              size="small"
+              icon={<BugOutlined />}
+              onClick={() => showContent('error', undefined, module.id)}
+              style={{ color: '#ff4d4f', padding: '0 4px', fontSize: 12 }}
+            >
+              查看错误
+            </Button>
+          </div>
+        </>
+      )}
 
       {/* 上游契约摘要 */}
       {module.upstreamContractSummary && (

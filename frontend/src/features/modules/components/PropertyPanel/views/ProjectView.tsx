@@ -1,6 +1,9 @@
 import React from 'react';
-import { Descriptions, Divider, Row, Col, Statistic, Tag, Collapse, Typography } from 'antd';
+import { Descriptions, Divider, Row, Col, Statistic, Tag, Collapse, Typography, Button } from 'antd';
+import { BugOutlined } from '@ant-design/icons';
 import { Project, Module, Task, TaskDependency } from '../../../../../types';
+import { usePropertyPanelStore } from '../../../../../stores/usePropertyPanelStore';
+import { parseBugLog } from '../../BugLogPanel';
 
 const { Panel } = Collapse;
 
@@ -33,6 +36,8 @@ const taskStatusLabels: Record<string, string> = {
 };
 
 const ProjectView: React.FC<ProjectViewProps> = ({ project, modules, tasks, taskDependencies }) => {
+  const { showContent } = usePropertyPanelStore();
+
   if (!project) {
     return (
       <div style={{ color: '#666', textAlign: 'center', padding: 20 }}>
@@ -54,6 +59,16 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, modules, tasks, task
       return acc;
     }, {} as Record<string, number>)
   );
+
+  // 计算项目级错误统计
+  const projectErrorStats = tasks.reduce((acc, task) => {
+    const entries = parseBugLog(task.bugLog as string);
+    acc.errors += entries.filter(e => e.level === 'error').length;
+    acc.warns += entries.filter(e => e.level === 'warn').length;
+    if (task.issueDetails) acc.issues += 1;
+    return acc;
+  }, { errors: 0, warns: 0, issues: 0 });
+  const hasProjectErrors = projectErrorStats.errors + projectErrorStats.warns + projectErrorStats.issues > 0;
 
   return (
     <div>
@@ -95,6 +110,29 @@ const ProjectView: React.FC<ProjectViewProps> = ({ project, modules, tasks, task
           />
         </Col>
       </Row>
+
+      {/* 项目级错误汇总 */}
+      {hasProjectErrors && (
+        <>
+          <Divider style={{ margin: '8px 0' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {projectErrorStats.errors > 0 && <Tag color="error">{projectErrorStats.errors} 个错误</Tag>}
+              {projectErrorStats.warns > 0 && <Tag color="warning">{projectErrorStats.warns} 个警告</Tag>}
+              {projectErrorStats.issues > 0 && <Tag color="orange">{projectErrorStats.issues} 个问题</Tag>}
+            </div>
+            <Button
+              type="link"
+              size="small"
+              icon={<BugOutlined />}
+              onClick={() => showContent('error')}
+              style={{ color: '#ff4d4f', padding: '0 4px', fontSize: 12 }}
+            >
+              查看全局错误
+            </Button>
+          </div>
+        </>
+      )}
 
       <Divider />
 

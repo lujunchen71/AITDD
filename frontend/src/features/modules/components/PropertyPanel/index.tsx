@@ -107,7 +107,10 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
         return (
           <ErrorView
             taskId={selectedTaskId}
+            moduleId={selectedModuleId}
             tasks={tasks}
+            modules={modules}
+            project={project}
           />
         );
       case 'tests':
